@@ -1,0 +1,24 @@
+# Metrica
+
+Metrica 是一个基于 Julia 的联邦式计量经济学框架，目标是在教学体验、工程一致性、性能与可扩展性上，逐步超越 Python `statsmodels`，并最终发展为可视化、原生化的计量经济学应用生态。
+
+当前目录包含：
+
+- `Metrica.jl-计量经济学框架-完善版.md`：项目总体蓝图与架构设计
+- `AGENTS.md`：跨 AI 助手统一协作规范
+- `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md`：双轨产品设计
+- `docs/superpowers/plans/2026-04-24-metrica-foundation-plan.md`：第一阶段实施计划
+
+建议采用 `monorepo + 多包` 组织方式，首阶段优先建设 `MetricaBase.jl` 协议内核，再逐步实现线性回归、面板数据、稳健协方差、诊断检验、输出、可视化与教学体系。
+
+当前第一阶段已启动，仓库中已经包含：
+
+- `packages/`：Julia Core 包骨架
+- `runtime/metrica-runtime/`：Rust 运行时桥接层骨架
+- `apps/metrica-desktop/`：桌面工作台原型壳
+
+第一阶段目标不是一次做完整产品，而是先建立稳定分层：
+
+- `Core` 负责计量协议与结果语义
+- `Runtime` 负责执行桥接与协议搬运
+- `App` 负责工作台体验与结构化结果展示

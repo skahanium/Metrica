@@ -1,0 +1,16 @@
+# This file is machine-generated - editing it directly is not advised
+
+julia_version = "1.12.5"
+manifest_format = "2.0"
+project_hash = "ca3d5270fe1f7b7ee9aa38e90f7dfce9dad0f70d"
+
+[[deps.MetricaBase]]
+path = "../MetricaBase.jl"
+uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+version = "0.1.0"
+
+[[deps.MetricaLinear]]
+deps = ["MetricaBase"]
+path = "."
+uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+version = "0.1.0"

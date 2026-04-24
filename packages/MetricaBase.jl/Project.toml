@@ -1,0 +1,7 @@
+name = "MetricaBase"
+uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+authors = ["Metrica Contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.10"

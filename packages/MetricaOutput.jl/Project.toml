@@ -1,0 +1,13 @@
+name = "MetricaOutput"
+uuid = "10c70d11-b779-43d3-b8f2-49770e63c885"
+version = "0.1.0"
+authors = ["Metrica Contributors"]
+
+[deps]
+MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+
+[sources]
+MetricaBase = {path = "../MetricaBase.jl"}
+
+[compat]
+julia = "1.10"

@@ -1,0 +1,7 @@
+[deps]
+MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+MetricaOutput = "10c70d11-b779-43d3-b8f2-49770e63c885"
+
+[compat]
+julia = "1.12"

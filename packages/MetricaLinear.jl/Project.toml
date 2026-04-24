@@ -1,0 +1,13 @@
+name = "MetricaLinear"
+uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+version = "0.1.0"
+authors = ["Metrica Contributors"]
+
+[deps]
+MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+
+[sources]
+MetricaBase = {path = "../MetricaBase.jl"}
+
+[compat]
+julia = "1.10"
