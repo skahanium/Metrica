@@ -6,12 +6,14 @@
 
 ## MVP 页面
 
-- 首页（Home）
-- 项目（Project）
-- 数据检查器（Data Inspector）
-- 模型构建器（Model Builder）
-- 结果（Results）
-- 学习（Learn）
+各页面在 alpha 阶段的实现状态：
+
+- 首页（Home）— alpha 占位
+- 项目（Project）— alpha 占位
+- 数据检查器（Data Inspector）— alpha 真实实现（文件选择 + 列预览）
+- 模型构建器（Model Builder）— alpha 真实实现（公式输入 + 模型选择 + 运行按钮）
+- 结果（Results）— alpha 真实实现（glance/tidy/warnings 结构化渲染）
+- 学习（Learn）— alpha 占位
 
 ## MVP 验收标准
 
@@ -34,6 +36,6 @@
 
 ## 相关文档
 
+- 当前消费本壳层的切片：`docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md`
 - Runtime 载荷由 `docs/architecture/runtime-protocol.md` 负责。
 - 项目级分层由 `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md` 负责。
-- 第一条可执行端到端切片由 `docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md` 负责。

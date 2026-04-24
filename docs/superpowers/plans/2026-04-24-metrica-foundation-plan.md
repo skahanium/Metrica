@@ -1,5 +1,7 @@
 # Metrica 基础实施计划
 
+> **状态：已完成。** 本计划中的脚手架、边界文档和初始 schema 均已落地。保留此文件作为历史参考。当前活跃实施计划为 `docs/superpowers/plans/2026-04-24-metrica-alpha-vertical-slice-plan.md`。
+>
 > **面向代理工作者：** 须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，**按任务逐步**执行本计划。步骤使用复选框语法（`- [ ]`）跟踪。
 
 **目标：** 为双轨产品搭建仓库基础：Julia Core 与跨平台桌面应用骨架。

@@ -103,9 +103,9 @@ pub fn sample_success_response() -> TaskResponse {
         status: "success".to_string(),
         messages: vec![Message {
             level: "info".to_string(),
-            code: "ROWS_DROPPED".to_string(),
-            text: "12 rows were removed due to missing values.".to_string(),
-            hint: None,
+            code: "INFO_ROWS_DROPPED".to_string(),
+            text: "因缺失值已移除 12 行。".to_string(),
+            hint: Some("拟合前请检查缺失列。".to_string()),
         }],
         artifacts: Some(vec![]),
         result_payload: Some(json!({
@@ -131,9 +131,9 @@ pub fn sample_error_response() -> TaskResponse {
         status: "error".to_string(),
         messages: vec![Message {
             level: "error".to_string(),
-            code: "SINGULAR_MATRIX".to_string(),
-            text: "Model could not be estimated because the design matrix is singular.".to_string(),
-            hint: Some("Check whether one predictor is a linear combination of others.".to_string()),
+            code: "NUM_SINGULAR_MATRIX".to_string(),
+            text: "设计矩阵奇异，无法估计模型。".to_string(),
+            hint: Some("请检查是否存在某一预测变量是其他变量的线性组合。".to_string()),
         }],
         artifacts: None,
         result_payload: None,

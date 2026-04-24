@@ -52,7 +52,20 @@ Metrica 的核心成功标准不是“模型列表最多”，而是同时做到
 - 版本边界清晰
 - 统一 CI / 文档 / benchmark / issue 管理
 - 子包可独立测试与演进
-- 用户仍可通过元包获得“一站式体验”
+- 用户仍可通过元包获得”一站式体验”
+
+### 2.4 版本体系对照
+
+本蓝图同时使用三套编号体系，其对应关系如下：
+
+| 公式系统版本 | 对应模块路线阶段 | 对应产品里程碑 | 说明 |
+|-------------|-----------------|---------------|------|
+| v1（最小可用扩展） | 阶段 1 (Base) | 里程碑 1 (Base Alpha) | 仅建立公式扩展框架与语义解析挂点 |
+| v1.1（线性关键扩展） | 阶段 2A (Linear) | 里程碑 2 (教学向 OLS) | 补 `endog()` 等线性回归核心语义 |
+| v1.2（面板扩展） | 阶段 2E (Panel) | 里程碑 3 (面板基础) | 补 `fe()` 和面板索引语义 |
+| v2（完整 DSL） | 阶段 4 以后 | 远期 | 时序算子、动态面板 DSL 等 |
+
+> 简记：阶段编号 = 执行顺序；里程碑 = 对外交付节点；公式版本 = 公式子系统的内部成熟度。
 
 ---
 
@@ -76,19 +89,19 @@ graph TB
     end
 
     subgraph modules["模型模块"]
-        L["MetricaLinear.jl"]
-        PN["MetricaPanel.jl"]
-        TS["MetricaTimeSeries.jl"]
-        DC["MetricaDiscrete.jl"]
-        CA["MetricaCausal.jl"]
+        L["MetricaLinear.jl ✓"]
+        PN["MetricaPanel.jl ✓"]
+        TS["MetricaTimeSeries.jl (远期)"]
+        DC["MetricaDiscrete.jl (远期)"]
+        CA["MetricaCausal.jl (远期)"]
     end
 
     subgraph infra["基础设施模块"]
-        RB["MetricaRobust.jl"]
-        TT["MetricaTests.jl"]
-        MG["MetricaMargins.jl"]
-        O["MetricaOutput.jl"]
-        V["MetricaViz.jl"]
+        RB["MetricaRobust.jl ✓"]
+        TT["MetricaTests.jl ✓"]
+        MG["MetricaMargins.jl (远期)"]
+        O["MetricaOutput.jl ✓"]
+        V["MetricaViz.jl (远期)"]
     end
 
     subgraph product["产品层"]
@@ -104,6 +117,8 @@ graph TB
     infra --> base
     product --> M
 ```
+
+> 标注说明：`✓` = 已有明确阶段规划；`(远期)` = 阶段 4 或尚未排入路线图，首批交付范围待定。
 
 ---
 
@@ -142,7 +157,26 @@ Base 的使命不是“先把功能写多”，而是定义整个生态中：
 - 表格和图如何消费模型
 - 扩展包如何声明自己支持哪些能力
 
----
+### 4.4 错误与警告码分类体系
+
+Base 应定义统一的错误/警告码枚举与分类层级，避免各模块自行发明错误语义。建议按来源分为四大类：
+
+| 类别 | 前缀 | 示例 | 说明 |
+|------|------|------|------|
+| **数据错误** | `DATA_` | `DATA_FILE_NOT_FOUND`、`DATA_COL_NOT_FOUND`、`DATA_PARSE_ERROR` | 输入数据问题，用户可自行修复 |
+| **模型规格错误** | `SPEC_` | `SPEC_FORMULA_SYNTAX`、`SPEC_PERFECT_COLLINEARITY`、`SPEC_RANK_DEFICIENT` | 模型设定问题，需调整公式或变量 |
+| **数值错误** | `NUM_` | `NUM_SINGULAR_MATRIX`、`NUM_CONVERGENCE_FAIL`、`NUM_NEAR_SINGULAR` | 数值计算问题，需调整方法或数据 |
+| **信息/警告** | `INFO_` | `INFO_ROWS_DROPPED`、`INFO_SMALL_SAMPLE`、`INFO_HIGH_LEVERAGE` | 非错误，但用户应知晓的提示 |
+
+每条错误/警告消息必须包含以下字段：
+
+- `code::Symbol` — 机器可识别的错误码（如 `:INFO_ROWS_DROPPED`）
+- `severity::Symbol` — `:info` / `:warn` / `:error` / `:fatal`
+- `title::String` — 简短标题（≤40 字符）
+- `detail::String` — 面向学生的解释说明
+- `hint::Union{Nothing, String}` — 建议修复动作
+
+此分类体系应置于 `MetricaBase.jl` 中，由所有模型模块和 Runtime 共同引用，确保 App 端能按类别展示差异化的 UI（如数据错误显示"检查文件"入口，数值错误显示"调整方法"建议）。
 
 ## 5. 抽象类型与接口协议
 
@@ -353,9 +387,22 @@ register_extension!(
 )
 ```
 
-### 9.3 技术路线
+### 9.3 注册表存储与发现机制
 
-- Julia 1.12+ 为主，优先依赖现代包扩展机制
+`register_extension!` 函数由 `MetricaBase.jl` 提供，第一阶段采用内存中的全局 `Dict{Symbol, ExtensionEntry}` 作为注册表。后续可按需迁移为持久化方案（如 TOML 文件或 Julia 包扩展机制）。
+
+各下游消费者可通过以下查询接口发现已注册扩展：
+
+- `list_models(; category=nothing)` — 按类别列出已注册模型
+- `list_capabilities(model_type)` — 查询某模型支持的能力列表
+- `list_tests(model_type)` — 查询某模型支持的诊断检验
+- `get_extension(name)` — 按名称获取完整注册信息
+
+这使得 Output 层能自适应渲染（如"该模型支持 r²，因此展示 r² 卡片"），App 层能动态构建模型选择器，而无需硬编码模型列表。
+
+### 9.4 技术路线
+
+- Julia 1.12+ 为主，优先依赖现代包扩展机制（如 `Requires.jl` 或 `PackageExtensions.jl`）
 - 避免过度依赖运行时黑魔法
 - 扩展发现要服务于文档、输出层和 GUI，而不仅仅是 `fit`
 
@@ -438,6 +485,26 @@ register_extension!(
 
 动态面板 GMM 不建议过早进入首批交付。
 
+### 阶段 2F：`MetricaMargins.jl`
+
+Margins 是教学体验的关键环节（学生需要理解"x 变化一单位，y 平均变化多少"），应在面板之后、可视化之前落地：
+
+- 平均边际效应 (AME)
+- 代表性值处的边际效应 (MEM / MER)
+- 连续变量与分类变量的差异化处理
+- 与 `tidy` 兼容的结构化输出
+
+### 阶段 2G：`MetricaViz.jl`
+
+Viz 负责所有图形诊断与可视化，消费 `glance / tidy / augment` 而非解析终端文本：
+
+- 残差诊断图（残差 vs 拟合、QQ、尺度-位置）
+- 系数图（森林图/coefplot）
+- 边际效应图
+- 基于 Makie 的主题与图层系统
+
+Output 管"表"，Viz 管"图"——两者共享 glance/tidy/augment 消费模式，但互不依赖。
+
 ### 阶段 3：教学与产品化增强
 
 - Pluto 教程
@@ -448,10 +515,12 @@ register_extension!(
 
 ### 阶段 4 以后
 
-- 时间序列
-- 离散选择
-- 因果推断
-- 原生应用 / GUI
+以下模块已有架构预留，但首批交付范围待验证当前链路后再细化：
+
+- **时间序列 (MetricaTimeSeries.jl)**：AR/MA/ARMA、滞后选择、单位根检验、协整检验
+- **离散选择 (MetricaDiscrete.jl)**：Logit/Probit、多项 Logit、有序 Logit
+- **因果推断 (MetricaCausal.jl)**：DID、RDD、IV 扩展、匹配方法
+- **原生应用 / GUI**：完整插件市场、项目模板系统、云端协作
 
 ---
 
@@ -502,6 +571,18 @@ register_extension!(
 - 变量标签
 - 推荐配套教程
 
+### 11.4 教学友好验收标准
+
+每个教学友好目标均以下列可验证条件衡量：
+
+| 目标 | 可验证验收条件 |
+|------|---------------|
+| 统一、好记的 API | 陌生用户阅读一个 OLS 示例后，能在 2 分钟内正确写出 WLS 或 Logit 的拟合代码（无需查阅文档） |
+| 面向学生的高可读输出 | `summary()` 输出经 3 名未接触过 Julia 的经济学本科生阅读，均能说出模型类型、样本量、核心结果 |
+| 对常见误用的友好诊断 | 当用户输入完全共线的变量、遗漏必需参数或使用错误数据类型时，错误信息须包含：可能原因 + 建议动作 + 教学背景解释 |
+| 默认输出直接上课 | 使用系统自带教学数据集运行 `fit(OLSModel, @formula(y ~ x1 + x2), data)` 后的默认输出，可直接截图放入课件无需额外处理 |
+| 与教科书写法接近的公式体验 | `@formula(y ~ x1 + x2 + log(x3))` 的写法与 Wooldridge/Greene 教材中的符号表达一致 |
+
 ---
 
 ## 12. 数值与工程质量标准
@@ -536,15 +617,30 @@ register_extension!(
 - 首次编译延迟
 - 重复调用吞吐
 
-### 12.4 CI / QA
+### 12.4 测试策略
 
-建议配置：
+#### 测试分类与目录布局
 
-- 单元测试
-- 数值对齐 golden tests
-- 文档示例测试
-- benchmark 监控
-- Julia 版本矩阵
+| 测试类型 | 目录位置 | 用途 | 示例 |
+|---------|---------|------|------|
+| **单元测试** | `test/runtests.jl`（各子包内） | 验证接口契约、数据类型、边界条件 | 确保 `glance` 返回结构正确的 `ModelGlance` |
+| **数值对齐测试** | `test/golden/`（各子包内） | 与 Stata/R/statsmodels 结果逐位对比 | OLS 系数与标准误精度 ≥ 6 位有效数字 |
+| **集成测试** | `test/integration/`（各子包内） | 验证跨包协作链路 | Base → Linear → Output 完整调用链 |
+| **文档示例测试** | 源码 docstring 中 | 确保文档示例始终可运行 | `julia --project -e "using Pkg; Pkg.test()"` 自动执行 |
+| **性能基准** | `benchmarks/`（仓库根） | 追踪性能不退化 | 小/中/大样本拟合吞吐与内存分配 |
+
+#### 数据集布局
+
+- `datasets/teaching/` — 教学用小型数据集（Wooldridge、Stock-Watson、Angrist-Pischke、Greene）
+- `datasets/golden/` — 数值对齐参考数据集，附 Stata/R/statsmodels 参考输出文件
+- `datasets/bench/` — 性能基准用模拟大数据集（≥ 1M 行）
+
+#### CI 配置
+
+- Julia 版本矩阵：当前稳定版 + LTS
+- 每个 PR 须通过单元测试 + 数值对齐测试
+- benchmark 监控在 `main` 分支合并后异步执行
+- 文档示例测试随单元测试一同运行
 
 ---
 
@@ -607,6 +703,8 @@ Metrica/
 - 终端 summary + Markdown/LaTeX 表格
 - 基础诊断检验
 
+> **当前 alpha 切片状态：** 里程碑 2 的完整范围（含 WLS、HC1/Cluster 等）将分步交付。第一条 alpha 垂直切片仅覆盖 OLS + 经典协方差，其余能力在 alpha 链路验证通过后依次追加。
+
 ### 里程碑 3：面板基础
 
 - `PanelData`
@@ -614,11 +712,37 @@ Metrica/
 - 基础面板诊断
 - Pluto 入门教程
 
-做到这 3 个里程碑后，Metrica 就已经不是“规划中的大项目”，而会成为一个真正可教学、可演示、可扩展的 Julia 计量框架雏形。
+做到这 3 个里程碑后，Metrica 就已经不是”规划中的大项目”，而会成为一个真正可教学、可演示、可扩展的 Julia 计量框架雏形。
 
 ---
 
-## 16. 最终建议
+## 16. 版本发布策略
+
+### 16.1 元包与子包版本协调
+
+子包（`MetricaBase.jl`、`MetricaLinear.jl` 等）各自独立维护语义版本，`Metrica.jl` 元包通过 `[compat]` 约束锁定子包兼容版本。建议所有子包初期统一使用 `0.1.x` 开发版本，直到 API 稳定后同步升至 `1.0.0`。
+
+### 16.2 版本 Gates
+
+| 版本跃迁 | Gate 条件 |
+|----------|----------|
+| `0.1.0` → `0.2.0` | Base 接口冻结、OLS 完整链路打通、Runtime 协议稳定、App 可演示 |
+| `0.2.0` → `0.9.0` | Linear/Panel/Robust/Output/Tests/Margins 六包功能就绪、教学数据集完整、Pluto 教程上线 |
+| `0.9.0` → `1.0.0` | 至少两个教学学期在真实课堂中使用无重大 API 投诉、与 Stata/R 对齐测试全部通过、性能基准达标 |
+
+### 16.3 首次公开发布建议时机
+
+- `MetricaBase.jl`：里程碑 1 完成后即可在 Julia 注册表发布 `0.1.0`
+- `Metrica.jl` 元包：里程碑 2 完成后首次发布，确保用户可 `add Metrica` 获得一站式体验
+- 桌面 App：里程碑 3 完成后提供首个可下载二进制包
+
+### 16.4 弃用策略
+
+在 `1.0.0` 前，核心 API 变更需至少经过一个次要版本的弃用警告期。破坏性变更须在 CHANGELOG 中记录迁移指南。
+
+---
+
+## 17. 最终建议
 
 Metrica 最有机会成功的路径，不是“把所有计量模型尽快做完”，而是：
 
