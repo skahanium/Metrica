@@ -20,7 +20,7 @@ abstract type AbstractFittedModel end
 abstract type AbstractCovarianceSpec end
 
 """
-Lightweight warning object designed for package, runtime, and app consumption.
+供包内、Runtime 与 App 消费的轻量警告对象。
 """
 struct ModelWarning
     code::Symbol
@@ -31,7 +31,7 @@ struct ModelWarning
 end
 
 """
-Model-level summary payload for downstream consumers.
+模型级摘要载荷，供下游消费者使用。
 """
 struct ModelGlance
     model::Symbol
@@ -42,7 +42,7 @@ struct ModelGlance
 end
 
 """
-One coefficient row in a structured parameter table.
+结构化参数表中的一行系数。
 """
 struct CoefRow
     name::Symbol
@@ -53,7 +53,7 @@ struct CoefRow
 end
 
 """
-Structured coefficient table for output and app layers.
+面向输出层与 App 的结构化系数表。
 """
 struct TidyTable
     rows::Vector{CoefRow}

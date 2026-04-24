@@ -7,14 +7,14 @@ export OLSModel, OLSFitResult, PHASE_1_MODELS
 const PHASE_1_MODELS = (:OLS,)
 
 """
-Specification object for the first reference linear model.
+第一条参考线性模型的规格对象。
 """
 struct OLSModel <: MetricaBase.AbstractEconModel
     formula::String
 end
 
 """
-Placeholder fitted-result shape for the first vertical slice.
+第一条垂直切片的拟合结果占位形状。
 """
 struct OLSFitResult <: MetricaBase.AbstractFittedModel
     formula::String

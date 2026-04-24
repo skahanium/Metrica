@@ -1,13 +1,13 @@
 # MetricaOutput.jl
 
-Output and report layer for Metrica.
+Metrica 的输出与报告层。
 
-## Responsibilities
+## 职责
 
-- Terminal summaries
-- Structured table rendering
-- Markdown, HTML, and LaTeX exports
+- 终端摘要
+- 结构化表格渲染
+- Markdown、HTML 与 LaTeX 导出
 
-## Constraint
+## 约束
 
-This package must consume public structured results and may not depend on private OLS internals.
+本包必须消费公开的结构化结果，且不得依赖私有 OLS 内部实现。

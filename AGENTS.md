@@ -1,335 +1,341 @@
-# Metrica AI Collaboration Protocol
+# Metrica AI 协作协议
 
-This file is the primary project-level instruction source for any AI coding assistant working in this repository, including but not limited to Codex, Claude, Cursor, and other agentic or autocomplete-capable models.
+本文件是本仓库内各类 AI 编程助手（包括但不限于 Codex、Claude、Cursor 及其他具备代理或补全能力的模型）的**项目级主指令源**。
 
-If a tool supports a project instruction file, this repository should treat `AGENTS.md` as the canonical source. Tool-specific files may mirror or adapt this content, but they should not conflict with it.
+若工具支持项目指令文件，本仓库应以 `AGENTS.md` 为权威来源。工具专属文件可镜像或改编本内容，但不得与之冲突。
 
-## 1. Project Identity
+## 1. 项目身份
 
-Metrica is not only a Julia package collection. It is a dual-track product:
+Metrica 不仅是 Julia 包集合，而是**双轨产品**：
 
-- `Metrica Core`: Julia econometrics packages and protocol layer
-- `Metrica Runtime`: bridge layer between desktop software and Julia execution
-- `Metrica App`: cross-platform native desktop workbench
+- `Metrica Core`：Julia 计量包与协议层
+- `Metrica Runtime`：桌面软件与 Julia 执行之间的桥接层
+- `Metrica App`：跨平台原生桌面工作台
 
-All changes should preserve this separation.
+所有变更须保持上述分层不被混淆。
 
-## 2. Primary Goal
+## 2. 首要目标
 
-The project goal is to build a modern econometrics ecosystem that is:
+项目目标是构建现代计量生态，具备：
 
-- teaching-friendly
-- architecturally consistent
-- numerically reliable
-- extensible
-- able to grow into a native cross-platform product
+- 教学友好
+- 架构一致
+- 数值可靠
+- 可扩展
+- 能演进为跨平台原生产品
 
-Do not optimize for short-term feature count at the cost of protocol clarity or architectural stability.
+不得以牺牲协议清晰度或架构稳定性为代价，换取短期功能数量。
 
-## 3. Non-Negotiable Principles
+## 3. 不可违背原则
 
-All AI assistants working here must follow these rules.
+在本仓库工作的所有 AI 助手均须遵守以下规则。
 
-### 3.1 Respect the architecture
+### 3.1 尊重架构
 
-Do not blur the boundaries below:
+不得模糊以下边界：
 
-- `packages/` contains Julia package code and protocol definitions
-- `runtime/` contains bridge and execution-management logic
-- `apps/` contains desktop application code
-- `docs/`, `tutorials/`, `datasets/`, and `benchmarks/` contain supporting assets, not core implementation logic
+- `packages/`：Julia 包代码与协议定义
+- `runtime/`：桥接与执行管理逻辑
+- `apps/`：桌面应用代码
+- `docs/`、`tutorials/`、`datasets/`、`benchmarks/`：支撑资产，非核心实现逻辑
 
-UI code must not contain econometric logic.
-Core package code must not depend on GUI details.
-Runtime code must not become a second business-logic layer.
+UI 代码不得包含计量逻辑。  
+Core 包代码不得依赖 GUI 细节。  
+Runtime 代码不得成为第二套业务逻辑层。
 
-### 3.2 Structure before feature count
+### 3.2 结构优先于功能数量
 
-Prefer stable interfaces, clear boundaries, and structured outputs over quickly adding many models or pages.
+优先稳定接口、清晰边界与结构化输出，而非快速堆模型或页面。
 
-When in doubt:
+犹豫时：
 
-- freeze interfaces first
-- implement the smallest useful vertical slice
-- verify the slice end to end
+- 先冻结接口
+- 实现最小可用垂直切片
+- 端到端验证该切片
 
-### 3.3 Structured results over display text
+### 3.3 结构化结果优于展示文本
 
-Do not build downstream behavior on top of parsing printed summaries.
-Any result that may be consumed by docs, notebooks, exports, or the desktop app should be represented as structured data.
+不得基于解析打印摘要来构建下游行为。  
+凡可能被文档、笔记本、导出或桌面应用消费的结果，均须表示为结构化数据。
 
-Preferred public result concepts include:
+优先的公开结果概念包括：
 
 - `glance`
 - `tidy`
 - `augment`
-- structured warnings
-- structured diagnostics
+- 结构化警告
+- 结构化诊断
 
-### 3.4 Teaching experience is a core requirement
+### 3.4 教学体验是核心要求
 
-Do not treat teaching-friendly behavior as optional polish.
-Missing-value handling, sample-size changes, variable-role clarity, and readable warnings are first-class product requirements.
+不得将教学友好行为视为可选润色。  
+缺失值处理、样本量变化、变量角色清晰度与可读警告均为**一等产品需求**。
 
-### 3.5 No silent invention
+### 3.5 禁止静默捏造
 
-Do not fabricate:
+不得虚构：
 
-- APIs that are not defined
-- files that do not exist
-- benchmark or test results that were not run
-- unsupported product capabilities
+- 未定义的 API
+- 不存在的文件
+- 未实际运行的基准或测试结果
+- 不具备的产品能力
 
-If something is uncertain, state the assumption explicitly in code comments, docs, or the completion summary.
+若存在不确定性，须在代码注释、文档或完成说明中**明确写出假设**。
 
-## 4. Required Work Sequence
+### 3.6 注释与文档正文语言（简体中文）
 
-Unless the user explicitly asks for a tiny isolated edit, follow this sequence.
+- 仓库内 **`packages/`、`runtime/`、`apps/`、`scripts/*.jl`** 等**源代码**中的注释（含 `#`、`//`、`//!`、块注释）以及 Julia **文档字符串**（`"""..."""`）必须使用**简体中文**（`zh-CN`）。
+- 以说明为主的配置文件（如 `.gitignore`、`.gitattributes`）中的分区说明注释，**宜**使用简体中文。
+- **本文件及 `docs/` 下 Markdown 文档的正文**（标题、段落、列表说明）须使用**简体中文**；协议字段名、代码标识符、JSON 键名、命令行与仓库路径等可保持英文以便互操作。文档内**代码示例中的注释**仍须使用简体中文。
 
-### Phase 1: Understand the local truth
+## 4. 必要工作顺序
 
-Before proposing or editing:
+除非用户明确要求极小的孤立编辑，否则遵循以下顺序。
 
-- inspect the relevant files
-- inspect nearby docs
-- identify the active subsystem
-- align with existing repository direction
+### 阶段 1：弄清本地事实
 
-Do not guess repository structure if it can be read directly.
+在提议或修改之前：
 
-### Phase 2: Design before implementation
+- 阅读相关文件
+- 阅读邻近文档
+- 识别活跃子系统
+- 与仓库既定方向对齐
 
-For any substantial feature, architectural change, workflow change, or new subsystem:
+若能直接读取，则不得猜测仓库结构。
 
-- define the scope
-- identify boundaries
-- choose the smallest viable vertical slice
-- document the intended behavior before broad implementation
+### 阶段 2：先设计再实现
 
-If the repository already contains a design or plan document for the work, follow it.
-If not, create one before implementing broad changes.
+对任何实质性功能、架构变更、工作流变更或新子系统：
 
-### Phase 3: Implement minimally
+- 界定范围
+- 识别边界
+- 选择最小可行垂直切片
+- 在广泛实现之前书面记录预期行为
 
-Implement the narrowest change that satisfies the current milestone.
+若仓库已有设计或计划文档，应遵循之。  
+若无，则在广泛实现之前先创建。
 
-Avoid:
+### 阶段 3：最小实现
 
-- speculative abstractions
-- premature generalization
-- side quests
-- broad refactors unrelated to the current slice
+实现满足当前里程碑的**最窄**变更。
 
-### Phase 4: Verify before claiming success
+避免：
 
-Do not claim a task is done until you verify the relevant layer.
+- 投机式抽象
+- 过早泛化
+- 支线任务
+- 与当前切片无关的大范围重构
 
-Examples:
+### 阶段 4：验证后再宣称完成
 
-- docs changed: verify paths, references, and consistency
-- runtime schema changed: verify examples and naming consistency
-- package code changed: run targeted tests where possible
-- UI changed: verify the affected flow or at minimum the buildable structure
+在验证相关层之前，不得宣称任务已完成。
 
-If verification was not possible, say so plainly.
+例如：
 
-### Phase 5: Leave the repo clearer
+- 文档变更：核对路径、引用与一致性
+- Runtime schema 变更：核对示例与命名一致性
+- 包代码变更：在可行时运行针对性测试
+- UI 变更：验证受影响流程或至少可构建结构
 
-A completed change should improve at least one of:
+若无法验证，须如实说明。
 
-- clarity
-- structure
-- documentation
-- test coverage
-- consistency of naming or boundaries
+### 阶段 5：让仓库更清晰
 
-## 5. Rules for Agentic Flows
+完成的变更应至少改进以下之一：
 
-These rules apply to long-running agents and multi-step assistants.
+- 清晰度
+- 结构
+- 文档
+- 测试覆盖
+- 命名或边界一致性
 
-### 5.1 Prefer explicit plans for substantial work
+## 5. 代理式流程规则
 
-If the change touches multiple directories, interfaces, or subsystems, first create or update a written plan in `docs/`.
+适用于长时间运行的代理与多步助手。
 
-### 5.2 Make assumptions visible
+### 5.1 实质性工作优先书面计划
 
-When proceeding without user confirmation, record assumptions in one of:
+若变更触及多个目录、接口或子系统，应先在 `docs/` 中创建或更新书面计划。
 
-- design doc
-- implementation plan
-- final summary
-- short inline note where appropriate
+### 5.2 假设须可见
 
-### 5.3 Do not hide tradeoffs
+未经用户确认而推进时，将假设记录在以下之一：
 
-If a decision affects future architecture, state the tradeoff clearly instead of burying it in code.
+- 设计文档
+- 实施计划
+- 完成总结
+- 适当的简短行内说明
 
-### 5.4 One concern per unit
+### 5.3 不隐瞒权衡
 
-Prefer small, focused files and modules with one clear responsibility.
-Avoid giant mixed-responsibility files when introducing new code.
+若决策影响未来架构，应清楚陈述权衡，而非埋藏在代码中。
 
-## 6. Rules for Tab Completion and Small Inline Suggestions
+### 5.4 单一职责单元
 
-These rules apply even when the model is only offering autocomplete-like edits.
+优先小而聚焦的文件与模块。  
+引入新代码时避免巨型混合职责文件。
 
-### 6.1 Match local patterns
+## 6. 标签补全与小型行内建议规则
 
-Autocomplete must follow the naming, layout, and style already established in the active directory.
-Do not inject a new style, framework pattern, or architectural assumption into unrelated code.
+即使模型仅提供类补全建议，也适用以下规则。
 
-### 6.2 Do not smuggle architecture changes
+### 6.1 匹配本地模式
 
-Tab completion must not quietly introduce:
+补全须遵循当前目录已建立的命名、布局与风格。  
+不得向无关代码注入新风格、框架模式或架构假设。
 
-- new layers
-- hidden dependencies
-- cross-module shortcuts
-- ad hoc configuration systems
+### 6.2 不得夹带架构变更
 
-Small suggestions must stay local unless the user explicitly asks for a broader change.
+行内补全不得悄悄引入：
 
-### 6.3 Prefer explicitness over magic
+- 新分层
+- 隐藏依赖
+- 跨模块捷径
+- 临时配置体系
 
-When completing code:
+除非用户明确要求更大范围，否则小建议须保持局部。
 
-- choose readable names
-- avoid opaque helper chains
-- avoid reflection-heavy or "clever" patterns unless already established
+### 6.3 显式优于魔法
 
-### 6.4 Do not leave broken placeholders
+补全代码时：
 
-Do not insert:
+- 选用可读名称
+- 避免不透明辅助链
+- 除非已建立，否则避免反射过重或过度「聪明」的模式
+
+### 6.4 不留破损占位
+
+不得插入：
 
 - `TODO`
 - `TBD`
-- fake implementations
-- placeholder return values
-- comments like "implement later"
+- 虚假实现
+- 占位返回值
+- 类似「稍后实现」的注释
 
-unless the user explicitly asks for scaffolding and knows the code is incomplete.
+除非用户明确要求脚手架且知晓代码不完整。
 
-## 7. Repository-Specific Direction
+## 7. 仓库特定方向
 
-### 7.1 Current priority
+### 7.1 当前优先级
 
-The current repository direction is:
+当前仓库方向为：
 
-- platform-first architecture
-- direct multi-package layout
-- alpha validated by `Base -> OLS -> Output`
-- desktop app and runtime planned in parallel
+- 平台优先架构
+- 直接多包布局
+- 以 `Base -> OLS -> Output` 验证 alpha
+- 桌面应用与 Runtime 并行规划
 
-Work should support this direction unless the user explicitly changes strategy.
+除非用户明确改变策略，否则工作应支持该方向。
 
-### 7.2 Core package expectations
+### 7.2 对 Core 包的期望
 
-`MetricaBase.jl` should define shared protocol, types, interfaces, structured results, model-frame semantics, and warning capability patterns.
+`MetricaBase.jl` 应定义共享协议、类型、接口、结构化结果、模型框架语义与警告能力模式。
 
-It should not become a dumping ground for:
+不得沦为以下内容的倾倒场：
 
-- estimator implementations
-- UI logic
-- output rendering internals
-- heavyweight algorithm families unrelated to the protocol layer
+- 估计量实现
+- UI 逻辑
+- 输出渲染内部
+- 与协议层无关的笨重算法族
 
-### 7.3 Runtime expectations
+### 7.3 对 Runtime 的期望
 
-`runtime/` should focus on:
+`runtime/` 应聚焦：
 
-- process orchestration
-- environment management
-- request/response schema handling
-- logging and cancellation
+- 进程编排
+- 环境管理
+- 请求/响应 schema 处理
+- 日志与取消
 
-It should not duplicate econometric logic that belongs in Julia packages.
+不得重复属于 Julia 包的计量逻辑。
 
-### 7.4 App expectations
+### 7.4 对 App 的期望
 
-`apps/` should focus on:
+`apps/` 应聚焦：
 
-- project workspace flows
-- data import and inspection
-- model configuration
-- results presentation
-- exports
-- teaching-oriented explanations
+- 项目工作区流程
+- 数据导入与检查
+- 模型配置
+- 结果展示
+- 导出
+- 面向教学的解释
 
-It should consume structured outputs, not parse terminal text.
+应消费结构化输出，而非解析终端文本。
 
-## 8. Documentation Rules
+## 8. 文档规则
 
-Any significant architectural or workflow change should update the relevant docs.
+任何重大架构或工作流变更均须更新相关文档。
 
-Prefer these locations:
+优先位置：
 
-- design docs: `docs/superpowers/specs/`
-- implementation plans: `docs/superpowers/plans/`
-- subsystem notes: `docs/architecture/`
+- 设计文档：`docs/superpowers/specs/`
+- 实施计划：`docs/superpowers/plans/`
+- 子系统笔记：`docs/architecture/`
 
-When code changes invalidate an existing document, update the document in the same work session if feasible.
+若代码变更使现有文档失效，在同一会话中更新文档（若可行）。
 
-## 9. Testing and Validation Rules
+## 9. 测试与验证规则
 
-AI assistants should prefer targeted validation over no validation.
+AI 助手应优先做针对性验证，而非完全不验证。
 
-Minimum expectations:
+最低期望：
 
-- verify file paths exist after creating docs or scaffolding
-- verify naming consistency across protocol examples
-- run focused tests for changed code when available
-- avoid claiming broad correctness from narrow checks
+- 创建文档或脚手架后核对文件路径存在
+- 核对协议示例的命名一致性
+- 对变更代码在可行时运行针对性测试
+- 避免用窄检查宣称广泛正确
 
-For numerical or econometric code, prioritize:
+对数值或计量代码，优先：
 
-- deterministic tests
-- result-shape tests
-- cross-tool alignment tests when available
-- edge cases around missing data, singularity, and sample changes
+- 确定性测试
+- 结果形状测试
+- 在可行时做跨工具对齐测试
+- 覆盖缺失数据、奇异性与样本变化等边界
 
-## 10. Change Control Rules
+## 10. 变更控制规则
 
-Do not make unrelated edits.
-Do not reformat large unrelated surfaces unless explicitly requested.
-Do not rename or move files without necessity.
-Do not overwrite user-authored work just to simplify the task.
+不做无关编辑。  
+除非用户明确要求，否则不重排大段无关表面。  
+无必要不得重命名或移动文件。  
+不得为简化任务而覆盖用户撰写的内容。
 
-If you encounter conflicting local changes:
+若遇到冲突的本地变更：
 
-- stop
-- preserve the existing work
-- explain the conflict clearly
+- 停止
+- 保留已有工作
+- 清楚说明冲突
 
-## 11. Definition of Done
+## 11. 完成定义
 
-A task is only done when all applicable items are true:
+仅当以下适用项全部为真时，任务才算完成：
 
-- the change aligns with the repository architecture
-- the smallest intended scope is implemented
-- relevant docs are updated
-- relevant validation was performed, or the limitation was stated
-- no placeholder logic was silently left behind
-- the result is understandable by the next human or agent
+- 变更符合仓库架构
+- 已实现最小预定范围
+- 已更新相关文档
+- 已执行相关验证，或已说明限制
+- 未在沉默中留下占位逻辑
+- 结果可被下一位人类或代理理解
 
-## 12. Preferred Output Style for AI Assistants
+## 12. AI 助手输出风格偏好
 
-When reporting completed work:
+汇报已完成工作时：
 
-- summarize the actual change
-- mention verification performed
-- mention important assumptions or remaining gaps
-- keep the summary concise and concrete
+- 总结实际变更
+- 说明已做验证
+- 说明重要假设或剩余缺口
+- 保持简洁具体
 
-Avoid exaggerated confidence.
-Avoid saying something is production-ready unless it has truly been validated to that level.
+避免夸大信心。  
+除非已验证到相应程度，否则勿称「生产就绪」。
 
-## 13. Instruction Priority
+## 13. 指令优先级
 
-If multiple instruction files exist:
+若存在多份指令文件，优先级为：
 
-1. direct user request
-2. repository architecture and active design docs
-3. this `AGENTS.md`
-4. tool-specific adaptation files such as `CLAUDE.md`, `.cursorrules`, or editor settings
+1. 用户直接请求
+2. 仓库架构与活跃设计文档
+3. 本 `AGENTS.md`
+4. 工具适配文件（如 `CLAUDE.md`、`.cursorrules` 或编辑器设置）
 
-Tool-specific files should refine this file for compatibility, not override the project direction.
+工具专属文件应服务于与本文件兼容，而非覆盖项目方向。

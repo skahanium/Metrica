@@ -1,16 +1,16 @@
 # Metrica Runtime
 
-Bridge layer between the desktop application and Julia Core.
+桌面应用与 Julia Core 之间的桥接层。
 
-## Responsibilities
+## 职责
 
-- Launch and manage Julia processes
-- Accept structured task requests
-- Return structured results and warnings
-- Handle logging, cancellation, and failure propagation
+- 启动与管理 Julia 进程
+- 接收结构化任务请求
+- 返回结构化结果与警告
+- 处理日志、取消与失败传播
 
-## Non-Responsibilities
+## 非职责
 
-- UI rendering
-- Econometric model semantics
-- Direct user-facing workflow design
+- UI 渲染
+- 计量模型语义
+- 直接面向用户的流程设计

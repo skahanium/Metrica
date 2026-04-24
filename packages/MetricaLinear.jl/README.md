@@ -1,15 +1,15 @@
 # MetricaLinear.jl
 
-Reference linear-model implementation package for Metrica.
+Metrica 的参考线性模型实现包。
 
-## First-phase scope
+## 第一阶段范围
 
 - OLS
-- Shared result objects returned through the Base API
-- Model fitting from formula plus table-like data
+- 通过 Base API 返回的共享结果对象
+- 由公式与类表数据驱动的模型拟合
 
-## Deferred scope
+## 延后范围
 
 - IV
 - GLS
-- WLS beyond the architecture-validation stage
+- 超出架构验证阶段的 WLS

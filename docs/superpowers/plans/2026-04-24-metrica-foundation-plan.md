@@ -1,48 +1,48 @@
-# Metrica Foundation Implementation Plan
+# Metrica 基础实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **面向代理工作者：** 须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，**按任务逐步**执行本计划。步骤使用复选框语法（`- [ ]`）跟踪。
 
-**Goal:** Build the initial Metrica repository foundation for a dual-track product: Julia Core plus cross-platform desktop app skeleton.
+**目标：** 为双轨产品搭建仓库基础：Julia Core 与跨平台桌面应用骨架。
 
-**Architecture:** The repository is organized around three isolated layers: Julia packages in `packages/`, a Rust runtime bridge in `runtime/`, and a Tauri desktop shell in `apps/`. The first implementation cycle validates the architecture with a minimal OLS-ready Core contract and a desktop-facing runtime/result schema, without attempting full model breadth.
+**架构：** 仓库分为三层：`packages/` 中的 Julia 包、`runtime/` 中的 Rust 运行时桥、`apps/` 中的 Tauri 桌面壳。首个实现周期以最小 OLS 就绪的 Core 契约与面向桌面的 runtime/结果 schema 验证架构，不追求模型广度。
 
-**Tech Stack:** Julia, Rust, Tauri, React, TypeScript, JSON, Markdown
+**技术栈：** Julia、Rust、Tauri、React、TypeScript、JSON、Markdown
 
 ---
 
-## File Structure
+## 文件结构
 
-- Create: `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md`
-- Create: `docs/superpowers/plans/2026-04-24-metrica-foundation-plan.md`
-- Create: `packages/.gitkeep`
-- Create: `apps/.gitkeep`
-- Create: `runtime/.gitkeep`
-- Create: `tutorials/.gitkeep`
-- Create: `datasets/.gitkeep`
-- Create: `benchmarks/.gitkeep`
-- Create: `scripts/.gitkeep`
-- Create: `apps/metrica-desktop/README.md`
-- Create: `runtime/metrica-runtime/README.md`
-- Create: `packages/MetricaBase.jl/README.md`
-- Create: `packages/MetricaLinear.jl/README.md`
-- Create: `packages/MetricaOutput.jl/README.md`
-- Create: `docs/architecture/runtime-protocol.md`
-- Create: `docs/architecture/app-shell.md`
+- 创建：`docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md`
+- 创建：`docs/superpowers/plans/2026-04-24-metrica-foundation-plan.md`
+- 创建：`packages/.gitkeep`
+- 创建：`apps/.gitkeep`
+- 创建：`runtime/.gitkeep`
+- 创建：`tutorials/.gitkeep`
+- 创建：`datasets/.gitkeep`
+- 创建：`benchmarks/.gitkeep`
+- 创建：`scripts/.gitkeep`
+- 创建：`apps/metrica-desktop/README.md`
+- 创建：`runtime/metrica-runtime/README.md`
+- 创建：`packages/MetricaBase.jl/README.md`
+- 创建：`packages/MetricaLinear.jl/README.md`
+- 创建：`packages/MetricaOutput.jl/README.md`
+- 创建：`docs/architecture/runtime-protocol.md`
+- 创建：`docs/architecture/app-shell.md`
 
-## Task 1: Create repository scaffold for the dual-track architecture
+## 任务 1：为双轨架构创建仓库脚手架
 
-**Files:**
-- Create: `packages/.gitkeep`
-- Create: `apps/.gitkeep`
-- Create: `runtime/.gitkeep`
-- Create: `tutorials/.gitkeep`
-- Create: `datasets/.gitkeep`
-- Create: `benchmarks/.gitkeep`
-- Create: `scripts/.gitkeep`
+**涉及文件：**
+- 创建：`packages/.gitkeep`
+- 创建：`apps/.gitkeep`
+- 创建：`runtime/.gitkeep`
+- 创建：`tutorials/.gitkeep`
+- 创建：`datasets/.gitkeep`
+- 创建：`benchmarks/.gitkeep`
+- 创建：`scripts/.gitkeep`
 
-- [ ] **Step 1: Create the root directory scaffold**
+- [ ] **步骤 1：创建根目录占位**
 
-Use `apply_patch` to add empty placeholder files:
+使用 `apply_patch` 添加空占位文件：
 
 ```diff
 *** Add File: packages/.gitkeep
@@ -61,15 +61,15 @@ Use `apply_patch` to add empty placeholder files:
 +
 ```
 
-- [ ] **Step 2: Verify the scaffold exists**
+- [ ] **步骤 2：验证脚手架存在**
 
-Run:
+运行：
 
 ```powershell
 Get-ChildItem -Force | Select-Object Name
 ```
 
-Expected:
+预期：
 
 ```text
 apps
@@ -84,116 +84,116 @@ README.md
 Metrica.jl-计量经济学框架-完善版.md
 ```
 
-- [ ] **Step 3: Commit the scaffold**
+- [ ] **步骤 3：提交脚手架**
 
-If the repository has been initialized with git, run:
+若已初始化 git，运行：
 
 ```powershell
 git add packages/.gitkeep apps/.gitkeep runtime/.gitkeep tutorials/.gitkeep datasets/.gitkeep benchmarks/.gitkeep scripts/.gitkeep
 git commit -m "chore: add dual-track repository scaffold"
 ```
 
-Expected:
+预期：
 
 ```text
 [main ...] chore: add dual-track repository scaffold
 ```
 
-## Task 2: Document the desktop app and runtime boundaries
+## 任务 2：书面界定桌面应用与 Runtime 边界
 
-**Files:**
-- Create: `apps/metrica-desktop/README.md`
-- Create: `runtime/metrica-runtime/README.md`
-- Create: `docs/architecture/app-shell.md`
-- Create: `docs/architecture/runtime-protocol.md`
+**涉及文件：**
+- 创建：`apps/metrica-desktop/README.md`
+- 创建：`runtime/metrica-runtime/README.md`
+- 创建：`docs/architecture/app-shell.md`
+- 创建：`docs/architecture/runtime-protocol.md`
 
-- [ ] **Step 1: Add the desktop shell README**
+- [ ] **步骤 1：添加桌面壳 README**
 
-Create `apps/metrica-desktop/README.md` with:
+创建 `apps/metrica-desktop/README.md`，内容为：
 
 ```markdown
-# Metrica Desktop
+# Metrica 桌面端
 
-Cross-platform native desktop workbench for Metrica.
+Metrica 的跨平台原生桌面工作台。
 
-## Responsibilities
+## 职责
 
-- Project workspace and navigation
-- Data import and inspection
-- Model configuration and execution triggers
-- Result rendering and export
-- Teaching-oriented explanations and warnings
+- 项目工作区与导航
+- 数据导入与检查
+- 模型配置与执行触发
+- 结果渲染与导出
+- 面向教学的解释与警告
 
-## Non-Responsibilities
+## 非职责
 
-- Econometric estimation logic
-- Julia package internals
-- Numerical algorithm implementation
+- 计量估计逻辑
+- Julia 包内部实现细节
+- 数值算法实现
 ```
 
-- [ ] **Step 2: Add the runtime bridge README**
+- [ ] **步骤 2：添加 Runtime 桥 README**
 
-Create `runtime/metrica-runtime/README.md` with:
+创建 `runtime/metrica-runtime/README.md`，内容为：
 
 ```markdown
 # Metrica Runtime
 
-Bridge layer between the desktop application and Julia Core.
+桌面应用与 Julia Core 之间的桥接层。
 
-## Responsibilities
+## 职责
 
-- Launch and manage Julia processes
-- Accept structured task requests
-- Return structured results and warnings
-- Handle logging, cancellation, and failure propagation
+- 启动与管理 Julia 进程
+- 接收结构化任务请求
+- 返回结构化结果与警告
+- 处理日志、取消与失败传播
 
-## Non-Responsibilities
+## 非职责
 
-- UI rendering
-- Econometric model semantics
-- Direct user-facing workflow design
+- UI 渲染
+- 计量模型语义
+- 直接面向用户的流程设计
 ```
 
-- [ ] **Step 3: Add the app shell architecture note**
+- [ ] **步骤 3：添加应用壳层架构说明**
 
-Create `docs/architecture/app-shell.md` with:
+创建 `docs/architecture/app-shell.md`，内容为：
 
 ```markdown
-# App Shell
+# 应用壳层（App Shell）
 
-The desktop shell is a Tauri-based workbench with six first-phase areas:
+桌面壳层是基于 Tauri 的工作台，包含六个第一阶段区域：
 
-- Home
-- Project
-- Data Inspector
-- Model Builder
-- Results
-- Learn
+- 首页（Home）
+- 项目（Project）
+- 数据检查器（Data Inspector）
+- 模型构建器（Model Builder）
+- 结果（Results）
+- 学习（Learn）
 
-The shell must consume structured result payloads and may not parse terminal summary text.
+壳层必须消费结构化结果载荷，且不得解析终端摘要文本。
 ```
 
-- [ ] **Step 4: Add the runtime protocol note**
+- [ ] **步骤 4：添加 Runtime 协议说明**
 
-Create `docs/architecture/runtime-protocol.md` with:
+创建 `docs/architecture/runtime-protocol.md`，内容为：
 
 ```markdown
-# Runtime Protocol
+# Runtime 协议
 
-First-phase actions:
+第一阶段动作：
 
 - `inspect_dataset`
 - `fit_model`
 - `export_result`
 - `explain_warning`
 
-Every request must contain `task_id`, `action`, `project_context`, and action-specific payload.
-Every response must contain `task_id`, `status`, `messages`, and optional `result_payload`.
+每个请求必须包含 `task_id`、`action`、`project_context` 以及动作相关载荷。  
+每个响应必须包含 `task_id`、`status`、`messages`，以及可选的 `result_payload`。
 ```
 
-- [ ] **Step 5: Verify the docs read cleanly**
+- [ ] **步骤 5：检查文档可读性**
 
-Run:
+运行：
 
 ```powershell
 Get-Content -Raw 'apps/metrica-desktop/README.md'
@@ -202,104 +202,104 @@ Get-Content -Raw 'docs/architecture/app-shell.md'
 Get-Content -Raw 'docs/architecture/runtime-protocol.md'
 ```
 
-Expected:
+预期：
 
 ```text
-Each file contains concise boundary definitions with no TODO or placeholder text.
+各文件包含简洁的边界定义，无 TODO 或占位正文。
 ```
 
-- [ ] **Step 6: Commit the boundary docs**
+- [ ] **步骤 6：提交边界文档**
 
-If git is initialized, run:
+若已初始化 git，运行：
 
 ```powershell
 git add apps/metrica-desktop/README.md runtime/metrica-runtime/README.md docs/architecture/app-shell.md docs/architecture/runtime-protocol.md
 git commit -m "docs: define app shell and runtime boundaries"
 ```
 
-Expected:
+预期：
 
 ```text
 [main ...] docs: define app shell and runtime boundaries
 ```
 
-## Task 3: Define the initial Julia package responsibilities
+## 任务 3：界定初始 Julia 包职责
 
-**Files:**
-- Create: `packages/MetricaBase.jl/README.md`
-- Create: `packages/MetricaLinear.jl/README.md`
-- Create: `packages/MetricaOutput.jl/README.md`
+**涉及文件：**
+- 创建：`packages/MetricaBase.jl/README.md`
+- 创建：`packages/MetricaLinear.jl/README.md`
+- 创建：`packages/MetricaOutput.jl/README.md`
 
-- [ ] **Step 1: Add the Base package responsibility note**
+- [ ] **步骤 1：添加 Base 包职责说明**
 
-Create `packages/MetricaBase.jl/README.md` with:
+创建 `packages/MetricaBase.jl/README.md`，内容为：
 
 ```markdown
 # MetricaBase.jl
 
-Protocol kernel for the Metrica ecosystem.
+Metrica 生态的协议内核。
 
-## Responsibilities
+## 职责
 
-- Abstract model and result types
-- Shared public APIs such as `fit`, `coef`, `vcov`, `predict`
-- Structured result semantics such as `glance`, `tidy`, and `augment`
-- ModelFrame and preprocessing contracts
-- Capability and warning protocols
+- 抽象模型与结果类型
+- 共享公共 API，例如 `fit`、`coef`、`vcov`、`predict`
+- 结构化结果语义，例如 `glance`、`tidy`、`augment`
+- ModelFrame 与预处理契约
+- 能力与警告协议
 
-## Non-Responsibilities
+## 非职责
 
-- OLS or other estimator implementations
-- Robust covariance algorithms
-- Rendering tables or HTML output
-- Visualization or desktop logic
+- OLS 或其他估计量的具体实现
+- 稳健协方差算法
+- 表格或 HTML 渲染
+- 可视化或桌面逻辑
 ```
 
-- [ ] **Step 2: Add the Linear package responsibility note**
+- [ ] **步骤 2：添加 Linear 包职责说明**
 
-Create `packages/MetricaLinear.jl/README.md` with:
+创建 `packages/MetricaLinear.jl/README.md`，内容为：
 
 ```markdown
 # MetricaLinear.jl
 
-Reference linear-model implementation package for Metrica.
+Metrica 的参考线性模型实现包。
 
-## First-phase scope
+## 第一阶段范围
 
 - OLS
-- Shared result objects returned through the Base API
-- Model fitting from formula plus table-like data
+- 通过 Base API 返回的共享结果对象
+- 由公式与类表数据驱动的模型拟合
 
-## Deferred scope
+## 延后范围
 
 - IV
 - GLS
-- WLS beyond the architecture-validation stage
+- 超出架构验证阶段的 WLS
 ```
 
-- [ ] **Step 3: Add the Output package responsibility note**
+- [ ] **步骤 3：添加 Output 包职责说明**
 
-Create `packages/MetricaOutput.jl/README.md` with:
+创建 `packages/MetricaOutput.jl/README.md`，内容为：
 
 ```markdown
 # MetricaOutput.jl
 
-Output and report layer for Metrica.
+Metrica 的输出与报告层。
 
-## Responsibilities
+## 职责
 
-- Terminal summaries
-- Structured table rendering
-- Markdown, HTML, and LaTeX exports
+- 终端摘要
+- 结构化表格渲染
+- Markdown、HTML 与 LaTeX 导出
 
-## Constraint
+## 约束
 
-This package must consume public structured results and may not depend on private OLS internals.
+本包必须消费公开的结构化结果，且不得依赖私有 OLS 内部实现。
 ```
 
-- [ ] **Step 4: Verify the package notes**
+- [ ] **步骤 4：验证包说明**
 
-Run:
+运行：
 
 ```powershell
 Get-Content -Raw 'packages/MetricaBase.jl/README.md'
@@ -307,35 +307,35 @@ Get-Content -Raw 'packages/MetricaLinear.jl/README.md'
 Get-Content -Raw 'packages/MetricaOutput.jl/README.md'
 ```
 
-Expected:
+预期：
 
 ```text
-The package responsibilities are clear, non-overlapping, and aligned with the dual-track architecture.
+包职责清晰、互不重叠，并与双轨架构一致。
 ```
 
-- [ ] **Step 5: Commit the package notes**
+- [ ] **步骤 5：提交包说明**
 
-If git is initialized, run:
+若已初始化 git，运行：
 
 ```powershell
 git add packages/MetricaBase.jl/README.md packages/MetricaLinear.jl/README.md packages/MetricaOutput.jl/README.md
 git commit -m "docs: define initial package responsibilities"
 ```
 
-Expected:
+预期：
 
 ```text
 [main ...] docs: define initial package responsibilities
 ```
 
-## Task 4: Freeze the runtime request/response schema in documentation
+## 任务 4：在文档中冻结 Runtime 请求/响应 schema
 
-**Files:**
-- Modify: `docs/architecture/runtime-protocol.md`
+**涉及文件：**
+- 修改：`docs/architecture/runtime-protocol.md`
 
-- [ ] **Step 1: Expand the request schema**
+- [ ] **步骤 1：扩展请求 schema**
 
-Update `docs/architecture/runtime-protocol.md` to include:
+更新 `docs/architecture/runtime-protocol.md`，加入：
 
 ```json
 {
@@ -364,9 +364,9 @@ Update `docs/architecture/runtime-protocol.md` to include:
 }
 ```
 
-- [ ] **Step 2: Expand the response schema**
+- [ ] **步骤 2：扩展响应 schema**
 
-Update the same file to include:
+在同一文件中补充：
 
 ```json
 {
@@ -376,7 +376,7 @@ Update the same file to include:
     {
       "level": "info",
       "code": "ROWS_DROPPED",
-      "text": "12 rows were removed due to missing values."
+      "text": "因缺失值已移除 12 行。"
     }
   ],
   "artifacts": [],
@@ -390,9 +390,9 @@ Update the same file to include:
 }
 ```
 
-- [ ] **Step 3: Add the failure contract**
+- [ ] **步骤 3：添加失败契约**
 
-Update the same file to include:
+在同一文件中补充：
 
 ```json
 {
@@ -402,140 +402,140 @@ Update the same file to include:
     {
       "level": "error",
       "code": "SINGULAR_MATRIX",
-      "text": "Model could not be estimated because the design matrix is singular.",
-      "hint": "Check whether one predictor is a linear combination of others."
+      "text": "设计矩阵奇异，无法估计模型。",
+      "hint": "请检查是否存在某一预测变量是其他变量的线性组合。"
     }
   ]
 }
 ```
 
-- [ ] **Step 4: Verify the schema note**
+- [ ] **步骤 4：验证 schema 说明**
 
-Run:
+运行：
 
 ```powershell
 Get-Content -Raw 'docs/architecture/runtime-protocol.md'
 ```
 
-Expected:
+预期：
 
 ```text
-The document contains explicit request, success response, and error response examples.
+文档包含明确的请求、成功响应与错误响应示例。
 ```
 
-- [ ] **Step 5: Commit the schema documentation**
+- [ ] **步骤 5：提交 schema 文档**
 
-If git is initialized, run:
+若已初始化 git，运行：
 
 ```powershell
 git add docs/architecture/runtime-protocol.md
 git commit -m "docs: freeze initial runtime schema"
 ```
 
-Expected:
+预期：
 
 ```text
 [main ...] docs: freeze initial runtime schema
 ```
 
-## Task 5: Define the first desktop MVP in writing
+## 任务 5：书面定义首个桌面 MVP
 
-**Files:**
-- Modify: `docs/architecture/app-shell.md`
+**涉及文件：**
+- 修改：`docs/architecture/app-shell.md`
 
-- [ ] **Step 1: Add the first-phase page list**
+- [ ] **步骤 1：添加第一阶段页面列表**
 
-Update `docs/architecture/app-shell.md` with:
-
-```markdown
-## MVP Pages
-
-- Home
-- Project
-- Data Inspector
-- Model Builder
-- Results
-- Learn
-```
-
-- [ ] **Step 2: Add the MVP acceptance criteria**
-
-Update the same file with:
+更新 `docs/architecture/app-shell.md`，加入：
 
 ```markdown
-## MVP Acceptance
+## MVP 页面
 
-The desktop alpha is successful if a user can:
-
-1. Open a project
-2. Import a dataset
-3. Configure and run one OLS model
-4. View structured results
-5. Export a result summary
-6. Receive readable warnings and error explanations
+- 首页（Home）
+- 项目（Project）
+- 数据检查器（Data Inspector）
+- 模型构建器（Model Builder）
+- 结果（Results）
+- 学习（Learn）
 ```
 
-- [ ] **Step 3: Add the out-of-scope list**
+- [ ] **步骤 2：添加 MVP 验收标准**
 
-Update the same file with:
+在同一文件中补充：
 
 ```markdown
-## Out of Scope for MVP
+## MVP 验收
 
-- Panel-model UI
-- Multi-model comparison dashboards
-- Cloud sync
-- Plugin marketplace
-- Full diagnostics suite
+当用户能够完成以下事项时，桌面 alpha 即视为成功：
+
+1. 打开项目
+2. 导入数据集
+3. 配置并运行一个 OLS 模型
+4. 查看结构化结果
+5. 导出结果摘要
+6. 收到可读的警告与错误说明
 ```
 
-- [ ] **Step 4: Verify the MVP note**
+- [ ] **步骤 3：添加范围外列表**
 
-Run:
+在同一文件中补充：
+
+```markdown
+## MVP 范围之外
+
+- 面板模型 UI
+- 多模型对比仪表板
+- 云同步
+- 插件市场
+- 完整诊断套件
+```
+
+- [ ] **步骤 4：验证 MVP 说明**
+
+运行：
 
 ```powershell
 Get-Content -Raw 'docs/architecture/app-shell.md'
 ```
 
-Expected:
+预期：
 
 ```text
-The app shell note clearly describes the first-phase pages, MVP acceptance, and out-of-scope features.
+应用壳层说明清楚描述第一阶段页面、MVP 验收与范围外功能。
 ```
 
-- [ ] **Step 5: Commit the MVP definition**
+- [ ] **步骤 5：提交 MVP 定义**
 
-If git is initialized, run:
+若已初始化 git，运行：
 
 ```powershell
 git add docs/architecture/app-shell.md
 git commit -m "docs: define desktop MVP"
 ```
 
-Expected:
+预期：
 
 ```text
 [main ...] docs: define desktop MVP
 ```
 
-## Self-Review
+## 自检
 
-Spec coverage:
+规格覆盖：
 
-- Dual-track architecture is covered by Tasks 1-2.
-- Package boundaries are covered by Task 3.
-- Runtime communication protocol is covered by Task 4.
-- Desktop MVP scope is covered by Task 5.
+- 双轨架构由任务 1–2 覆盖。
+- 包边界由任务 3 覆盖。
+- Runtime 通信协议由任务 4 覆盖。
+- 桌面 MVP 范围由任务 5 覆盖。
 
-Placeholder scan:
+占位扫描：
 
-- No TODO or TBD markers are present in the plan body.
+- 计划正文中不得出现 TODO 或 TBD 标记。
 
-Type consistency:
+类型一致性：
 
-- `task_id`, `action`, `project_context`, `messages`, and `result_payload` naming is used consistently across the runtime contract tasks.
+- `task_id`、`action`、`project_context`、`messages`、`result_payload` 等命名在 Runtime 契约相关任务中保持一致。
 
-## Notes
+## 说明
 
-- This workspace is currently not a git repository, so commit steps are conditional on initializing git first.
-- The next execution cycle should implement the scaffold first, then the runtime and app shell placeholders, before writing any econometric model code.
+- 若工作区尚未初始化 git，则提交类步骤须先完成 `git init` 后再执行。
+- 下一轮执行应先完成脚手架，再完成 Runtime 与桌面壳占位，然后再编写任何计量模型代码。

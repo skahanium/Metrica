@@ -1,4 +1,4 @@
-# Metrica.jl 计量经济学框架总体蓝图（完善版）
+# Metrica.jl 计量经济学框架总体蓝图
 
 ## 1. 项目定位
 
@@ -365,14 +365,14 @@ register_extension!(
 
 原路线图按学科主题拆分是合理的，但从工程上看，建议进一步重排为“协议验证型阶段”。
 
-### Phase 0：仓库与工程基建
+### 阶段 0：仓库与工程基建
 
 - monorepo 结构
 - 子包模板与共享 CI
 - 统一格式化、测试、文档、benchmark 规范
 - 示例数据与 golden test 目录布局
 
-### Phase 1：`MetricaBase.jl`
+### 阶段 1：`MetricaBase.jl`
 
 - 抽象类型
 - 核心 API
@@ -383,7 +383,7 @@ register_extension!(
 - 插件注册协议
 - 统一错误/警告机制
 
-### Phase 2A：`MetricaLinear.jl`
+### 阶段 2A：`MetricaLinear.jl`
 
 第一批只建议聚焦：
 
@@ -394,7 +394,7 @@ register_extension!(
 
 `LIML / GMM / SUR / 3SLS` 可以列为 `2A.5` 或 `2B`，不要在第一轮一次性全部压进来。
 
-### Phase 2B：`MetricaRobust.jl`
+### 阶段 2B：`MetricaRobust.jl`
 
 优先级建议：
 
@@ -405,7 +405,7 @@ register_extension!(
 
 `HC4-HC5`、双向聚类、多向聚类、Bootstrap 可作为增强阶段。
 
-### Phase 2C：`MetricaOutput.jl`
+### 阶段 2C：`MetricaOutput.jl`
 
 因为教学优先，输出层应比高阶估计器更早落地：
 
@@ -414,7 +414,7 @@ register_extension!(
 - Markdown / LaTeX / HTML
 - 描述统计表
 
-### Phase 2D：`MetricaTests.jl`
+### 阶段 2D：`MetricaTests.jl`
 
 优先诊断检验：
 
@@ -426,7 +426,7 @@ register_extension!(
 - VIF
 - Jarque-Bera
 
-### Phase 2E：`MetricaPanel.jl`
+### 阶段 2E：`MetricaPanel.jl`
 
 先做：
 
@@ -438,7 +438,7 @@ register_extension!(
 
 动态面板 GMM 不建议过早进入首批交付。
 
-### Phase 3：教学与产品化增强
+### 阶段 3：教学与产品化增强
 
 - Pluto 教程
 - 内置教材数据集
@@ -446,7 +446,7 @@ register_extension!(
 - 错误提示与解释性警告增强
 - 示例项目与课堂作业模板
 
-### Phase 4 以后
+### 阶段 4 以后
 
 - 时间序列
 - 离散选择
@@ -593,21 +593,21 @@ Metrica/
 
 建议把最初 3 个里程碑定义为：
 
-### Milestone 1：Base Alpha
+### 里程碑 1：Base Alpha
 
 - 可定义模型类型
 - 可从公式与表数据构建 `ModelFrame`
 - 可返回标准化结果对象
 - 可被输出层消费
 
-### Milestone 2：Teaching OLS
+### 里程碑 2：教学向 OLS
 
 - OLS + WLS
 - 经典/HC1/Cluster 协方差
 - 终端 summary + Markdown/LaTeX 表格
 - 基础诊断检验
 
-### Milestone 3：Panel Foundations
+### 里程碑 3：面板基础
 
 - `PanelData`
 - FE / RE / FD

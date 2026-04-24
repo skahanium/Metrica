@@ -1,4 +1,4 @@
-# Metrica Alpha Vertical Slice Design
+# Metrica Alpha 垂直切片设计
 
 ## 概述
 
@@ -130,12 +130,12 @@ App 在本阶段不需要：
 
 ```mermaid
 flowchart LR
-    A["User selects CSV"] --> B["App builds fit_model request"]
-    B --> C["Runtime validates request"]
-    C --> D["Julia Core loads data and fits OLS"]
-    D --> E["Core returns structured result"]
-    E --> F["Runtime serializes success/error payload"]
-    F --> G["App renders glance, tidy, and warnings"]
+    A["用户选择 CSV"] --> B["App 构造 fit_model 请求"]
+    B --> C["Runtime 校验请求"]
+    C --> D["Julia Core 读入数据并拟合 OLS"]
+    D --> E["Core 返回结构化结果"]
+    E --> F["Runtime 序列化成功/错误载荷"]
+    F --> G["App 渲染 glance、tidy 与 warnings"]
 ```
 
 这条链路里最关键的约束是：

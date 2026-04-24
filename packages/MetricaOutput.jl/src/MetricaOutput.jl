@@ -5,7 +5,7 @@ using MetricaBase
 export summary_card
 
 """
-Render a minimal human-readable summary from a structured glance payload.
+根据结构化 glance 载荷生成最简可读摘要。
 """
 function summary_card(glance::MetricaBase.ModelGlance)
     metric_pairs = collect(glance.metrics)

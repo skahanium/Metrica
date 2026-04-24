@@ -1,39 +1,39 @@
-# App Shell
+# 应用壳层（App Shell）
 
-The desktop shell is a Tauri-based workbench focused on a teaching-friendly econometrics workflow.
+桌面壳层是基于 Tauri 的工作台，聚焦教学友好的计量工作流。
 
-The shell must consume structured result payloads and may not parse terminal summary text.
+壳层必须消费结构化结果载荷，且不得解析终端摘要文本。
 
-## MVP Pages
+## MVP 页面
 
-- Home
-- Project
-- Data Inspector
-- Model Builder
-- Results
-- Learn
+- 首页（Home）
+- 项目（Project）
+- 数据检查器（Data Inspector）
+- 模型构建器（Model Builder）
+- 结果（Results）
+- 学习（Learn）
 
-## MVP Acceptance
+## MVP 验收标准
 
-The desktop alpha is successful if a user can:
+当用户能够完成以下事项时，桌面 alpha 即视为成功：
 
-1. Open a project
-2. Import a dataset
-3. Configure and run one OLS model
-4. View structured results
-5. Export a result summary
-6. Receive readable warnings and error explanations
+1. 打开项目
+2. 导入数据集
+3. 配置并运行一个 OLS 模型
+4. 查看结构化结果
+5. 导出结果摘要
+6. 收到可读的警告与错误说明
 
-## Out of Scope for MVP
+## MVP 范围之外
 
-- Panel-model UI
-- Multi-model comparison dashboards
-- Cloud sync
-- Plugin marketplace
-- Full diagnostics suite
+- 面板模型 UI
+- 多模型对比仪表板
+- 云同步
+- 插件市场
+- 完整诊断套件
 
-## Related Documents
+## 相关文档
 
-- Runtime payloads are owned by `docs/architecture/runtime-protocol.md`.
-- Project-level layering is owned by `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md`.
-- The first executable end-to-end slice is owned by `docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md`.
+- Runtime 载荷由 `docs/architecture/runtime-protocol.md` 负责。
+- 项目级分层由 `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md` 负责。
+- 第一条可执行端到端切片由 `docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md` 负责。

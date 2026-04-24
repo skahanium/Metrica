@@ -1,17 +1,17 @@
-# Metrica Desktop
+# Metrica 桌面端
 
-Cross-platform native desktop workbench for Metrica.
+Metrica 的跨平台原生桌面工作台。
 
-## Responsibilities
+## 职责
 
-- Project workspace and navigation
-- Data import and inspection
-- Model configuration and execution triggers
-- Result rendering and export
-- Teaching-oriented explanations and warnings
+- 项目工作区与导航
+- 数据导入与检查
+- 模型配置与执行触发
+- 结果渲染与导出
+- 面向教学的解释与警告
 
-## Non-Responsibilities
+## 非职责
 
-- Econometric estimation logic
-- Julia package internals
-- Numerical algorithm implementation
+- 计量估计逻辑
+- Julia 包内部实现细节
+- 数值算法实现

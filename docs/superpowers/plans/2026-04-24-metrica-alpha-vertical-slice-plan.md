@@ -1,53 +1,53 @@
-# Metrica Alpha Vertical Slice Implementation Plan
+# Metrica Alpha 垂直切片实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **面向代理工作者：** 须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务逐步执行本计划。步骤使用复选框语法（`- [ ]`）跟踪。
 
-**Goal:** Deliver the first real end-to-end Metrica slice: local CSV input to OLS execution to structured Runtime payload to desktop result rendering.
+**目标：** 交付第一条真实端到端 Metrica 切片：本地 CSV → OLS 执行 → 结构化 Runtime 载荷 → 桌面结果渲染。
 
-**Architecture:** This plan implements one narrow chain across the three existing layers without expanding scope. `packages/` owns the first executable OLS path and structured result objects, `runtime/` owns the request/response bridge and process-facing contract, and `apps/` owns the minimal user flow that triggers a real run and renders structured results.
+**架构：** 本计划在既有三层上实现一条窄链路，不扩大范围。`packages/` 拥有第一条可执行 OLS 路径与结构化结果对象；`runtime/` 拥有请求/响应桥与面向进程的契约；`apps/` 拥有触发真实运行并渲染结构化结果的最小用户流。
 
-**Tech Stack:** Julia, Rust, JSON, HTML, CSS, JavaScript
+**技术栈：** Julia、Rust、JSON、HTML、CSS、JavaScript
 
 ---
 
-## Scope Anchor
+## 范围锚定
 
-This plan only executes the slice defined in:
+本计划仅执行以下文档所定义的切片：
 
 - `docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md`
 
-It does not broaden into:
+不扩展到：
 
-- panel or IV work
-- generalized desktop architecture cleanup
-- plugin systems
-- cloud or sync flows
+- 面板或 IV 工作
+- 泛化的桌面架构整理
+- 插件体系
+- 云或同步流程
 
-## File Structure
+## 文件结构
 
-- Modify: `packages/MetricaBase.jl/src/MetricaBase.jl`
-- Create: `packages/MetricaBase.jl/test/runtests.jl`
-- Modify: `packages/MetricaLinear.jl/src/MetricaLinear.jl`
-- Create: `packages/MetricaLinear.jl/test/runtests.jl`
-- Modify: `packages/MetricaOutput.jl/src/MetricaOutput.jl`
-- Create: `packages/MetricaOutput.jl/test/runtests.jl`
-- Modify: `runtime/metrica-runtime/src/lib.rs`
-- Modify: `runtime/metrica-runtime/src/main.rs`
-- Create: `apps/metrica-desktop/data/demo.csv`
-- Modify: `apps/metrica-desktop/index.html`
-- Modify: `apps/metrica-desktop/src/main.js`
-- Modify: `apps/metrica-desktop/src/styles.css`
-- Modify: `docs/architecture/runtime-protocol.md`
+- 修改：`packages/MetricaBase.jl/src/MetricaBase.jl`
+- 创建：`packages/MetricaBase.jl/test/runtests.jl`
+- 修改：`packages/MetricaLinear.jl/src/MetricaLinear.jl`
+- 创建：`packages/MetricaLinear.jl/test/runtests.jl`
+- 修改：`packages/MetricaOutput.jl/src/MetricaOutput.jl`
+- 创建：`packages/MetricaOutput.jl/test/runtests.jl`
+- 修改：`runtime/metrica-runtime/src/lib.rs`
+- 修改：`runtime/metrica-runtime/src/main.rs`
+- 创建：`apps/metrica-desktop/data/demo.csv`
+- 修改：`apps/metrica-desktop/index.html`
+- 修改：`apps/metrica-desktop/src/main.js`
+- 修改：`apps/metrica-desktop/src/styles.css`
+- 修改：`docs/architecture/runtime-protocol.md`
 
-## Task 1: Make `MetricaBase` own the minimum structured result contract
+## 任务 1：使 `MetricaBase` 拥有最小结构化结果契约
 
-**Files:**
-- Modify: `packages/MetricaBase.jl/src/MetricaBase.jl`
-- Create: `packages/MetricaBase.jl/test/runtests.jl`
+**涉及文件：**
+- 修改：`packages/MetricaBase.jl/src/MetricaBase.jl`
+- 创建：`packages/MetricaBase.jl/test/runtests.jl`
 
-- [ ] **Step 1: Write the failing Base contract test**
+- [ ] **步骤 1：编写会先失败的 Base 契约测试**
 
-Create `packages/MetricaBase.jl/test/runtests.jl` with:
+创建 `packages/MetricaBase.jl/test/runtests.jl`，内容为：
 
 ```julia
 using Test
@@ -83,23 +83,23 @@ td = TidyTable(
 @test td.vcov_label == "classical"
 ```
 
-- [ ] **Step 2: Run the Base test to verify it fails if package loading is not wired**
+- [ ] **步骤 2：运行 Base 测试以验证加载/入口是否就绪**
 
-Run:
+运行：
 
 ```powershell
 julia --project=D:\Metrica\packages\MetricaBase.jl -e "using Pkg; Pkg.test()"
 ```
 
-Expected:
+预期：
 
 ```text
-Either the package test passes immediately because the current contract already satisfies it, or it fails because the package test entrypoint is still missing.
+要么因当前契约已满足而立即通过，要么因缺少测试入口等原因失败。
 ```
 
-- [ ] **Step 3: Add the minimal Base test entrypoint if missing**
+- [ ] **步骤 3：若缺失则添加最小 Base 测试入口**
 
-Ensure `packages/MetricaBase.jl/src/MetricaBase.jl` exports the current structured contract and add `Project.toml`-compatible test loading behavior by keeping the current public names stable:
+确保 `packages/MetricaBase.jl/src/MetricaBase.jl` 导出当前结构化契约，并保持公开名称稳定，以兼容 `Project.toml` 与测试加载：
 
 ```julia
 module MetricaBase
@@ -119,40 +119,40 @@ export AbstractEconModel,
     tidy,
     augment
 
-# existing type definitions remain the public minimum contract
+# 既有类型定义仍为对外的最小契约
 ```
 
-- [ ] **Step 4: Re-run the Base package test**
+- [ ] **步骤 4：再次运行 Base 包测试**
 
-Run:
+运行：
 
 ```powershell
 julia --project=D:\Metrica\packages\MetricaBase.jl -e "using Pkg; Pkg.test()"
 ```
 
-Expected:
+预期：
 
 ```text
-PASS for the minimal structured contract test.
+最小结构化契约测试通过。
 ```
 
-- [ ] **Step 5: Record the current limitation**
+- [ ] **步骤 5：记录当前阶段定位**
 
-Add one short note to `packages/MetricaBase.jl/README.md`:
+在 `packages/MetricaBase.jl/README.md` 增加一句简短说明：
 
 ```markdown
-Current alpha role: own the minimum structured result contract required by the first real vertical slice.
+当前 alpha 角色：承载第一条真实垂直切片所需的最小结构化结果契约。
 ```
 
-## Task 2: Make `MetricaLinear` return a real OLS-like structured slice result
+## 任务 2：使 `MetricaLinear` 返回类 OLS 的结构化切片结果
 
-**Files:**
-- Modify: `packages/MetricaLinear.jl/src/MetricaLinear.jl`
-- Create: `packages/MetricaLinear.jl/test/runtests.jl`
+**涉及文件：**
+- 修改：`packages/MetricaLinear.jl/src/MetricaLinear.jl`
+- 创建：`packages/MetricaLinear.jl/test/runtests.jl`
 
-- [ ] **Step 1: Write the failing Linear test**
+- [ ] **步骤 1：编写会先失败的 Linear 测试**
 
-Create `packages/MetricaLinear.jl/test/runtests.jl` with:
+创建 `packages/MetricaLinear.jl/test/runtests.jl`，内容为：
 
 ```julia
 using Test
@@ -167,23 +167,23 @@ result = fit_ols_demo("y ~ x1 + x2")
 @test result.tidy.rows[2].name == :x1
 ```
 
-- [ ] **Step 2: Run the Linear test to verify failure**
+- [ ] **步骤 2：运行 Linear 测试以确认失败形态**
 
-Run:
+运行：
 
 ```powershell
 julia --project=D:\Metrica\packages\MetricaLinear.jl -e "using Pkg; Pkg.test()"
 ```
 
-Expected:
+预期：
 
 ```text
-FAIL because `fit_ols_demo` does not yet exist.
+失败，因为 `fit_ols_demo` 尚不存在。
 ```
 
-- [ ] **Step 3: Implement the minimum real slice function**
+- [ ] **步骤 3：实现最小真实切片函数**
 
-Update `packages/MetricaLinear.jl/src/MetricaLinear.jl` to include:
+更新 `packages/MetricaLinear.jl/src/MetricaLinear.jl`，加入：
 
 ```julia
 struct SliceFitResult
@@ -221,37 +221,37 @@ function fit_ols_demo(formula::String)
 end
 ```
 
-- [ ] **Step 4: Export the vertical-slice entrypoint**
+- [ ] **步骤 4：导出垂直切片入口**
 
-Update the module export list:
+更新模块 `export` 列表：
 
 ```julia
 export OLSModel, OLSFitResult, SliceFitResult, PHASE_1_MODELS, fit_ols_demo
 ```
 
-- [ ] **Step 5: Re-run the Linear test**
+- [ ] **步骤 5：再次运行 Linear 测试**
 
-Run:
+运行：
 
 ```powershell
 julia --project=D:\Metrica\packages\MetricaLinear.jl -e "using Pkg; Pkg.test()"
 ```
 
-Expected:
+预期：
 
 ```text
-PASS with one executable OLS slice path returning structured results.
+通过：存在一条可执行的 OLS 切片路径并返回结构化结果。
 ```
 
-## Task 3: Make Runtime serialize the real slice shape instead of only mock payloads
+## 任务 3：使 Runtime 序列化真实切片形状，而非仅 mock 载荷
 
-**Files:**
-- Modify: `runtime/metrica-runtime/src/lib.rs`
-- Modify: `runtime/metrica-runtime/src/main.rs`
+**涉及文件：**
+- 修改：`runtime/metrica-runtime/src/lib.rs`
+- 修改：`runtime/metrica-runtime/src/main.rs`
 
-- [ ] **Step 1: Write the failing Runtime serialization test**
+- [ ] **步骤 1：编写会先失败的 Runtime 序列化测试**
 
-Add this test to `runtime/metrica-runtime/src/lib.rs`:
+将以下测试加入 `runtime/metrica-runtime/src/lib.rs`：
 
 ```rust
 #[test]
@@ -263,23 +263,23 @@ fn success_payload_contains_glance_and_tidy_shapes() {
 }
 ```
 
-- [ ] **Step 2: Run Runtime tests**
+- [ ] **步骤 2：运行 Runtime 测试**
 
-Run:
+运行：
 
 ```powershell
 cargo test
 ```
 
-Expected:
+预期：
 
 ```text
-PASS if current payload shape already satisfies the requirement, otherwise FAIL with a missing field assertion.
+若当前载荷形状已满足要求则通过，否则因缺少字段断言失败。
 ```
 
-- [ ] **Step 3: Add a dedicated vertical-slice response builder**
+- [ ] **步骤 3：添加垂直切片专用响应构造器**
 
-Update `runtime/metrica-runtime/src/lib.rs` with:
+更新 `runtime/metrica-runtime/src/lib.rs`，加入：
 
 ```rust
 pub fn vertical_slice_success_response() -> TaskResponse {
@@ -289,8 +289,8 @@ pub fn vertical_slice_success_response() -> TaskResponse {
         messages: vec![Message {
             level: "info".to_string(),
             code: "ROWS_DROPPED".to_string(),
-            text: "2 rows were removed due to missing values.".to_string(),
-            hint: Some("Inspect missing columns before fitting.".to_string()),
+            text: "因缺失值已移除 2 行。".to_string(),
+            hint: Some("拟合前请检查缺失列。".to_string()),
         }],
         artifacts: Some(vec![]),
         result_payload: Some(json!({
@@ -308,8 +308,8 @@ pub fn vertical_slice_success_response() -> TaskResponse {
             "warnings": [
                 {
                     "code": "rows_dropped",
-                    "title": "Rows dropped",
-                    "detail": "2 rows were removed due to missing values."
+                    "title": "已删行",
+                    "detail": "因缺失值已移除 2 行。"
                 }
             ]
         })),
@@ -317,35 +317,35 @@ pub fn vertical_slice_success_response() -> TaskResponse {
 }
 ```
 
-- [ ] **Step 4: Wire the CLI to expose the vertical slice**
+- [ ] **步骤 4：将 CLI 接到垂直切片**
 
-Update `runtime/metrica-runtime/src/main.rs` so the `"success"` path serializes `vertical_slice_success_response()` instead of the older placeholder builder.
+更新 `runtime/metrica-runtime/src/main.rs`，使 `"success"` 路径序列化 `vertical_slice_success_response()`，而非旧占位构造器。
 
-- [ ] **Step 5: Re-run Runtime tests**
+- [ ] **步骤 5：再次运行 Runtime 测试**
 
-Run:
+运行：
 
 ```powershell
 cargo test
 ```
 
-Expected:
+预期：
 
 ```text
-PASS with the vertical-slice payload locked in.
+通过：垂直切片载荷已固定。
 ```
 
-## Task 4: Render the real structured payload in the desktop shell
+## 任务 4：在桌面壳中渲染真实结构化载荷
 
-**Files:**
-- Create: `apps/metrica-desktop/data/demo.csv`
-- Modify: `apps/metrica-desktop/index.html`
-- Modify: `apps/metrica-desktop/src/main.js`
-- Modify: `apps/metrica-desktop/src/styles.css`
+**涉及文件：**
+- 创建： `apps/metrica-desktop/data/demo.csv`
+- 修改： `apps/metrica-desktop/index.html`
+- 修改： `apps/metrica-desktop/src/main.js`
+- 修改： `apps/metrica-desktop/src/styles.css`
 
-- [ ] **Step 1: Add a tiny demo dataset**
+- [ ] **步骤 1：添加最小演示数据集**
 
-Create `apps/metrica-desktop/data/demo.csv` with:
+创建 `apps/metrica-desktop/data/demo.csv`，内容为：
 
 ```csv
 y,x1,x2
@@ -356,21 +356,21 @@ y,x1,x2
 5,5,2
 ```
 
-- [ ] **Step 2: Add a failing UI expectation in plain JavaScript**
+- [ ] **步骤 2：在纯 JavaScript 中加入会先失败的 UI 断言**
 
-Before implementing rendering, update `apps/metrica-desktop/src/main.js` to throw if the expected results mount point is missing:
+在实现渲染前，更新 `apps/metrica-desktop/src/main.js`：若缺少结果挂载点则抛出错误：
 
 ```javascript
 const resultsMount = document.querySelector("[data-results-mount]");
 
 if (!resultsMount) {
-  throw new Error("Missing results mount for vertical slice rendering.");
+  throw new Error("缺少垂直切片渲染所需的结果挂载点。");
 }
 ```
 
-- [ ] **Step 3: Add the results mount to the HTML**
+- [ ] **步骤 3：在 HTML 中加入结果挂载点**
 
-Update `apps/metrica-desktop/index.html` inside the Results card:
+在 `apps/metrica-desktop/index.html` 的 Results 卡片内更新为：
 
 ```html
 <article class="card" id="results">
@@ -379,9 +379,9 @@ Update `apps/metrica-desktop/index.html` inside the Results card:
 </article>
 ```
 
-- [ ] **Step 4: Render the real vertical-slice payload**
+- [ ] **步骤 4：渲染真实垂直切片载荷**
 
-Replace `apps/metrica-desktop/src/main.js` with a minimal renderer:
+将 `apps/metrica-desktop/src/main.js` 替换为最小渲染器：
 
 ```javascript
 const payload = {
@@ -398,8 +398,8 @@ const payload = {
   ],
   warnings: [
     {
-      title: "Rows dropped",
-      detail: "2 rows were removed due to missing values."
+      title: "已删行",
+      detail: "因缺失值已移除 2 行。"
     }
   ]
 };
@@ -407,7 +407,7 @@ const payload = {
 const resultsMount = document.querySelector("[data-results-mount]");
 
 if (!resultsMount) {
-  throw new Error("Missing results mount for vertical slice rendering.");
+  throw new Error("缺少垂直切片渲染所需的结果挂载点。");
 }
 
 resultsMount.innerHTML = `
@@ -444,9 +444,9 @@ resultsMount.innerHTML = `
 `;
 ```
 
-- [ ] **Step 5: Add minimal styles for rendered results**
+- [ ] **步骤 5：为渲染结果添加最小样式**
 
-Append to `apps/metrica-desktop/src/styles.css`:
+追加到 `apps/metrica-desktop/src/styles.css`：
 
 ```css
 .result-block {
@@ -476,65 +476,65 @@ Append to `apps/metrica-desktop/src/styles.css`:
 }
 ```
 
-- [ ] **Step 6: Verify the desktop shell structure**
+- [ ] **步骤 6：验证桌面壳文件结构**
 
-Run:
+运行：
 
 ```powershell
 Get-ChildItem -Recurse -File 'D:\Metrica\apps\metrica-desktop' | Select-Object FullName
 ```
 
-Expected:
+预期：
 
 ```text
-The desktop shell contains `index.html`, `src/main.js`, `src/styles.css`, and `data/demo.csv`.
+桌面壳包含 `index.html`、`src/main.js`、`src/styles.css` 与 `data/demo.csv`。
 ```
 
-## Task 5: Sync the protocol doc with the first real vertical slice
+## 任务 5：将协议文档与第一条真实垂直切片对齐
 
-**Files:**
-- Modify: `docs/architecture/runtime-protocol.md`
+**涉及文件：**
+- 修改： `docs/architecture/runtime-protocol.md`
 
-- [ ] **Step 1: Add a short note identifying the current executable slice**
+- [ ] **步骤 1：追加短文说明当前可执行切片**
 
-Append this section:
+追加以下小节：
 
 ```markdown
-## Current Executable Slice
+## 当前可执行切片
 
-The first real executable slice is:
+第一条真实可执行切片为：
 
-- local CSV input
-- `fit_model` action
-- `ols` model type
-- structured `glance` and `tidy` response payloads
-- warning/message propagation for dropped rows and fitting errors
+- 本地 CSV 输入
+- `fit_model` 动作
+- `ols` 模型类型
+- 结构化的 `glance` 与 `tidy` 响应载荷
+- 删行与拟合错误的警告/消息传播
 ```
 
-- [ ] **Step 2: Verify the protocol note**
+- [ ] **步骤 2：验证协议说明**
 
-Run:
+运行：
 
 ```powershell
 Get-Content -Raw 'D:\Metrica\docs\architecture\runtime-protocol.md'
 ```
 
-Expected:
+预期：
 
 ```text
-The protocol document reflects the current vertical-slice contract without repeating project-level architecture.
+协议文档反映当前垂直切片契约，且不重复项目级架构叙述。
 ```
 
-## Verification Summary
+## 验证摘要
 
-The slice is only ready to claim when these checks are complete:
+仅当以下检查均完成时，方可宣称切片就绪：
 
-- `cargo test` passes in `runtime/metrica-runtime`
-- Julia package tests pass for `MetricaBase` and `MetricaLinear` if `julia` is available
-- the desktop shell files exist and the Results card has a real structured render target
-- docs stay aligned with the slice and do not reintroduce duplicated architecture text
+- 在 `runtime/metrica-runtime` 中 `cargo test` 通过
+- 若环境中有 `julia`，则 `MetricaBase` 与 `MetricaLinear` 的包测试通过
+- 桌面壳文件存在，且 Results 卡片具备真实结构化渲染挂载点
+- 文档与切片保持一致，不重新引入重复的架构正文
 
-## Notes
+## 说明
 
-- If Julia is still unavailable in the environment, complete the non-Julia layers and explicitly report the missing verification.
-- Do not replace this plan with a broader “alpha” plan until this single vertical slice is actually working.
+- 若环境中仍不可用 Julia，应先完成非 Julia 层，并明确报告缺失的验证项。
+- 在该单一垂直切片实际工作之前，勿用更泛化的「alpha」计划替换本计划。

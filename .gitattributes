@@ -1,4 +1,4 @@
-# Normalize text files on checkout; keeps Julia/Rust sources LF across OS.
+# 检出时规范化文本换行；跨操作系统保持 Julia/Rust 等源码为 LF。
 * text=auto
 
 *.jl   text eol=lf
@@ -14,7 +14,7 @@
 *.csv  text eol=lf
 *.sh   text eol=lf
 
-# Windows scripts stay CRLF when checked out on Windows
+# Windows 脚本在 Windows 检出时保持 CRLF
 *.ps1  text eol=crlf
 *.bat  text eol=crlf
 *.cmd  text eol=crlf

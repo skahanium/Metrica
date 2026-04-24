@@ -307,26 +307,26 @@ Runtime 的动作命名、请求结构与响应 payload 示例由 `docs/architec
 
 ## 里程碑建议
 
-### Milestone 1：Core + Schema Foundation
+### 里程碑 1：Core + 协议模式基础
 
 - 冻结 `Base` 层接口与结果语义
 - 冻结 Runtime 协议草案
 - 为 App 预留稳定消费格式
 
-### Milestone 2：Desktop Skeleton
+### 里程碑 2：桌面骨架
 
 - 建立 Tauri 桌面工程
 - 完成项目、数据、模型、结果四大骨架页面
 - 用 mock 结果驱动 UI
 
-### Milestone 3：First Real Run
+### 里程碑 3：首次真实运行
 
 - Runtime 调起 Julia
 - 桌面端跑通真实 OLS
 - 展示真实 `glance / tidy`
 - 支持最小导出
 
-### Milestone 4：Alpha Polishing
+### 里程碑 4：Alpha 打磨
 
 - 强化缺失值追踪
 - 增补教学解释
