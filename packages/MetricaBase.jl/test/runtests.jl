@@ -245,47 +245,70 @@ using MetricaBase
         end
     end
 
-    # === Alpha 垂直切片典型场景 ==============================================
+    # === Alpha 真实 OLS 载荷契约 ============================================
 
-    @testset "Alpha 垂直切片端到端载荷" begin
-        warnings = [
-            ModelWarning(
-                :rows_dropped,
-                "Rows dropped",
-                "2 rows were removed due to missing values.",
-                "Inspect missing columns before fitting.",
-                info,
-            ),
-        ]
-
-        glance = ModelGlance(:ols, 98, 3, Dict(:r2 => 0.82, :sigma => 1.5), warnings)
-
-        tidy_table = TidyTable(
-            [
-                CoefRow(:intercept, 1.2, 0.10, 12.0, 0.0001),
-                CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001),
-            ],
-            "classical",
+    @testset "Alpha 真实 OLS 载荷契约" begin
+        rows_dropped_warning = ModelWarning(
+            :rows_dropped,
+            "Rows dropped",
+            "2 rows were removed due to missing values before estimation.",
+            "Inspect missing columns before fitting.",
+            info,
         )
-
-        @test glance.model == :ols
-        @test glance.nobs == 98
-        @test glance.metrics[:r2] == 0.82
-        @test length(glance.warnings) == 1
-        @test glance.warnings[1].severity == info
-        @test tidy_table.rows[1].name == :intercept
-        @test tidy_table.rows[2].estimate == 2.1
-        @test tidy_table.vcov_label == "classical"
-
-        fitting_error = ModelError(
+        singular_design_error = ModelError(
             :singular_design,
             "Design matrix singular",
             "X'X is not invertible; perfect collinearity detected.",
             "Remove perfectly collinear regressors and refit.",
         )
+        ols_glance = ModelGlance(
+            :ols,
+            98,
+            3,
+            Dict(
+                :r2 => 0.84,
+                :adj_r2 => 0.79,
+                :rss => 1.2,
+                :tss => 7.5,
+                :sigma => 0.49,
+            ),
+            [rows_dropped_warning],
+        )
+        ols_tidy = TidyTable(
+            [
+                CoefRow(:Intercept, 1.2, 0.10, 12.0, 0.0001),
+                CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001),
+            ],
+            "classical",
+        )
 
-        @test fitting_error.code == :singular_design
-        @test fitting_error.hint !== nothing
+        @test rows_dropped_warning.code == :rows_dropped
+        @test rows_dropped_warning.title == "Rows dropped"
+        @test rows_dropped_warning.detail == "2 rows were removed due to missing values before estimation."
+        @test rows_dropped_warning.hint == "Inspect missing columns before fitting."
+        @test rows_dropped_warning.severity == info
+
+        @test singular_design_error.code == :singular_design
+        @test singular_design_error.title == "Design matrix singular"
+        @test singular_design_error.detail == "X'X is not invertible; perfect collinearity detected."
+        @test singular_design_error.hint == "Remove perfectly collinear regressors and refit."
+
+        @test ols_glance.model == :ols
+        @test ols_glance.nobs == 98
+        @test ols_glance.dof == 3
+        @test ols_glance.metrics == Dict(
+            :r2 => 0.84,
+            :adj_r2 => 0.79,
+            :rss => 1.2,
+            :tss => 7.5,
+            :sigma => 0.49,
+        )
+        @test ols_glance.warnings == [rows_dropped_warning]
+
+        @test length(ols_tidy.rows) == 2
+        @test ols_tidy.rows[1] == CoefRow(:Intercept, 1.2, 0.10, 12.0, 0.0001)
+        @test ols_tidy.rows[2] == CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001)
+        @test ols_tidy.vcov_label == "classical"
     end
 
 end
