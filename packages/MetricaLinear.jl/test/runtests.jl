@@ -35,9 +35,12 @@ end
 
     empty_csv, empty_io = mktemp()
     close(empty_io)
-    write(empty_csv, "y,x1\n,\n,\n")
+    write(empty_csv, "y,x1\n,1\n,2\n")
 
     empty_result = fit_ols_file(empty_csv, "y ~ x1")
     @test empty_result isa ModelError
     @test empty_result.code === :empty_effective_sample
+
+    rm(singular_csv; force=true)
+    rm(empty_csv; force=true)
 end
