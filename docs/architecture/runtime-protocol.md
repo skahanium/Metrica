@@ -91,6 +91,13 @@
 完整切片设计与验收标准见：
 
 - `docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md`
-- `docs/superpowers/plans/2026-04-24-metrica-alpha-vertical-slice-plan.md`
+- 当前实施依据：`docs/superpowers/plans/2026-04-25-metrica-alpha-real-ols-full-chain-plan.md`
+- 历史草案参考：`docs/superpowers/plans/2026-04-24-metrica-alpha-vertical-slice-plan.md`
+
+当前活跃实现路线补充约束：
+
+- `fit_model` 必须通过 Runtime 调用 Julia 子进程真实执行
+- 成功响应中的 `glance` 与 `tidy` 来自真实 OLS 拟合结果
+- `fit_ols_demo` 或纯示例载荷不得作为当前 alpha 完成标准
 
 > 注意：成功响应中的 `augment_preview` 字段在当前 alpha 切片中恒为空数组，完整 `augment` 大表渲染在后续切片中启用。

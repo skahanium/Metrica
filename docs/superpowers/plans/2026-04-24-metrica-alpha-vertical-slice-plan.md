@@ -1,5 +1,7 @@
 # Metrica Alpha 垂直切片实施计划
 
+> **状态：已被后续真实实现计划细化。** 本文件保留为早期 alpha 垂直切片实施草案，其中 `fit_ols_demo` 与示例载荷路线不再作为当前实施依据。当前活跃实施计划为 `docs/superpowers/plans/2026-04-25-metrica-alpha-real-ols-full-chain-plan.md`。
+
 > **面向代理工作者：** 须使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务逐步执行本计划。步骤使用复选框语法（`- [ ]`）跟踪。
 
 **目标：** 交付第一条真实端到端 Metrica 切片：本地 CSV → OLS 执行 → 结构化 Runtime 载荷 → 桌面结果渲染。
