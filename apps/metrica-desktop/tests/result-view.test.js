@@ -1,0 +1,100 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  renderWarnings,
+  renderGlance,
+  renderTidyRows,
+  renderError,
+  renderDatasetSummary,
+  renderPreviewRows,
+} from "../src/result-view.js";
+
+test("renderWarnings 输出 warning 标题与正文", () => {
+  const html = renderWarnings([
+    {
+      title: "缺失值删样",
+      detail: "因模型相关列存在缺失值，已删除 1 行观测。",
+    },
+  ]);
+
+  assert.match(html, /缺失值删样/);
+  assert.match(html, /已删除 1 行观测/);
+});
+
+test("renderGlance 输出关键指标卡片", () => {
+  const html = renderGlance({
+    model: "ols",
+    nobs: 7,
+    dof: 4,
+    metrics: {
+      r2: 0.99,
+      adj_r2: 0.98,
+      sigma: 0.52,
+      rss: 1.1,
+      tss: 165.4,
+    },
+  });
+
+  assert.match(html, /样本量/);
+  assert.match(html, /调整 R²/);
+  assert.match(html, /0\.9900/);
+});
+
+test("renderTidyRows 输出系数行", () => {
+  const html = renderTidyRows([
+    {
+      name: "x1",
+      estimate: 2.7333,
+      stderror: 0.718,
+      statistic: 3.80,
+      pvalue: 0.019,
+    },
+  ]);
+
+  assert.match(html, /x1/);
+  assert.match(html, /2\.7333/);
+  assert.match(html, /0\.0190/);
+});
+
+test("renderError 输出错误与 hint", () => {
+  const html = renderError({
+    text: "公式中的变量无法在数据集中找到：x9。",
+    hint: "请检查公式中的变量名是否与数据列一致。",
+  });
+
+  assert.match(html, /运行失败/);
+  assert.match(html, /x9/);
+  assert.match(html, /变量名是否与数据列一致/);
+});
+
+test("renderDatasetSummary 输出列摘要", () => {
+  const html = renderDatasetSummary({
+    dataset_summary: {
+      row_count: 8,
+      column_count: 3,
+    },
+    columns: [
+      { name: "y", inferred_type: "Float64", missing_count: 0 },
+      { name: "x2", inferred_type: "Float64?", missing_count: 1 },
+    ],
+  });
+
+  assert.match(html, /8/);
+  assert.match(html, /Float64/);
+  assert.match(html, /missing/i);
+});
+
+test("renderPreviewRows 输出预览行", () => {
+  const html = renderPreviewRows(
+    [
+      { y: 10, x1: 1, x2: 5 },
+      { y: 12, x1: 2, x2: 4 },
+    ],
+    ["y", "x1", "x2"],
+  );
+
+  assert.match(html, /<table/);
+  assert.match(html, /10/);
+  assert.match(html, /x2/);
+});

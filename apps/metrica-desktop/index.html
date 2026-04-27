@@ -1,77 +1,108 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Metrica Desktop Shell</title>
+  <title>Metrica Alpha OLS</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <h1>Metrica</h1>
-        <p>Desktop Workbench Shell</p>
-      </div>
-      <nav>
-        <a href="#home">Home</a>
-        <a href="#project">Project</a>
-        <a href="#data">Data Inspector</a>
-        <a href="#model">Model Builder</a>
-        <a href="#results">Results</a>
-        <a href="#learn">Learn</a>
-      </nav>
-    </aside>
-
-    <main class="workspace">
-      <header class="hero">
-        <span class="badge">Phase 1</span>
-        <h2>Core / Runtime / App scaffold</h2>
+  <main class="app-shell">
+    <section class="panel controls">
+      <div class="panel-header">
+        <span class="eyebrow">Metrica Alpha</span>
+        <h1>最小真实 OLS 链路</h1>
         <p>
-          This zero-dependency prototype marks the intended desktop information architecture
-          before the full Tauri shell is wired up.
+          当前页面只负责通过 Runtime 发起真实 `fit_model` 请求，并渲染结构化结果。
         </p>
-      </header>
+      </div>
 
-      <section class="grid">
-        <article class="card" id="home">
-          <h3>Home</h3>
-          <p>Recent projects, sample analyses, and quick-start entry points.</p>
-        </article>
-        <article class="card" id="project">
-          <h3>Project</h3>
-          <p>Workspace summary, saved models, datasets, and export history.</p>
-        </article>
-        <article class="card" id="data">
-          <h3>Data Inspector</h3>
-          <p>Column roles, missing-value counts, inferred types, and sample changes.</p>
-        </article>
-        <article class="card" id="model">
-          <h3>Model Builder</h3>
-          <p>Formula entry, model selection, covariance options, and execution controls.</p>
-        </article>
-        <article class="card" id="results">
-          <h3>Results</h3>
-          <p>Structured `glance`, `tidy`, warnings, and export-ready summaries.</p>
-        </article>
-        <article class="card" id="learn">
-          <h3>Learn</h3>
-          <p>Teaching-oriented explanations, term definitions, and guided examples.</p>
-        </article>
+      <label class="field">
+        <span>Runtime 基础地址</span>
+        <input id="runtime-base" type="text" />
+      </label>
+
+      <label class="field">
+        <span>CSV 文件路径</span>
+        <input id="dataset-path" type="text" />
+      </label>
+
+      <div class="button-row">
+        <button id="choose-file" type="button" class="secondary-button">选择文件</button>
+        <button id="inspect-dataset" type="button" class="secondary-button">检查数据</button>
+      </div>
+      <input id="file-picker" type="file" accept=".csv,text/csv" hidden />
+
+      <label class="field">
+        <span>OLS 公式</span>
+        <input id="formula-input" type="text" value="y ~ x1 + x2" />
+      </label>
+
+      <button id="run-model" type="button">运行模型</button>
+      <p id="status-text" class="status-text">等待运行。</p>
+
+      <div class="notes">
+        <h2>链路约束</h2>
+        <ul>
+          <li>前端不直接调用 Julia。</li>
+          <li>Runtime 是唯一执行桥。</li>
+          <li>结果页只消费结构化 `glance / tidy / warnings / messages`。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel results">
+      <div class="results-header">
+        <span class="eyebrow">Results</span>
+        <h2>结构化结果</h2>
+      </div>
+
+      <div id="error-box" class="message-box error-box" hidden></div>
+      <div id="message-box" class="message-list"></div>
+      <div id="warning-box" class="warning-list" hidden></div>
+
+      <section class="table-panel">
+        <div class="table-header">
+          <h3>数据摘要</h3>
+          <p>展示 Runtime 返回的结构化列摘要。</p>
+        </div>
+        <div id="dataset-summary-box"></div>
       </section>
 
-      <section class="protocol-strip">
-        <div>
-          <strong>Runtime actions</strong>
-          <span>inspect_dataset / fit_model / export_result / explain_warning</span>
+      <section class="table-panel">
+        <div class="table-header">
+          <h3>数据预览</h3>
+          <p>展示 Runtime 返回的前几行结构化预览。</p>
         </div>
-        <div>
-          <strong>Structured outputs</strong>
-          <span>glance / tidy / augment / warnings</span>
-        </div>
+        <div id="preview-box"></div>
       </section>
-    </main>
-  </div>
+
+      <section id="glance-box" class="glance-grid" hidden></section>
+
+      <section class="table-panel">
+        <div class="table-header">
+          <h3>系数表</h3>
+          <p>展示 Runtime 返回的结构化 `tidy` 结果。</p>
+        </div>
+        <table id="tidy-table">
+          <thead>
+            <tr>
+              <th>参数</th>
+              <th>估计值</th>
+              <th>标准误</th>
+              <th>统计量</th>
+              <th>p 值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="5" class="empty-row">尚未运行模型。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+  </main>
 
   <script type="module" src="./src/main.js"></script>
 </body>
