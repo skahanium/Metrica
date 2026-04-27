@@ -1,8 +1,15 @@
 module MetricaLinear
 
+using CSV
+using DataFrames
+using Distributions
+using JSON3
+using LinearAlgebra
+using Statistics
+using StatsModels
 using MetricaBase
 
-export OLSModel, OLSFitResult, PHASE_1_MODELS
+export OLSModel, OLSFitResult, PHASE_1_MODELS, fit_ols_file, inspect_dataset, result_to_payload
 
 const PHASE_1_MODELS = (:OLS,)
 
@@ -14,12 +21,19 @@ struct OLSModel <: MetricaBase.AbstractEconModel
 end
 
 """
-第一条垂直切片的拟合结果占位形状。
+第一条真实 OLS 链路的结构化拟合结果。
 """
 struct OLSFitResult <: MetricaBase.AbstractFittedModel
     formula::String
-    nobs::Int
-    warnings::Vector{MetricaBase.ModelWarning}
+    glance_table::MetricaBase.ModelGlance
+    tidy_table::MetricaBase.TidyTable
 end
+
+MetricaBase.glance(result::OLSFitResult) = result.glance_table
+MetricaBase.tidy(result::OLSFitResult) = result.tidy_table
+
+include("io.jl")
+include("ols.jl")
+include("serialize.jl")
 
 end

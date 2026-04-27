@@ -1,0 +1,188 @@
+function parse_formula_term(formula::AbstractString)
+    expr = try
+        Meta.parse("@formula($(formula))")
+    catch err
+        return MetricaBase.ModelError(
+            :formula_parse_failed,
+            "公式解析失败",
+            "无法解析公式字符串：$(sprint(showerror, err))",
+            "请使用如 y ~ x1 + x2 的公式格式。",
+        )
+    end
+
+    try
+        return Core.eval(@__MODULE__, expr)
+    catch err
+        return MetricaBase.ModelError(
+            :formula_parse_failed,
+            "公式解析失败",
+            "无法构造公式对象：$(sprint(showerror, err))",
+            "请使用如 y ~ x1 + x2 的公式格式。",
+        )
+    end
+end
+
+function collect_term_symbols(term)
+    symbols = Symbol[]
+    append_term_symbols!(symbols, term)
+    return unique(symbols)
+end
+
+function append_term_symbols!(symbols::Vector{Symbol}, term)
+    if term isa StatsModels.Term
+        push!(symbols, term.sym)
+        return symbols
+    end
+
+    if term isa Tuple
+        for item in term
+            append_term_symbols!(symbols, item)
+        end
+        return symbols
+    end
+
+    if hasproperty(term, :lhs)
+        append_term_symbols!(symbols, getproperty(term, :lhs))
+    end
+
+    if hasproperty(term, :rhs)
+        append_term_symbols!(symbols, getproperty(term, :rhs))
+    end
+
+    return symbols
+end
+
+function build_rows_dropped_warning(dropped_rows::Int)
+    return MetricaBase.ModelWarning(
+        :rows_dropped,
+        "缺失值删样",
+        "因模型相关列存在缺失值，已删除 $(dropped_rows) 行观测。",
+        "请检查模型变量中的缺失分布。",
+        MetricaBase.warning,
+    )
+end
+
+function compute_pvalues(statistics::Vector{Float64}, dof::Int)
+    distribution = TDist(dof)
+    return 2 .* (1 .- cdf.(distribution, abs.(statistics)))
+end
+
+function fit_ols_file(path::AbstractString, formula::AbstractString)
+    dataset = load_dataset(path)
+    dataset isa MetricaBase.ModelError && return dataset
+
+    model_formula = parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+
+    model_columns = collect_term_symbols(model_formula)
+    available_columns = Set(Symbol.(names(dataset)))
+    missing_columns = [name for name in model_columns if name ∉ available_columns]
+
+    isempty(missing_columns) || return MetricaBase.ModelError(
+        :unknown_variable,
+        "模型变量不存在",
+        "公式中的变量无法在数据集中找到：$(join(string.(missing_columns), ", "))。",
+        "请检查公式中的变量名是否与数据列一致。",
+    )
+
+    filtered_dataset = dataset[completecases(dataset[:, model_columns]), :]
+    n_total = nrow(dataset)
+    n_effective = nrow(filtered_dataset)
+
+    n_effective > 0 || return MetricaBase.ModelError(
+        :empty_effective_sample,
+        "有效样本为空",
+        "在模型相关列完成缺失值删除后，没有剩余观测可用于拟合。",
+        "请检查响应变量与解释变量中的缺失情况。",
+    )
+
+    model_frame = try
+        ModelFrame(model_formula, filtered_dataset)
+    catch err
+        if err isa ArgumentError
+            return MetricaBase.ModelError(
+                :unknown_variable,
+                "模型变量不存在",
+                "公式中的变量无法在数据集中解析：$(sprint(showerror, err))",
+                "请检查公式中的变量名是否与数据列一致。",
+            )
+        end
+
+        rethrow(err)
+    end
+
+    model_matrix = ModelMatrix(model_frame)
+    X = model_matrix.m
+    y = Float64.(response(model_frame))
+    nobs = length(y)
+    ncoef = size(X, 2)
+
+    rank(X) == ncoef || return MetricaBase.ModelError(
+        :singular_design,
+        "设计矩阵奇异",
+        "预测变量之间存在完全线性相关，模型无法唯一估计。",
+        "请移除冗余变量或检查重复列后重试。",
+    )
+
+    dof = nobs - ncoef
+    dof > 0 || return MetricaBase.ModelError(
+        :insufficient_degrees_of_freedom,
+        "自由度不足",
+        "有效样本量不足以支撑当前模型参数个数。",
+        "请减少参数数量或增加样本后重试。",
+    )
+
+    coefficients = X \ y
+    fitted = X * coefficients
+    residuals = y - fitted
+    rss = sum(abs2, residuals)
+    y_mean = mean(y)
+    tss = sum(abs2, y .- y_mean)
+    r2 = iszero(tss) ? 1.0 : 1 - rss / tss
+    adj_r2 = if iszero(tss)
+        1.0
+    else
+        1 - (rss / dof) / (tss / (nobs - 1))
+    end
+
+    xtx = transpose(X) * X
+    sigma2 = rss / dof
+    vcov = sigma2 * inv(xtx)
+    stderror = sqrt.(diag(vcov))
+    statistics = coefficients ./ stderror
+    pvalues = compute_pvalues(statistics, dof)
+    coefficient_names = Symbol.(coefnames(model_frame))
+
+    tidy_rows = [
+        MetricaBase.CoefRow(
+            coefficient_names[index],
+            coefficients[index],
+            stderror[index],
+            statistics[index],
+            pvalues[index],
+        )
+        for index in eachindex(coefficients)
+    ]
+
+    warnings = MetricaBase.ModelWarning[]
+    dropped_rows = n_total - n_effective
+    dropped_rows > 0 && push!(warnings, build_rows_dropped_warning(dropped_rows))
+
+    glance_table = MetricaBase.ModelGlance(
+        :ols,
+        nobs,
+        dof,
+        Dict{Symbol, MetricaBase.MetricValue}(
+            :r2 => r2,
+            :adj_r2 => adj_r2,
+            :rss => rss,
+            :tss => tss,
+            :sigma => sqrt(sigma2),
+        ),
+        warnings,
+    )
+
+    tidy_table = MetricaBase.TidyTable(tidy_rows, "classical")
+
+    return OLSFitResult(String(formula), glance_table, tidy_table)
+end
