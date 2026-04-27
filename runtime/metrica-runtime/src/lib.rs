@@ -1,39 +1,45 @@
-use serde::Serialize;
+pub mod http;
+pub mod julia_bridge;
+
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-#[derive(Debug, Serialize)]
+pub use http::{build_http_response, default_bind_addr, serve_http, HttpResponse};
+pub use julia_bridge::execute_fit_model;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectContext {
     pub project_id: String,
     pub working_dir: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatasetRef {
     pub source: String,
     pub path: String,
     pub format: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VcovSpec {
     #[serde(rename = "type")]
     pub kind: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelSpec {
     pub model_type: String,
     pub formula: String,
     pub vcov: VcovSpec,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestOptions {
     pub drop_missing: bool,
     pub return_augment: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskRequest {
     pub task_id: String,
     pub action: String,
@@ -43,7 +49,7 @@ pub struct TaskRequest {
     pub options: RequestOptions,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub level: String,
     pub code: String,
@@ -52,7 +58,7 @@ pub struct Message {
     pub hint: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskResponse {
     pub task_id: String,
     pub status: String,
@@ -63,7 +69,7 @@ pub struct TaskResponse {
     pub result_payload: Option<Value>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct HealthSummary {
     pub service: String,
     pub status: String,
@@ -75,24 +81,51 @@ pub fn sample_fit_model_request() -> TaskRequest {
         task_id: "uuid".to_string(),
         action: "fit_model".to_string(),
         project_context: ProjectContext {
-            project_id: "proj_001".to_string(),
-            working_dir: "/path/to/project".to_string(),
+            project_id: "alpha-demo".to_string(),
+            working_dir: "/Users/skahanium/Metrica/apps/metrica-desktop".to_string(),
         },
         dataset_ref: DatasetRef {
             source: "file".to_string(),
-            path: "/path/to/data.csv".to_string(),
+            path: "/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv".to_string(),
             format: "csv".to_string(),
         },
         model_spec: ModelSpec {
             model_type: "ols".to_string(),
-            formula: "y ~ x1 + x2 + x3".to_string(),
+            formula: "y ~ x1 + x2".to_string(),
             vcov: VcovSpec {
                 kind: "classical".to_string(),
             },
         },
         options: RequestOptions {
             drop_missing: true,
-            return_augment: true,
+            return_augment: false,
+        },
+    }
+}
+
+pub fn sample_inspect_dataset_request() -> TaskRequest {
+    TaskRequest {
+        task_id: "inspect-uuid".to_string(),
+        action: "inspect_dataset".to_string(),
+        project_context: ProjectContext {
+            project_id: "alpha-demo".to_string(),
+            working_dir: "/Users/skahanium/Metrica/apps/metrica-desktop".to_string(),
+        },
+        dataset_ref: DatasetRef {
+            source: "file".to_string(),
+            path: "/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv".to_string(),
+            format: "csv".to_string(),
+        },
+        model_spec: ModelSpec {
+            model_type: "ols".to_string(),
+            formula: "y ~ x1 + x2".to_string(),
+            vcov: VcovSpec {
+                kind: "classical".to_string(),
+            },
+        },
+        options: RequestOptions {
+            drop_missing: true,
+            return_augment: false,
         },
     }
 }
@@ -147,8 +180,6 @@ pub fn health_summary() -> HealthSummary {
         supported_actions: vec![
             "inspect_dataset",
             "fit_model",
-            "export_result",
-            "explain_warning",
         ],
     }
 }
