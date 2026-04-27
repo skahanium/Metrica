@@ -1,10 +1,12 @@
 # Metrica Alpha 真实 OLS 全链路设计
 
+> **状态补充：** 本设计仍是当前 Alpha 主链路的主规格。当前仓库已先完成 Julia 端最小可用 OLS；接下来的直接目标是把这条链路继续收口为“最小真实全链路前端”，即 `App -> Runtime -> Julia -> 结构化结果 -> App` 必须真实打通，不允许以 mock 响应或前端直调脚本替代。
+
 ## 概述
 
 本设计文档定义 Metrica 当前阶段最核心的实施目标：
 
-**将 “本地 CSV 导入 + 真实 OLS 拟合 + 结构化结果 + 桌面渲染 + 教学友好警告” 这条 Alpha 主链路真正跑通。**
+**将 “本地 CSV 导入 + 真实数据检查 + 真实 OLS 拟合 + 结构化结果 + 桌面渲染 + 教学友好警告” 这条 Alpha 主链路真正跑通。**
 
 这不是一个演示级 mock 切片，也不是占位式联调；它是后续所有模型能力、输出能力、桌面能力与教学能力的基石。
 
@@ -21,9 +23,15 @@
 
 1. `MetricaBase.jl` 的结构化协议足以作为 Core、Runtime、App 三层的稳定共享边界。
 2. `MetricaLinear.jl` 可以在不依赖 GUI、也不暴露第三方回归对象的前提下，提供真实 OLS 能力。
-3. `runtime/metrica-runtime` 可以通过 Julia 子进程稳定执行模型任务并传递结构化成功/失败载荷。
-4. `apps/metrica-desktop` 可以只消费结构化结果对象，而不回退到解析终端文本。
+3. `runtime/metrica-runtime` 可以通过 Julia 子进程稳定执行 `inspect_dataset` 与 `fit_model` 两类任务，并传递结构化成功/失败载荷。
+4. `apps/metrica-desktop` 可以只消费结构化数据检查结果与模型结果对象，而不回退到解析终端文本。
 5. 教学友好行为在第一条链路中是协议级能力，而不是 UI 补丁。
+
+当前阶段性落点补充：
+
+- 已完成的最小可用边界：`fit_ols_file`、`glance`、`tidy`、结构化 warning / error、结构化 payload
+- 当前正在推进的边界：Runtime 真实调用 Julia、桌面端真实发请求与渲染、数据检查最小链路
+- 明确排除的短期捷径：前端直接调用本地 Julia 脚本、前端消费示例 JSON、Runtime 返回样例载荷冒充真实链路
 
 ## 非目标
 
@@ -50,6 +58,7 @@
 
 `runtime/metrica-runtime` 是桌面端与 Julia Core 之间的唯一桥。
 
+- 接收 `inspect_dataset` 请求
 - 接收 `fit_model` 请求
 - 做轻量输入校验与路径整理
 - 通过 Julia CLI 子进程执行真实拟合
@@ -57,16 +66,30 @@
 
 Runtime 不得重做计量逻辑，不得解释系数或重新计算统计量。
 
+当前实现要求补充：
+
+- Runtime 必须成为前端触发 OLS 的唯一执行入口
+- Runtime 可以转发结构化结果，但不得复制 Julia 侧的 OLS 语义或统计计算
+- 在真实子进程桥接完成前，不得把样例响应测试通过误报为“真实 OLS 全链路已打通”
+
 ### App
 
 `apps/metrica-desktop` 负责最小但真实的桌面工作流。
 
 - 选择本地 CSV
+- 触发数据检查
 - 输入 OLS 公式
 - 触发运行
+- 渲染结构化列摘要与预览表
 - 渲染结构化 `glance`、`tidy`、warnings 与错误
 
 App 不解析 `summary()` 文本，也不依赖终端打印格式。
+
+当前实现要求补充：
+
+- App 必须通过 Runtime 发起真实 `fit_model`
+- App 必须渲染结构化 `glance`、`tidy`、warnings 与错误
+- 在真实调用 Runtime 前，不得把壳层页面或占位 banner 视为“基本可用前端”
 
 ## Julia 端设计
 
@@ -192,7 +215,11 @@ Runtime 通过一次一调用的 Julia CLI 子进程执行真实模型任务。
 
 ### 请求与响应
 
-`fit_model` 仍沿用既有结构化协议方向：
+`inspect_dataset` 与 `fit_model` 仍沿用既有结构化协议方向：
+
+- `inspect_dataset`
+  - `dataset_ref.path` 指向本地 CSV
+  - 返回 `dataset_summary`、`columns`、`preview_rows` 与可选 `warnings`
 
 - `dataset_ref.path` 指向本地 CSV
 - `model_spec.model_type = "ols"`
@@ -206,6 +233,55 @@ Runtime 的职责只包括：
 - 启动 Julia 子进程
 - 捕获 stdout/stderr、退出码与超时
 - 将 Julia 返回的 JSON 响应转发为稳定桌面协议
+
+本阶段的最小真实前端链路要求 Runtime 额外满足：
+
+- 有一个能被桌面端稳定调用的 `fit_model` 执行入口
+- 有一个能被桌面端稳定调用的 `inspect_dataset` 执行入口
+- 对成功与失败都返回统一结构化响应
+- 不要求在本阶段引入常驻 worker、任务队列或复杂调度
+
+## App 最小结果页
+
+前端当前阶段不追求完整工作台，而追求一条可长期保留的最小真实结果页。
+
+必须包含：
+
+- 文件选择按钮
+- CSV 路径输入
+- 数据检查按钮
+- 数据摘要区
+- 数据预览表
+- 公式输入
+- 运行按钮
+- 运行中状态
+- `glance` 摘要区
+- `tidy` 系数表
+- warnings 区
+- error 区
+
+明确不包含：
+
+- 多模型切换
+- 项目系统全量流程
+- 复杂导航与多标签工作区
+- 任何依赖 mock 结果的占位运行体验
+
+## 数据检查最小协议
+
+`inspect_dataset` 的最小成功结果应至少包含：
+
+- `dataset_summary`
+  - `row_count`
+  - `column_count`
+- `columns`
+  - `name`
+  - `inferred_type`
+  - `missing_count`
+- `preview_rows`
+  - 仅返回前几行原始值的结构化对象数组
+- `warnings`
+  - 如存在空列、全缺失列或其他教学友好提示
 
 ### 失败分层
 

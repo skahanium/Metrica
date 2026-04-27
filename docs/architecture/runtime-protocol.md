@@ -10,6 +10,16 @@
 每个请求必须包含 `task_id`、`action`、`project_context` 以及动作相关载荷。  
 每个响应必须包含 `task_id`、`status`、`messages`，以及可选的 `result_payload`。
 
+## 当前 Alpha 传输方式
+
+当前最小真实链路通过本地 HTTP 传输协议暴露 Runtime：
+
+- 默认绑定：`127.0.0.1:47821`
+- `POST /fit_model`
+- `OPTIONS /fit_model`
+
+该 HTTP 层只负责搬运结构化请求与响应，不承载计量逻辑本身。
+
 ## 请求示例
 
 ```json
@@ -58,6 +68,37 @@
     "tidy": [],
     "augment_preview": [],
     "diagnostics": [],
+    "warnings": []
+  }
+}
+```
+
+## 数据检查成功响应示例
+
+```json
+{
+  "task_id": "uuid",
+  "status": "success",
+  "messages": [],
+  "result_payload": {
+    "dataset_summary": {
+      "row_count": 8,
+      "column_count": 3
+    },
+    "columns": [
+      {
+        "name": "y",
+        "inferred_type": "Int64",
+        "missing_count": 0
+      }
+    ],
+    "preview_rows": [
+      {
+        "y": 10,
+        "x1": 1,
+        "x2": 5
+      }
+    ],
     "warnings": []
   }
 }
