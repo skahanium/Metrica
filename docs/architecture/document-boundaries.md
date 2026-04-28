@@ -146,6 +146,22 @@
 - 通用仓库脚手架工作
 - 无关的未来里程碑
 
+### `docs/superpowers/specs/2026-04-28-metrica-visualization-architecture-design.md`
+
+拥有：
+
+- 统计图、地图、3D 可视化的架构方向
+- PlotSpec / TableSpec 协议定义与双通道渲染设计
+- App 渲染层技术选型（ECharts、Leaflet、Three.js）
+- 离线出版级输出方案（Makie.jl + PrettyTables.jl）
+- 跨平台 WebView 兼容性评估
+
+不拥有：
+
+- 当前阶段实施范围（属于远期设计）
+- 具体图类型的完整字段 schema（实施时补全）
+- 前端组件实现细节
+
 ## 编辑策略
 
 修改文档时：
