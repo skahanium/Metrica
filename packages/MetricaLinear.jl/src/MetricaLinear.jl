@@ -8,6 +8,7 @@ using LinearAlgebra
 using Statistics
 using StatsModels
 using MetricaBase
+using MetricaOutput
 
 export OLSModel, OLSFitResult, PHASE_1_MODELS, fit_ols_file, inspect_dataset, result_to_payload
 

@@ -207,7 +207,7 @@ export function renderDatasetSummary(inspection) {
     return `
       <article class="empty-state">
         <strong>尚未检查数据集。</strong>
-        <p>点击“检查数据”后，这里会显示列摘要。</p>
+        <p>点击"检查数据"后，这里会显示列摘要。</p>
       </article>
     `;
   }
@@ -283,5 +283,23 @@ export function renderPreviewRows(rows = [], columnOrder = []) {
       </thead>
       <tbody>${body}</tbody>
     </table>
+  `;
+}
+
+export function renderSummaryText(summaryText) {
+  if (!summaryText) {
+    return `
+      <article class="empty-state">
+        <strong>尚未生成摘要。</strong>
+        <p>运行模型后会在这里显示文本摘要。</p>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="summary-card">
+      <strong>模型摘要</strong>
+      <p>${escapeHtml(summaryText)}</p>
+    </article>
   `;
 }

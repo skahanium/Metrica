@@ -304,3 +304,26 @@ body {
     position: static;
   }
 }
+
+.summary-card {
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-top: 12px;
+}
+
+.summary-card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.summary-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.5;
+  word-break: break-all;
+}

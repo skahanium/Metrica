@@ -68,7 +68,8 @@
     "tidy": [],
     "augment_preview": [],
     "diagnostics": [],
-    "warnings": []
+    "warnings": [],
+    "summary_text": "model=ols, nobs=128, dof=124, r2=0.81"
   }
 }
 ```

@@ -31,6 +31,12 @@ function result_to_payload(result::OLSFitResult)
     tidy_table = MetricaBase.tidy(result)
     warnings = [warning_to_dict(warning) for warning in glance_table.warnings]
 
+    summary_text = try
+        MetricaOutput.summary_card(glance_table)
+    catch
+        ""
+    end
+
     return Dict(
         "status" => "success",
         "messages" => [
@@ -61,6 +67,7 @@ function result_to_payload(result::OLSFitResult)
                 for row in tidy_table.rows
             ],
             "warnings" => warnings,
+            "summary_text" => summary_text,
         ),
     )
 end

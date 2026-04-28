@@ -76,17 +76,56 @@ pub struct HealthSummary {
     pub supported_actions: Vec<&'static str>,
 }
 
+/// 解析示例 demo 目录。
+///
+/// 优先读取环境变量 `METRICA_DEMO_DIR`；若未设置，则基于
+/// `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根，
+/// 再拼接 `apps/metrica-desktop` 作为默认路径。
+fn default_demo_dir() -> String {
+    if let Ok(path) = std::env::var("METRICA_DEMO_DIR") {
+        return path;
+    }
+
+    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default();
+
+    repo_root
+        .join("apps")
+        .join("metrica-desktop")
+        .to_string_lossy()
+        .to_string()
+}
+
+/// 解析示例 demo CSV 路径。
+///
+/// 优先读取环境变量 `METRICA_DEMO_CSV`；若未设置，则在 `default_demo_dir()`
+/// 的 `data/demo.csv` 子路径中查找。
+fn default_demo_csv() -> String {
+    if let Ok(path) = std::env::var("METRICA_DEMO_CSV") {
+        return path;
+    }
+
+    std::path::PathBuf::from(default_demo_dir())
+        .join("data")
+        .join("demo.csv")
+        .to_string_lossy()
+        .to_string()
+}
+
 pub fn sample_fit_model_request() -> TaskRequest {
     TaskRequest {
         task_id: "uuid".to_string(),
         action: "fit_model".to_string(),
         project_context: ProjectContext {
             project_id: "alpha-demo".to_string(),
-            working_dir: "/Users/skahanium/Metrica/apps/metrica-desktop".to_string(),
+            working_dir: default_demo_dir(),
         },
         dataset_ref: DatasetRef {
             source: "file".to_string(),
-            path: "/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv".to_string(),
+            path: default_demo_csv(),
             format: "csv".to_string(),
         },
         model_spec: ModelSpec {
@@ -109,11 +148,11 @@ pub fn sample_inspect_dataset_request() -> TaskRequest {
         action: "inspect_dataset".to_string(),
         project_context: ProjectContext {
             project_id: "alpha-demo".to_string(),
-            working_dir: "/Users/skahanium/Metrica/apps/metrica-desktop".to_string(),
+            working_dir: default_demo_dir(),
         },
         dataset_ref: DatasetRef {
             source: "file".to_string(),
-            path: "/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv".to_string(),
+            path: default_demo_csv(),
             format: "csv".to_string(),
         },
         model_spec: ModelSpec {

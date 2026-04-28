@@ -10,6 +10,7 @@ import {
   renderGlance,
   renderMessagesMarkup,
   renderPreviewRows,
+  renderSummaryText,
   renderTidyRows,
   renderWarnings,
 } from "./result-view.js";
@@ -28,6 +29,7 @@ const warningBox = document.getElementById("warning-box");
 const datasetSummaryBox = document.getElementById("dataset-summary-box");
 const previewBox = document.getElementById("preview-box");
 const glanceBox = document.getElementById("glance-box");
+const summaryBox = document.getElementById("summary-box");
 const tidyTableBody = document.querySelector("#tidy-table tbody");
 
 runtimeBaseInput.value = DEFAULT_RUNTIME_BASE;
@@ -43,6 +45,8 @@ function resetResultArea() {
   previewBox.innerHTML = renderPreviewRows([], []);
   glanceBox.hidden = false;
   glanceBox.innerHTML = renderGlance(null);
+  summaryBox.hidden = false;
+  summaryBox.innerHTML = renderSummaryText(null);
   tidyTableBody.innerHTML = `
     <tr>
       <td colspan="5" class="empty-row">等待 Runtime 返回结构化 tidy。</td>
@@ -70,6 +74,10 @@ function showWarnings(warnings) {
 
 function showGlance(glance) {
   glanceBox.innerHTML = renderGlance(glance);
+}
+
+function showSummary(summaryText) {
+  summaryBox.innerHTML = renderSummaryText(summaryText);
 }
 
 function showTidy(rows) {
@@ -159,6 +167,7 @@ async function runModel() {
     const payload = response.result_payload || {};
     showWarnings(payload.warnings || []);
     showGlance(payload.glance);
+    showSummary(payload.summary_text || "");
     showTidy(payload.tidy || []);
   } catch (message) {
     statusText.textContent = "运行失败。";

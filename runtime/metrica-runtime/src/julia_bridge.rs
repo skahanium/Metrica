@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::Command;
 
 use serde::Deserialize;
@@ -5,7 +6,28 @@ use serde_json::Value;
 
 use crate::{Message, TaskRequest, TaskResponse};
 
-const JULIA_PROJECT: &str = "/Users/skahanium/Metrica/packages/MetricaLinear.jl";
+/// 解析 Julia 项目路径。
+///
+/// 优先读取环境变量 `METRICA_JULIA_PROJECT`；若未设置，则基于
+/// `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根，
+/// 再拼接 `packages/MetricaLinear.jl` 作为默认路径。
+fn julia_project_path() -> String {
+    if let Ok(path) = std::env::var("METRICA_JULIA_PROJECT") {
+        return path;
+    }
+
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent() // metrica-runtime
+        .and_then(|p| p.parent()) // runtime
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default();
+
+    repo_root
+        .join("packages")
+        .join("MetricaLinear.jl")
+        .to_string_lossy()
+        .to_string()
+}
 
 const JULIA_SCRIPT: &str = r#"
 using JSON3
@@ -57,8 +79,9 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
     let request_json = serde_json::to_string(request)
         .map_err(|err| format!("序列化 fit_model 请求失败: {err}"))?;
 
+    let project_path = julia_project_path();
     let output = Command::new("julia")
-        .arg(format!("--project={JULIA_PROJECT}"))
+        .arg(format!("--project={project_path}"))
         .arg("--startup-file=no")
         .arg("--color=no")
         .arg("-e")

@@ -1,9 +1,9 @@
 export const DEFAULT_RUNTIME_BASE = "http://127.0.0.1:47821";
 export const DEFAULT_RUNTIME_ENDPOINT = `${DEFAULT_RUNTIME_BASE}/fit_model`;
 export const DEFAULT_INSPECT_ENDPOINT = `${DEFAULT_RUNTIME_BASE}/inspect_dataset`;
-export const DEFAULT_DATASET_PATH =
-  "/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv";
-export const DEFAULT_WORKING_DIR = "/Users/skahanium/Metrica/apps/metrica-desktop";
+// 默认 CSV 与工作目录取自仓库相对路径；桌面端可通过 Tauri 注入实际值。
+export const DEFAULT_DATASET_PATH = "apps/metrica-desktop/data/demo.csv";
+export const DEFAULT_WORKING_DIR = "apps/metrica-desktop";
 
 function createTaskId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {

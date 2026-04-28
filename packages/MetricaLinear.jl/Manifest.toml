@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "f7cc04f44e0dad18200b98f7b48798771c208efb"
+project_hash = "9c65c4d7e16edfb2a3e87f7daac4a07d19bec008"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -238,9 +238,15 @@ uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 version = "0.1.0"
 
 [[deps.MetricaLinear]]
-deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaOutput", "Statistics", "StatsModels"]
 path = "."
 uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+version = "0.1.0"
+
+[[deps.MetricaOutput]]
+deps = ["MetricaBase"]
+path = "../MetricaOutput.jl"
+uuid = "10c70d11-b779-43d3-b8f2-49770e63c885"
 version = "0.1.0"
 
 [[deps.Missings]]
