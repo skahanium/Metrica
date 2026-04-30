@@ -61,6 +61,18 @@ fn fit_model_forwards_weights_to_julia() {
 }
 
 #[test]
+fn fit_model_returns_structured_diagnostics() {
+    let request = sample_fit_model_request();
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diagnostics = payload.get("diagnostics").expect("diagnostics");
+    assert!(diagnostics.get("vif").and_then(|value| value.as_array()).is_some());
+    assert!(diagnostics.get("breusch_pagan").is_some());
+}
+
+#[test]
 fn inspect_dataset_returns_preview_payload_shape() {
     let request = sample_inspect_dataset_request();
     let response = execute_fit_model(&request).expect("runtime response");

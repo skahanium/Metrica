@@ -1,5 +1,7 @@
 # Metrica 当前实施计划
 
+> **状态：已收口。** 本计划的 Runtime/App 贯通、WLS/HC1 结构化选项与数值可信度加固已经完成。下一阶段实施依据为 `docs/superpowers/plans/2026-04-30-metrica-diagnostics-payload-plan.md`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 在已验证的真实 OLS 基线上，完成里程碑 2 的协议贯通与数值可信度加固。

@@ -336,6 +336,26 @@ body {
   font-size: 0.86rem;
 }
 
+.diagnostics-section {
+  display: grid;
+  gap: 16px;
+}
+
+.diagnostics-block {
+  display: grid;
+  gap: 10px;
+}
+
+.diagnostics-block h4 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.diagnostics-table,
+.diagnostics-grid {
+  margin-top: 0;
+}
+
 .summary-card p {
   margin: 0;
   font-size: 0.9rem;

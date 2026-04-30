@@ -181,6 +181,86 @@ export function renderVcovLabel(vcovLabel) {
   `;
 }
 
+export function renderDiagnostics(diagnostics) {
+  if (!diagnostics) {
+    return `
+      <article class="empty-state">
+        <strong>暂无诊断结果。</strong>
+        <p>运行模型后会在这里显示结构化诊断。</p>
+      </article>
+    `;
+  }
+
+  const vifRows = Array.isArray(diagnostics.vif) ? diagnostics.vif : [];
+  const vifMarkup = vifRows.length
+    ? `
+      <table class="tidy-table diagnostics-table">
+        <thead>
+          <tr>
+            <th>变量</th>
+            <th>VIF</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${vifRows
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHtml(row.name)}</td>
+                  <td>${formatNumber(row.vif)}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `
+    : `
+      <article class="empty-state">
+        <strong>暂无 VIF 结果。</strong>
+        <p>模型没有返回可展示的共线性诊断行。</p>
+      </article>
+    `;
+
+  const bp = diagnostics.breusch_pagan;
+  const bpMarkup = bp
+    ? `
+      <div class="glance-grid diagnostics-grid">
+        <div class="glance-card">
+          <span>统计量</span>
+          <strong>${formatNumber(bp.statistic)}</strong>
+        </div>
+        <div class="glance-card">
+          <span>p 值</span>
+          <strong>${formatNumber(bp.pvalue)}</strong>
+        </div>
+        <div class="glance-card">
+          <span>自由度</span>
+          <strong>${formatNumber(bp.dof)}</strong>
+        </div>
+      </div>
+    `
+    : `
+      <article class="empty-state">
+        <strong>暂无 Breusch-Pagan 结果。</strong>
+        <p>模型没有返回异方差诊断。</p>
+      </article>
+    `;
+
+  return `
+    <section class="diagnostics-section">
+      <article class="diagnostics-block">
+        <h4>VIF</h4>
+        ${vifMarkup}
+      </article>
+      <article class="diagnostics-block">
+        <h4>Breusch-Pagan</h4>
+        ${bpMarkup}
+      </article>
+    </section>
+  `;
+}
+
 export function renderWarningsMarkup(warnings = []) {
   return renderWarnings(warnings);
 }

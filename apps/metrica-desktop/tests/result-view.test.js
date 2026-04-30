@@ -7,6 +7,7 @@ import {
   renderTidyRows,
   renderError,
   renderDatasetSummary,
+  renderDiagnostics,
   renderPreviewRows,
   renderVcovLabel,
 } from "../src/result-view.js";
@@ -63,6 +64,26 @@ test("renderVcovLabel 输出协方差标签", () => {
 
   assert.match(html, /协方差/);
   assert.match(html, /HC1/);
+});
+
+test("renderDiagnostics 输出结构化诊断结果", () => {
+  const html = renderDiagnostics({
+    vif: [
+      { name: "x1", vif: 1.25 },
+      { name: "x2", vif: 2.5 },
+    ],
+    breusch_pagan: {
+      statistic: 3.2,
+      pvalue: 0.0736,
+      dof: 2,
+    },
+  });
+
+  assert.match(html, /VIF/);
+  assert.match(html, /x1/);
+  assert.match(html, /1\.2500/);
+  assert.match(html, /Breusch-Pagan/);
+  assert.match(html, /0\.0736/);
 });
 
 test("renderError 输出错误与 hint", () => {

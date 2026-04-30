@@ -10,19 +10,13 @@ use crate::{Message, TaskRequest, TaskResponse};
 ///
 /// 优先读取环境变量 `METRICA_JULIA_PROJECT`；若未设置，则基于
 /// `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根，
-/// 再拼接 `packages/MetricaLinear.jl` 作为默认路径。
+/// 再进入 `packages/MetricaLinear.jl`。
 fn julia_project_path() -> String {
     if let Ok(path) = std::env::var("METRICA_JULIA_PROJECT") {
         return path;
     }
 
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent() // metrica-runtime
-        .and_then(|p| p.parent()) // runtime
-        .map(|p| p.to_path_buf())
-        .unwrap_or_default();
-
-    repo_root
+    repo_root()
         .join("packages")
         .join("MetricaLinear.jl")
         .to_string_lossy()
@@ -60,6 +54,27 @@ const JULIA_SCRIPT: &str = r#"
 using JSON3
 using MetricaLinear
 
+include(joinpath(String(ARGS[2]), "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))
+using .MetricaTests
+
+function diagnostics_to_dict(result)
+    bp = breusch_pagan(result)
+    return Dict(
+        "vif" => [
+            Dict(
+                "name" => row.name,
+                "vif" => row.vif,
+            )
+            for row in vif(result)
+        ],
+        "breusch_pagan" => Dict(
+            "statistic" => bp.statistic,
+            "pvalue" => bp.pvalue,
+            "dof" => bp.dof,
+        ),
+    )
+end
+
 request = JSON3.read(ARGS[1])
 action = String(request.action)
 dataset_path = String(request.dataset_ref.path)
@@ -75,7 +90,11 @@ else
     else
         fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
     end
-    result_to_payload(result)
+    payload = result_to_payload(result)
+    if result isa OLSFitResult
+        payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
+    end
+    payload
 end
 println(JSON3.write(payload))
 "#;
@@ -128,6 +147,7 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
             serde_json::to_string(&runtime_request)
                 .map_err(|err| format!("序列化运行时请求失败: {err}"))?,
         )
+        .arg(repo_root().to_string_lossy().to_string())
         .output()
         .map_err(|err| format!("启动 Julia 失败: {err}"))?;
 

@@ -6,6 +6,7 @@ import {
 } from "./runtime-client.js";
 import {
   renderDatasetSummary,
+  renderDiagnostics,
   renderError,
   renderGlance,
   renderMessagesMarkup,
@@ -34,6 +35,7 @@ const previewBox = document.getElementById("preview-box");
 const glanceBox = document.getElementById("glance-box");
 const summaryBox = document.getElementById("summary-box");
 const vcovLabelBox = document.getElementById("vcov-label-box");
+const diagnosticsBox = document.getElementById("diagnostics-box");
 const tidyTableBody = document.querySelector("#tidy-table tbody");
 
 runtimeBaseInput.value = DEFAULT_RUNTIME_BASE;
@@ -52,6 +54,7 @@ function resetResultArea() {
   summaryBox.hidden = false;
   summaryBox.innerHTML = renderSummaryText(null);
   vcovLabelBox.innerHTML = "";
+  diagnosticsBox.innerHTML = renderDiagnostics(null);
   tidyTableBody.innerHTML = `
     <tr>
       <td colspan="5" class="empty-row">等待 Runtime 返回结构化 tidy。</td>
@@ -91,6 +94,10 @@ function showTidy(rows) {
 
 function showVcovLabel(vcovLabel) {
   vcovLabelBox.innerHTML = renderVcovLabel(vcovLabel);
+}
+
+function showDiagnostics(diagnostics) {
+  diagnosticsBox.innerHTML = renderDiagnostics(diagnostics);
 }
 
 function showInspection(payload) {
@@ -182,6 +189,7 @@ async function runModel() {
     showGlance(payload.glance);
     showSummary(payload.summary_text || "");
     showVcovLabel(payload.vcov_label || "");
+    showDiagnostics(payload.diagnostics);
     showTidy(payload.tidy || []);
   } catch (message) {
     statusText.textContent = "运行失败。";
