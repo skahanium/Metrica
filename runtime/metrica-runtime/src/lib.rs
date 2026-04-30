@@ -1,11 +1,26 @@
 pub mod http;
 pub mod julia_bridge;
+pub mod julia_session;
+pub mod server;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 pub use http::{build_http_response, default_bind_addr, serve_http, HttpResponse};
 pub use julia_bridge::execute_fit_model;
+pub use julia_session::JuliaSession;
+pub use server::{build_router, serve as serve_axum};
+
+/// 解析仓库根目录。
+///
+/// 基于 `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根。
+pub fn repo_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectContext {
@@ -80,21 +95,14 @@ pub struct HealthSummary {
 
 /// 解析示例 demo 目录。
 ///
-/// 优先读取环境变量 `METRICA_DEMO_DIR`；若未设置，则基于
-/// `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根，
-/// 再拼接 `apps/metrica-desktop` 作为默认路径。
+/// 优先读取环境变量 `METRICA_DEMO_DIR`；若未设置，则基于仓库根
+/// 拼接 `apps/metrica-desktop` 作为默认路径。
 fn default_demo_dir() -> String {
     if let Ok(path) = std::env::var("METRICA_DEMO_DIR") {
         return path;
     }
 
-    let repo_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|p| p.to_path_buf())
-        .unwrap_or_default();
-
-    repo_root
+    repo_root()
         .join("apps")
         .join("metrica-desktop")
         .to_string_lossy()
@@ -117,10 +125,10 @@ fn default_demo_csv() -> String {
         .to_string()
 }
 
-pub fn sample_fit_model_request() -> TaskRequest {
+fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
     TaskRequest {
-        task_id: "uuid".to_string(),
-        action: "fit_model".to_string(),
+        task_id: task_id.to_string(),
+        action: action.to_string(),
         project_context: ProjectContext {
             project_id: "alpha-demo".to_string(),
             working_dir: default_demo_dir(),
@@ -145,32 +153,12 @@ pub fn sample_fit_model_request() -> TaskRequest {
     }
 }
 
+pub fn sample_fit_model_request() -> TaskRequest {
+    sample_request_base("fit_model", "uuid")
+}
+
 pub fn sample_inspect_dataset_request() -> TaskRequest {
-    TaskRequest {
-        task_id: "inspect-uuid".to_string(),
-        action: "inspect_dataset".to_string(),
-        project_context: ProjectContext {
-            project_id: "alpha-demo".to_string(),
-            working_dir: default_demo_dir(),
-        },
-        dataset_ref: DatasetRef {
-            source: "file".to_string(),
-            path: default_demo_csv(),
-            format: "csv".to_string(),
-        },
-        model_spec: ModelSpec {
-            model_type: "ols".to_string(),
-            formula: "y ~ x1 + x2".to_string(),
-            vcov: VcovSpec {
-                kind: "classical".to_string(),
-            },
-            weights: None,
-        },
-        options: RequestOptions {
-            drop_missing: true,
-            return_augment: false,
-        },
-    }
+    sample_request_base("inspect_dataset", "inspect-uuid")
 }
 
 pub fn sample_success_response() -> TaskResponse {

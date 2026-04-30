@@ -9,26 +9,17 @@ use crate::{Message, TaskRequest, TaskResponse};
 /// 解析 Julia 项目路径。
 ///
 /// 优先读取环境变量 `METRICA_JULIA_PROJECT`；若未设置，则基于
-/// `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根，
-/// 再进入 `packages/MetricaLinear.jl`。
+/// 仓库根拼接 `packages/MetricaLinear.jl`。
 fn julia_project_path() -> String {
     if let Ok(path) = std::env::var("METRICA_JULIA_PROJECT") {
         return path;
     }
 
-    repo_root()
+    crate::repo_root()
         .join("packages")
         .join("MetricaLinear.jl")
         .to_string_lossy()
         .to_string()
-}
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|p| p.to_path_buf())
-        .unwrap_or_default()
 }
 
 fn resolve_working_dir(raw_working_dir: &str) -> PathBuf {
@@ -37,7 +28,7 @@ fn resolve_working_dir(raw_working_dir: &str) -> PathBuf {
         return working_dir;
     }
 
-    repo_root().join(working_dir)
+    crate::repo_root().join(working_dir)
 }
 
 fn resolve_dataset_path(request: &TaskRequest) -> String {
@@ -50,54 +41,7 @@ fn resolve_dataset_path(request: &TaskRequest) -> String {
     working_dir.join(dataset_path).to_string_lossy().to_string()
 }
 
-const JULIA_SCRIPT: &str = r#"
-using JSON3
-using MetricaLinear
-
-include(joinpath(String(ARGS[2]), "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))
-using .MetricaTests
-
-function diagnostics_to_dict(result)
-    bp = breusch_pagan(result)
-    return Dict(
-        "vif" => [
-            Dict(
-                "name" => row.name,
-                "vif" => row.vif,
-            )
-            for row in vif(result)
-        ],
-        "breusch_pagan" => Dict(
-            "statistic" => bp.statistic,
-            "pvalue" => bp.pvalue,
-            "dof" => bp.dof,
-        ),
-    )
-end
-
-request = JSON3.read(ARGS[1])
-action = String(request.action)
-dataset_path = String(request.dataset_ref.path)
-payload = if action == "inspect_dataset"
-    inspect_dataset(dataset_path)
-else
-    formula = String(request.model_spec.formula)
-    vcov_type = String(request.model_spec.vcov.type)
-    vcov_symbol = vcov_type == "HC1" ? :HC1 : :classical
-    has_weights = haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights)
-    result = if has_weights
-        fit_ols_file(dataset_path, formula; weights=Symbol(String(request.model_spec.weights)), vcov=vcov_symbol)
-    else
-        fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
-    end
-    payload = result_to_payload(result)
-    if result isa OLSFitResult
-        payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
-    end
-    payload
-end
-println(JSON3.write(payload))
-"#;
+const JULIA_SCRIPT: &str = include_str!("../../../scripts/julia_bridge_entry.jl");
 
 #[derive(Debug, Deserialize)]
 struct JuliaEnvelope {
@@ -147,7 +91,7 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
             serde_json::to_string(&runtime_request)
                 .map_err(|err| format!("序列化运行时请求失败: {err}"))?,
         )
-        .arg(repo_root().to_string_lossy().to_string())
+        .arg(crate::repo_root().to_string_lossy().to_string())
         .output()
         .map_err(|err| format!("启动 Julia 失败: {err}"))?;
 

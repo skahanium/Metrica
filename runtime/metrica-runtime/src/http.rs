@@ -3,10 +3,10 @@ use std::net::{TcpListener, TcpStream};
 
 use serde::Serialize;
 
-use crate::{execute_fit_model, Message, TaskRequest, TaskResponse};
+use crate::{execute_fit_model, health_summary, Message, TaskRequest, TaskResponse};
 
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:47821";
-const ALLOWED_METHODS: &str = "POST, OPTIONS";
+const ALLOWED_METHODS: &str = "GET, POST, OPTIONS";
 const ALLOWED_HEADERS: &str = "Content-Type";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,58 +22,17 @@ pub fn default_bind_addr() -> &'static str {
 
 pub fn build_http_response(method: &str, path: &str, body: &[u8]) -> Result<HttpResponse, String> {
     match (method, path) {
-        ("OPTIONS", "/fit_model") => Ok(HttpResponse {
+        ("GET", "/health") => json_response(200, &health_summary()),
+        ("OPTIONS", "/fit_model") | ("OPTIONS", "/inspect_dataset") => Ok(HttpResponse {
             status_code: 204,
             headers: cors_headers(),
             body: Vec::new(),
         }),
-        ("OPTIONS", "/inspect_dataset") => Ok(HttpResponse {
-            status_code: 204,
-            headers: cors_headers(),
-            body: Vec::new(),
-        }),
-        ("POST", "/fit_model") => {
+        ("POST", "/fit_model") | ("POST", "/inspect_dataset") => {
             let request: TaskRequest = match serde_json::from_slice(body) {
                 Ok(request) => request,
                 Err(err) => {
-                    let response = TaskResponse {
-                        task_id: "unknown".to_string(),
-                        status: "error".to_string(),
-                        messages: vec![Message {
-                            level: "error".to_string(),
-                            code: "RUNTIME_INVALID_JSON".to_string(),
-                            text: format!("请求 JSON 解析失败: {err}"),
-                            hint: Some("请确认请求体符合 runtime-protocol。".to_string()),
-                        }],
-                        artifacts: None,
-                        result_payload: None,
-                    };
-
-                    return json_response(400, &response);
-                }
-            };
-
-            let response = execute_fit_model(&request)?;
-            json_response(200, &response)
-        }
-        ("POST", "/inspect_dataset") => {
-            let request: TaskRequest = match serde_json::from_slice(body) {
-                Ok(request) => request,
-                Err(err) => {
-                    let response = TaskResponse {
-                        task_id: "unknown".to_string(),
-                        status: "error".to_string(),
-                        messages: vec![Message {
-                            level: "error".to_string(),
-                            code: "RUNTIME_INVALID_JSON".to_string(),
-                            text: format!("请求 JSON 解析失败: {err}"),
-                            hint: Some("请确认请求体符合 runtime-protocol。".to_string()),
-                        }],
-                        artifacts: None,
-                        result_payload: None,
-                    };
-
-                    return json_response(400, &response);
+                    return json_response(400, &invalid_json_response(err));
                 }
             };
 
@@ -86,7 +45,7 @@ pub fn build_http_response(method: &str, path: &str, body: &[u8]) -> Result<Http
                 "unknown".to_string(),
                 "RUNTIME_HTTP_NOT_FOUND",
                 format!("未找到路径 `{path}`。"),
-                Some("当前最小 HTTP 入口仅暴露 /inspect_dataset 与 /fit_model。".to_string()),
+                Some("当前 HTTP 入口仅暴露 /health、/fit_model 与 /inspect_dataset。".to_string()),
             ),
         ),
         _ => json_response(
@@ -96,7 +55,7 @@ pub fn build_http_response(method: &str, path: &str, body: &[u8]) -> Result<Http
                 "RUNTIME_HTTP_METHOD_NOT_ALLOWED",
                 format!("HTTP 方法 `{method}` 不受支持。"),
                 Some(
-                    "请使用 POST/OPTIONS /inspect_dataset 或 POST/OPTIONS /fit_model。".to_string(),
+                    "请使用 GET /health、POST/OPTIONS /fit_model 或 POST/OPTIONS /inspect_dataset。".to_string(),
                 ),
             ),
         ),
@@ -232,6 +191,21 @@ fn cors_headers() -> Vec<(String, String)> {
             ALLOWED_HEADERS.to_string(),
         ),
     ]
+}
+
+fn invalid_json_response(err: impl std::fmt::Display) -> TaskResponse {
+    TaskResponse {
+        task_id: "unknown".to_string(),
+        status: "error".to_string(),
+        messages: vec![Message {
+            level: "error".to_string(),
+            code: "RUNTIME_INVALID_JSON".to_string(),
+            text: format!("请求 JSON 解析失败: {err}"),
+            hint: Some("请确认请求体符合 runtime-protocol。".to_string()),
+        }],
+        artifacts: None,
+        result_payload: None,
+    }
 }
 
 fn error_response(task_id: String, code: &str, text: String, hint: Option<String>) -> TaskResponse {

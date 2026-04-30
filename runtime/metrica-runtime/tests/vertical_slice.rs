@@ -109,7 +109,7 @@ fn options_fit_model_returns_cors_headers() {
     );
     assert_eq!(
         response_header(&response, "Access-Control-Allow-Methods"),
-        Some("POST, OPTIONS")
+        Some("GET, POST, OPTIONS")
     );
     assert_eq!(
         response_header(&response, "Access-Control-Allow-Headers"),
