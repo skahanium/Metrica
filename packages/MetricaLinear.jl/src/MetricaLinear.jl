@@ -28,6 +28,11 @@ struct OLSFitResult <: MetricaBase.AbstractFittedModel
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
+    design_matrix::Matrix{Float64}
+    response_vector::Vector{Float64}
+    fitted_values::Vector{Float64}
+    residual_vector::Vector{Float64}
+    coefficient_names::Vector{Symbol}
 end
 
 MetricaBase.glance(result::OLSFitResult) = result.glance_table

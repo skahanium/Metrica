@@ -14,9 +14,12 @@
 
 ## 当前阶段
 
-项目处于 Alpha 垂直切片阶段。当前活跃计划：
-- `docs/superpowers/plans/2026-04-24-metrica-alpha-vertical-slice-plan.md`
+项目处于里程碑 2 收口阶段。当前活跃计划：
+- `docs/superpowers/plans/2026-04-30-metrica-current-plan.md`
 
 架构设计：
-- `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md`
-- `docs/superpowers/specs/2026-04-24-metrica-alpha-vertical-slice-design.md`
+- `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
+
+App 层技术栈：Tauri 2 + React 19 + TypeScript 5 + Zustand + Ant Design + AG Grid + ECharts
+Runtime 层技术栈：Rust + axum + tokio + 持久化 Julia 进程（stdin/stdout JSON lines）
+详细架构：`docs/architecture/app-shell.md`、`docs/architecture/runtime-protocol.md`

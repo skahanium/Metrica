@@ -1,0 +1,8 @@
+[deps]
+MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+MetricaOutput = "10c70d11-b779-43d3-b8f2-49770e63c885"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+MetricaBase = {path = "../../MetricaBase.jl"}
+MetricaOutput = {path = ".."}

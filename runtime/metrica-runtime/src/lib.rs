@@ -216,10 +216,7 @@ pub fn health_summary() -> HealthSummary {
     HealthSummary {
         service: "metrica-runtime".to_string(),
         status: "ready".to_string(),
-        supported_actions: vec![
-            "inspect_dataset",
-            "fit_model",
-        ],
+        supported_actions: vec!["inspect_dataset", "fit_model"],
     }
 }
 

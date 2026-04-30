@@ -29,6 +29,33 @@ fn julia_project_path() -> String {
         .to_string()
 }
 
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or_default()
+}
+
+fn resolve_working_dir(raw_working_dir: &str) -> PathBuf {
+    let working_dir = PathBuf::from(raw_working_dir);
+    if working_dir.is_absolute() {
+        return working_dir;
+    }
+
+    repo_root().join(working_dir)
+}
+
+fn resolve_dataset_path(request: &TaskRequest) -> String {
+    let dataset_path = PathBuf::from(&request.dataset_ref.path);
+    if dataset_path.is_absolute() {
+        return dataset_path.to_string_lossy().to_string();
+    }
+
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    working_dir.join(dataset_path).to_string_lossy().to_string()
+}
+
 const JULIA_SCRIPT: &str = r#"
 using JSON3
 using MetricaLinear
@@ -76,8 +103,12 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
         ));
     }
 
-    let request_json = serde_json::to_string(request)
-        .map_err(|err| format!("序列化 fit_model 请求失败: {err}"))?;
+    let mut runtime_request = request.clone();
+    runtime_request.project_context.working_dir =
+        resolve_working_dir(&request.project_context.working_dir)
+            .to_string_lossy()
+            .to_string();
+    runtime_request.dataset_ref.path = resolve_dataset_path(request);
 
     let project_path = julia_project_path();
     let output = Command::new("julia")
@@ -86,7 +117,10 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
         .arg("--color=no")
         .arg("-e")
         .arg(JULIA_SCRIPT)
-        .arg(request_json)
+        .arg(
+            serde_json::to_string(&runtime_request)
+                .map_err(|err| format!("序列化运行时请求失败: {err}"))?,
+        )
         .output()
         .map_err(|err| format!("启动 Julia 失败: {err}"))?;
 

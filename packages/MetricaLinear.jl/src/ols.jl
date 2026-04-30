@@ -67,7 +67,23 @@ function compute_pvalues(statistics::Vector{Float64}, dof::Int)
     return 2 .* (1 .- cdf.(distribution, abs.(statistics)))
 end
 
-function fit_ols_file(path::AbstractString, formula::AbstractString)
+function weighted_tss(y::Vector{Float64}, weights::Union{Nothing, Vector{Float64}})
+    if isnothing(weights)
+        y_mean = mean(y)
+        return sum(abs2, y .- y_mean)
+    end
+
+    total_weight = sum(weights)
+    y_mean = sum(weights .* y) / total_weight
+    return sum(weights .* abs2.(y .- y_mean))
+end
+
+function fit_ols_file(
+    path::AbstractString,
+    formula::AbstractString;
+    weights::Union{Nothing, Symbol}=nothing,
+    vcov::Symbol=:classical,
+)
     dataset = load_dataset(path)
     dataset isa MetricaBase.ModelError && return dataset
 
@@ -85,7 +101,17 @@ function fit_ols_file(path::AbstractString, formula::AbstractString)
         "请检查公式中的变量名是否与数据列一致。",
     )
 
-    filtered_dataset = dataset[completecases(dataset[:, model_columns]), :]
+    if !isnothing(weights) && weights ∉ available_columns
+        return MetricaBase.ModelError(
+            :unknown_weight_variable,
+            "权重变量不存在",
+            "指定的权重变量无法在数据集中找到：$(weights)。",
+            "请检查权重变量名是否与数据列一致。",
+        )
+    end
+
+    required_columns = isnothing(weights) ? model_columns : unique([model_columns; weights])
+    filtered_dataset = dataset[completecases(dataset[:, required_columns]), :]
     n_total = nrow(dataset)
     n_effective = nrow(filtered_dataset)
 
@@ -132,12 +158,32 @@ function fit_ols_file(path::AbstractString, formula::AbstractString)
         "请减少参数数量或增加样本后重试。",
     )
 
-    coefficients = X \ y
+    weight_values = isnothing(weights) ? nothing : Float64.(filtered_dataset[!, weights])
+    if !isnothing(weight_values) && any(value -> value <= 0, weight_values)
+        return MetricaBase.ModelError(
+            :invalid_weights,
+            "权重无效",
+            "WLS 权重必须严格大于 0。",
+            "请检查权重变量中的零值或负值。",
+        )
+    end
+
+    X_eff = X
+    y_eff = y
+    model_label = :ols
+    if !isnothing(weight_values)
+        sqrt_w = sqrt.(weight_values)
+        X_eff = X .* sqrt_w
+        y_eff = y .* sqrt_w
+        model_label = :wls
+    end
+
+    coefficients = X_eff \ y_eff
     fitted = X * coefficients
     residuals = y - fitted
-    rss = sum(abs2, residuals)
-    y_mean = mean(y)
-    tss = sum(abs2, y .- y_mean)
+    effective_residuals = y_eff - (X_eff * coefficients)
+    rss = sum(abs2, effective_residuals)
+    tss = weighted_tss(y, weight_values)
     r2 = iszero(tss) ? 1.0 : 1 - rss / tss
     adj_r2 = if iszero(tss)
         1.0
@@ -145,10 +191,28 @@ function fit_ols_file(path::AbstractString, formula::AbstractString)
         1 - (rss / dof) / (tss / (nobs - 1))
     end
 
-    xtx = transpose(X) * X
+    xtx = transpose(X_eff) * X_eff
+    xtx_inv = inv(xtx)
     sigma2 = rss / dof
-    vcov = sigma2 * inv(xtx)
-    stderror = sqrt.(diag(vcov))
+    vcov_matrix = if vcov === :classical
+        sigma2 * xtx_inv
+    elseif vcov === :HC1
+        scale = nobs / dof
+        meat = zeros(size(X_eff, 2), size(X_eff, 2))
+        for index in 1:nobs
+            xi = reshape(X_eff[index, :], :, 1)
+            meat += effective_residuals[index]^2 .* (xi * transpose(xi))
+        end
+        scale .* (xtx_inv * meat * xtx_inv)
+    else
+        return MetricaBase.ModelError(
+            :unsupported_vcov,
+            "协方差类型暂不支持",
+            "当前仅支持 classical 与 HC1。",
+            "请先使用 `classical` 或 `HC1`。",
+        )
+    end
+    stderror = sqrt.(diag(vcov_matrix))
     statistics = coefficients ./ stderror
     pvalues = compute_pvalues(statistics, dof)
     coefficient_names = Symbol.(coefnames(model_frame))
@@ -169,7 +233,7 @@ function fit_ols_file(path::AbstractString, formula::AbstractString)
     dropped_rows > 0 && push!(warnings, build_rows_dropped_warning(dropped_rows))
 
     glance_table = MetricaBase.ModelGlance(
-        :ols,
+        model_label,
         nobs,
         dof,
         Dict{Symbol, MetricaBase.MetricValue}(
@@ -182,7 +246,19 @@ function fit_ols_file(path::AbstractString, formula::AbstractString)
         warnings,
     )
 
-    tidy_table = MetricaBase.TidyTable(tidy_rows, "classical")
+    tidy_table = MetricaBase.TidyTable(
+        tidy_rows,
+        vcov === :HC1 ? "HC1" : "classical",
+    )
 
-    return OLSFitResult(String(formula), glance_table, tidy_table)
+    return OLSFitResult(
+        String(formula),
+        glance_table,
+        tidy_table,
+        Matrix{Float64}(X),
+        copy(y),
+        fitted,
+        residuals,
+        coefficient_names,
+    )
 end

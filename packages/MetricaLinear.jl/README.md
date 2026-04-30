@@ -13,7 +13,18 @@ Metrica 的参考线性模型实现包。
 
 - IV
 - GLS
-- 超出架构验证阶段的 WLS
+
+## 里程碑口径说明
+
+按 `Metrica.jl-计量经济学框架-完善版.md` 的总体路线，`WLS` 仍属于 `阶段 2A (Linear)` / `里程碑 2 (教学向 OLS)` 的目标范围。
+
+但当前仓库中的 Alpha 垂直切片只负责验证最小真实 OLS 全链路，因此现阶段暂未实现：
+
+- WLS
+- HC1 / Cluster 等更丰富协方差规格
+- 更完整的线性模型族扩展
+
+换言之，`WLS` 不是被移出总路线，而是被顺延到 OLS Alpha 链路验证通过之后继续补齐。
 
 ## 当前最小可用入口
 
@@ -35,4 +46,4 @@ julia /Users/skahanium/Metrica/scripts/init_julia_env.jl
 julia /Users/skahanium/Metrica/scripts/run_minimal_ols.jl /Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv "y ~ x1 + x2"
 ```
 
-该脚本会输出结构化 JSON，当前适合作为最小手工验证入口；Runtime 与桌面端真实桥接仍属于后续链路工作。
+该脚本会输出结构化 JSON，可作为包层手工验证入口。当前仓库中的 Runtime 与桌面端真实桥接已建立；后续 Post-Alpha 工作将以这条 OLS 全链路作为稳定基线，继续补 WLS、稳健协方差与更完整输出能力。

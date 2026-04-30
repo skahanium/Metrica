@@ -1,0 +1,16 @@
+name = "MetricaTests"
+uuid = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
+version = "0.1.0"
+authors = ["Metrica Contributors"]
+
+[deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[sources]
+MetricaLinear = {path = "../MetricaLinear.jl"}
+
+[compat]
+julia = "1.12"

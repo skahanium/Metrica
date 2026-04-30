@@ -29,6 +29,29 @@ const DEMO_CSV = joinpath(
     @test missing_col.code === :unknown_variable
 end
 
+@testset "WLS 基础链路" begin
+    weighted = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; weights=:x1)
+    @test weighted isa OLSFitResult
+    @test glance(weighted).model === :wls
+    @test tidy(weighted).vcov_label == "classical"
+    @test length(tidy(weighted).rows) == 3
+
+    missing_weight = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; weights=:w9)
+    @test missing_weight isa ModelError
+    @test missing_weight.code === :unknown_weight_variable
+end
+
+@testset "HC1 协方差链路" begin
+    robust = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; vcov=:HC1)
+    @test robust isa OLSFitResult
+    @test tidy(robust).vcov_label == "HC1"
+    @test all(row -> row.stderror !== nothing, tidy(robust).rows)
+
+    unsupported = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; vcov=:cluster)
+    @test unsupported isa ModelError
+    @test unsupported.code === :unsupported_vcov
+end
+
 @testset "奇异矩阵与空样本" begin
     singular_csv, singular_io = mktemp()
     close(singular_io)

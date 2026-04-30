@@ -95,7 +95,9 @@ pub fn build_http_response(method: &str, path: &str, body: &[u8]) -> Result<Http
                 "unknown".to_string(),
                 "RUNTIME_HTTP_METHOD_NOT_ALLOWED",
                 format!("HTTP 方法 `{method}` 不受支持。"),
-                Some("请使用 POST/OPTIONS /inspect_dataset 或 POST/OPTIONS /fit_model。".to_string()),
+                Some(
+                    "请使用 POST/OPTIONS /inspect_dataset 或 POST/OPTIONS /fit_model。".to_string(),
+                ),
             ),
         ),
     }
@@ -197,7 +199,9 @@ fn write_http_response(stream: &mut TcpStream, response: &HttpResponse) -> Resul
     stream
         .write_all(&response.body)
         .map_err(|err| format!("写入响应体失败: {err}"))?;
-    stream.flush().map_err(|err| format!("刷新响应失败: {err}"))?;
+    stream
+        .flush()
+        .map_err(|err| format!("刷新响应失败: {err}"))?;
     Ok(())
 }
 
@@ -218,10 +222,7 @@ where
 
 fn cors_headers() -> Vec<(String, String)> {
     vec![
-        (
-            "Access-Control-Allow-Origin".to_string(),
-            "*".to_string(),
-        ),
+        ("Access-Control-Allow-Origin".to_string(), "*".to_string()),
         (
             "Access-Control-Allow-Methods".to_string(),
             ALLOWED_METHODS.to_string(),

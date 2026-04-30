@@ -1,8 +1,8 @@
 export const DEFAULT_RUNTIME_BASE = "http://127.0.0.1:47821";
 export const DEFAULT_RUNTIME_ENDPOINT = `${DEFAULT_RUNTIME_BASE}/fit_model`;
 export const DEFAULT_INSPECT_ENDPOINT = `${DEFAULT_RUNTIME_BASE}/inspect_dataset`;
-// 默认 CSV 与工作目录取自仓库相对路径；桌面端可通过 Tauri 注入实际值。
-export const DEFAULT_DATASET_PATH = "apps/metrica-desktop/data/demo.csv";
+// 默认 CSV 路径相对工作目录解析，便于 Runtime 统一做路径归一化。
+export const DEFAULT_DATASET_PATH = "data/demo.csv";
 export const DEFAULT_WORKING_DIR = "apps/metrica-desktop";
 
 function createTaskId() {

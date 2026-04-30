@@ -6,18 +6,18 @@ Metrica 是一个基于 Julia 的联邦式计量经济学框架，目标是在�
 
 - `Metrica.jl-计量经济学框架-完善版.md`：项目总体蓝图与架构设计
 - `AGENTS.md`：跨 AI 助手统一协作规范
-- `docs/superpowers/specs/2026-04-24-metrica-dual-track-design.md`：双轨产品设计
-- `docs/superpowers/plans/2026-04-24-metrica-foundation-plan.md`：第一阶段实施计划
+- `docs/superpowers/specs/2026-04-30-metrica-main-design.md`：当前主设计
+- `docs/superpowers/plans/2026-04-30-metrica-current-plan.md`：当前实施计划
 
-建议采用 `monorepo + 多包` 组织方式，首阶段优先建设 `MetricaBase.jl` 协议内核，再逐步实现线性回归、面板数据、稳健协方差、诊断检验、输出、可视化与教学体系。
+建议采用 `monorepo + 多包` 组织方式，以 `MetricaBase.jl` 协议内核为边界，逐步实现线性回归、稳健协方差、诊断检验、输出、可视化与教学体系。
 
-当前第一阶段已启动，仓库中已经包含：
+当前仓库中已经包含：
 
 - `packages/`：Julia Core 包骨架
 - `runtime/metrica-runtime/`：Rust 运行时桥接层骨架
 - `apps/metrica-desktop/`：桌面工作台原型壳
 
-第一阶段目标不是一次做完整产品，而是先建立稳定分层：
+当前目标不是一次做完整产品，而是在已验证的真实 OLS 基线上继续保持稳定分层：
 
 - `Core` 负责计量协议与结果语义
 - `Runtime` 负责执行桥接与协议搬运

@@ -1,8 +1,8 @@
 //! Alpha 垂直切片：真实 Julia 桥与最小 HTTP 传输测试。
 
 use metrica_runtime::{
-    build_http_response, execute_fit_model, sample_fit_model_request, sample_inspect_dataset_request,
-    HttpResponse,
+    build_http_response, execute_fit_model, sample_fit_model_request,
+    sample_inspect_dataset_request, HttpResponse,
 };
 
 fn response_header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
@@ -25,8 +25,35 @@ fn fit_model_returns_real_payload_shape() {
 }
 
 #[test]
+fn fit_model_accepts_paths_relative_to_project_context() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = "apps/metrica-desktop".to_string();
+    request.dataset_ref.path = "data/demo.csv".to_string();
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("glance").is_some());
+    assert!(payload.get("tidy").is_some());
+}
+
+#[test]
 fn inspect_dataset_returns_preview_payload_shape() {
     let request = sample_inspect_dataset_request();
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("dataset_summary").is_some());
+    assert!(payload.get("columns").is_some());
+    assert!(payload.get("preview_rows").is_some());
+}
+
+#[test]
+fn inspect_dataset_accepts_paths_relative_to_project_context() {
+    let mut request = sample_inspect_dataset_request();
+    request.project_context.working_dir = "apps/metrica-desktop".to_string();
+    request.dataset_ref.path = "data/demo.csv".to_string();
     let response = execute_fit_model(&request).expect("runtime response");
 
     assert_eq!(response.status, "success");
@@ -59,11 +86,13 @@ fn options_fit_model_returns_cors_headers() {
 fn post_fit_model_returns_json_with_cors_headers() {
     let request_body =
         serde_json::to_vec(&sample_fit_model_request()).expect("serialize sample request");
-    let response = build_http_response("POST", "/fit_model", &request_body)
-        .expect("post response");
+    let response = build_http_response("POST", "/fit_model", &request_body).expect("post response");
 
     assert_eq!(response.status_code, 200);
-    assert_eq!(response_header(&response, "Content-Type"), Some("application/json"));
+    assert_eq!(
+        response_header(&response, "Content-Type"),
+        Some("application/json")
+    );
     assert_eq!(
         response_header(&response, "Access-Control-Allow-Origin"),
         Some("*")
@@ -79,11 +108,14 @@ fn post_fit_model_returns_json_with_cors_headers() {
 fn post_inspect_dataset_returns_json_with_cors_headers() {
     let request_body = serde_json::to_vec(&sample_inspect_dataset_request())
         .expect("serialize sample inspect request");
-    let response = build_http_response("POST", "/inspect_dataset", &request_body)
-        .expect("post response");
+    let response =
+        build_http_response("POST", "/inspect_dataset", &request_body).expect("post response");
 
     assert_eq!(response.status_code, 200);
-    assert_eq!(response_header(&response, "Content-Type"), Some("application/json"));
+    assert_eq!(
+        response_header(&response, "Content-Type"),
+        Some("application/json")
+    );
     assert_eq!(
         response_header(&response, "Access-Control-Allow-Origin"),
         Some("*")
