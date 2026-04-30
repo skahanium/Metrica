@@ -16,9 +16,23 @@ function createTaskId() {
 export function buildFitModelRequest({
   datasetPath,
   formula,
+  vcovType = "classical",
+  weightsColumn = "",
   projectId = "alpha-demo",
   workingDir = DEFAULT_WORKING_DIR,
 }) {
+  const modelSpec = {
+    model_type: "ols",
+    formula,
+    vcov: {
+      type: vcovType,
+    },
+  };
+  const trimmedWeights = weightsColumn.trim();
+  if (trimmedWeights) {
+    modelSpec.weights = trimmedWeights;
+  }
+
   return {
     task_id: createTaskId(),
     action: "fit_model",
@@ -31,13 +45,7 @@ export function buildFitModelRequest({
       path: datasetPath,
       format: "csv",
     },
-    model_spec: {
-      model_type: "ols",
-      formula,
-      vcov: {
-        type: "classical",
-      },
-    },
+    model_spec: modelSpec,
     options: {
       drop_missing: true,
       return_augment: false,
@@ -160,9 +168,16 @@ export async function fitModel({
   endpoint = DEFAULT_RUNTIME_ENDPOINT,
   datasetPath,
   formula,
+  vcovType = "classical",
+  weightsColumn = "",
   fetchImpl = fetch,
 }) {
-  const requestBody = buildFitModelRequest({ datasetPath, formula });
+  const requestBody = buildFitModelRequest({
+    datasetPath,
+    formula,
+    vcovType,
+    weightsColumn,
+  });
   const result = await postFitModel(endpoint, requestBody, fetchImpl);
 
   if (!result.ok) {

@@ -38,6 +38,29 @@ fn fit_model_accepts_paths_relative_to_project_context() {
 }
 
 #[test]
+fn fit_model_forwards_hc1_vcov_to_julia() {
+    let mut request = sample_fit_model_request();
+    request.model_spec.vcov.kind = "HC1".to_string();
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert_eq!(payload.get("vcov_label").and_then(|value| value.as_str()), Some("HC1"));
+}
+
+#[test]
+fn fit_model_forwards_weights_to_julia() {
+    let mut request = sample_fit_model_request();
+    request.model_spec.weights = Some("x1".to_string());
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let glance = payload.get("glance").expect("glance");
+    assert_eq!(glance.get("model").and_then(|value| value.as_str()), Some("wls"));
+}
+
+#[test]
 fn inspect_dataset_returns_preview_payload_shape() {
     let request = sample_inspect_dataset_request();
     let response = execute_fit_model(&request).expect("runtime response");

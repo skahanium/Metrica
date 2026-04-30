@@ -49,7 +49,7 @@ function breusch_pagan(fit::MetricaLinear.OLSFitResult)
     fitted = X * coefficients
     rss = sum(abs2, squared_residuals - fitted)
     tss = sum(abs2, squared_residuals .- mean(squared_residuals))
-    r2 = iszero(tss) ? 0.0 : 1 - rss / tss
+    r2 = iszero(tss) ? 0.0 : max(0.0, 1 - rss / tss)
     statistic = nobs * r2
     dof = max(size(X, 2) - 1, 1)
     pvalue = 1 - cdf(Chisq(dof), statistic)

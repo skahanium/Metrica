@@ -168,6 +168,19 @@ export function renderTidyRows(rows = []) {
     .join("");
 }
 
+export function renderVcovLabel(vcovLabel) {
+  if (!vcovLabel) {
+    return "";
+  }
+
+  return `
+    <article class="vcov-card">
+      <span>协方差</span>
+      <strong>${escapeHtml(vcovLabel)}</strong>
+    </article>
+  `;
+}
+
 export function renderWarningsMarkup(warnings = []) {
   return renderWarnings(warnings);
 }

@@ -8,6 +8,7 @@ import {
   renderError,
   renderDatasetSummary,
   renderPreviewRows,
+  renderVcovLabel,
 } from "../src/result-view.js";
 
 test("renderWarnings 输出 warning 标题与正文", () => {
@@ -55,6 +56,13 @@ test("renderTidyRows 输出系数行", () => {
   assert.match(html, /x1/);
   assert.match(html, /2\.7333/);
   assert.match(html, /0\.0190/);
+});
+
+test("renderVcovLabel 输出协方差标签", () => {
+  const html = renderVcovLabel("HC1");
+
+  assert.match(html, /协方差/);
+  assert.match(html, /HC1/);
 });
 
 test("renderError 输出错误与 hint", () => {

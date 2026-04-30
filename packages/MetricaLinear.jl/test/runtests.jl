@@ -10,6 +10,10 @@ const DEMO_CSV = joinpath(
     "demo.csv",
 )
 
+function coef_row(fit::OLSFitResult, name::Symbol)
+    return only(row for row in tidy(fit).rows if row.name === name)
+end
+
 @testset "真实 OLS 链路" begin
     ok = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
     @test ok isa OLSFitResult
@@ -23,6 +27,10 @@ const DEMO_CSV = joinpath(
     @test length(tidy(ok).rows) == 3
     @test all(row -> row.pvalue !== nothing, tidy(ok).rows)
     @test any(w -> w.code === :rows_dropped, glance(ok).warnings)
+    @test glance(ok).metrics[:r2] ≈ 0.993321819228555
+    @test glance(ok).metrics[:sigma] ≈ 0.5255382728122434
+    @test coef_row(ok, :x1).estimate ≈ 2.7333333333333347
+    @test coef_row(ok, :x1).stderror ≈ 0.7180219742845957
 
     missing_col = fit_ols_file(DEMO_CSV, "y ~ x9")
     @test missing_col isa ModelError
@@ -35,6 +43,9 @@ end
     @test glance(weighted).model === :wls
     @test tidy(weighted).vcov_label == "classical"
     @test length(tidy(weighted).rows) == 3
+    @test glance(weighted).metrics[:r2] ≈ 0.9939949706951068
+    @test coef_row(weighted, :x1).estimate ≈ 2.396059113300492
+    @test coef_row(weighted, :x1).stderror ≈ 0.6371988621545017
 
     missing_weight = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; weights=:w9)
     @test missing_weight isa ModelError
@@ -46,6 +57,8 @@ end
     @test robust isa OLSFitResult
     @test tidy(robust).vcov_label == "HC1"
     @test all(row -> row.stderror !== nothing, tidy(robust).rows)
+    @test coef_row(robust, :x1).estimate ≈ 2.7333333333333347
+    @test coef_row(robust, :x1).stderror ≈ 0.7950774478930701
 
     unsupported = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; vcov=:cluster)
     @test unsupported isa ModelError
@@ -80,6 +93,7 @@ end
     @test haskey(ok_payload, "result_payload")
     @test haskey(ok_payload["result_payload"], "glance")
     @test haskey(ok_payload["result_payload"], "tidy")
+    @test ok_payload["result_payload"]["vcov_label"] == "classical"
     @test ok_payload["result_payload"]["glance"]["metrics"]["adj_r2"] isa Real
     @test length(ok_payload["result_payload"]["warnings"]) >= 1
 

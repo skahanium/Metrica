@@ -56,6 +56,7 @@ function result_to_payload(result::OLSFitResult)
                 "metrics" => Dict(String(key) => value for (key, value) in glance_table.metrics),
                 "warnings" => warnings,
             ),
+            "vcov_label" => tidy_table.vcov_label,
             "tidy" => [
                 Dict(
                     "name" => String(row.name),

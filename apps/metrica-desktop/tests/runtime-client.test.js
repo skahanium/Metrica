@@ -24,6 +24,18 @@ test("buildFitModelRequest 生成稳定协议对象", () => {
   assert.equal(request.options.return_augment, false);
 });
 
+test("buildFitModelRequest 支持协方差与权重字段", () => {
+  const request = buildFitModelRequest({
+    datasetPath: "/tmp/demo.csv",
+    formula: "y ~ x1 + x2",
+    vcovType: "HC1",
+    weightsColumn: "x1",
+  });
+
+  assert.equal(request.model_spec.vcov.type, "HC1");
+  assert.equal(request.model_spec.weights, "x1");
+});
+
 test("fitModel 使用 JSON POST 调用 Runtime", async () => {
   let capturedUrl;
   let capturedOptions;
@@ -32,6 +44,8 @@ test("fitModel 使用 JSON POST 调用 Runtime", async () => {
     endpoint: DEFAULT_RUNTIME_ENDPOINT,
     datasetPath: "/tmp/demo.csv",
     formula: "y ~ x1",
+    vcovType: "HC1",
+    weightsColumn: "x1",
     fetchImpl: async (url, options) => {
       capturedUrl = url;
       capturedOptions = options;
@@ -48,7 +62,10 @@ test("fitModel 使用 JSON POST 调用 Runtime", async () => {
   assert.equal(capturedUrl, DEFAULT_RUNTIME_ENDPOINT);
   assert.equal(capturedOptions.method, "POST");
   assert.equal(capturedOptions.headers["Content-Type"], "application/json");
-  assert.equal(JSON.parse(capturedOptions.body).action, "fit_model");
+  const body = JSON.parse(capturedOptions.body);
+  assert.equal(body.action, "fit_model");
+  assert.equal(body.model_spec.vcov.type, "HC1");
+  assert.equal(body.model_spec.weights, "x1");
   assert.equal(payload.status, "success");
 });
 

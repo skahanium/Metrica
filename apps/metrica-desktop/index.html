@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Metrica Alpha OLS</title>
+  <title>Metrica OLS</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
   <main class="app-shell">
     <section class="panel controls">
       <div class="panel-header">
-        <span class="eyebrow">Metrica Alpha</span>
-        <h1>最小真实 OLS 链路</h1>
+        <span class="eyebrow">Metrica</span>
+        <h1>真实 OLS / WLS 链路</h1>
         <p>
           当前页面只负责通过 Runtime 发起真实 `fit_model` 请求，并渲染结构化结果。
         </p>
@@ -36,6 +36,19 @@
       <label class="field">
         <span>OLS 公式</span>
         <input id="formula-input" type="text" value="y ~ x1 + x2" />
+      </label>
+
+      <label class="field">
+        <span>协方差类型</span>
+        <select id="vcov-type">
+          <option value="classical">classical</option>
+          <option value="HC1">HC1</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>WLS 权重列（可选）</span>
+        <input id="weights-column" type="text" placeholder="例如 x1" />
       </label>
 
       <button id="run-model" type="button">运行模型</button>
@@ -91,6 +104,7 @@
           <h3>系数表</h3>
           <p>展示 Runtime 返回的结构化 `tidy` 结果。</p>
         </div>
+        <div id="vcov-label-box"></div>
         <table id="tidy-table">
           <thead>
             <tr>
@@ -107,6 +121,19 @@
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section class="table-panel">
+        <div class="table-header">
+          <h3>诊断结果</h3>
+          <p>后续 Runtime 返回结构化诊断结果时在这里展示。</p>
+        </div>
+        <div id="diagnostics-box">
+          <article class="empty-state">
+            <strong>暂无诊断结果。</strong>
+            <p>当前链路先保留结构化展示入口。</p>
+          </article>
+        </div>
       </section>
     </section>
   </main>

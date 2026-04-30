@@ -12,6 +12,7 @@ import {
   renderPreviewRows,
   renderSummaryText,
   renderTidyRows,
+  renderVcovLabel,
   renderWarnings,
 } from "./result-view.js";
 
@@ -21,6 +22,8 @@ const chooseFileButton = document.getElementById("choose-file");
 const inspectButton = document.getElementById("inspect-dataset");
 const filePicker = document.getElementById("file-picker");
 const formulaInput = document.getElementById("formula-input");
+const vcovTypeInput = document.getElementById("vcov-type");
+const weightsColumnInput = document.getElementById("weights-column");
 const runButton = document.getElementById("run-model");
 const statusText = document.getElementById("status-text");
 const errorBox = document.getElementById("error-box");
@@ -30,6 +33,7 @@ const datasetSummaryBox = document.getElementById("dataset-summary-box");
 const previewBox = document.getElementById("preview-box");
 const glanceBox = document.getElementById("glance-box");
 const summaryBox = document.getElementById("summary-box");
+const vcovLabelBox = document.getElementById("vcov-label-box");
 const tidyTableBody = document.querySelector("#tidy-table tbody");
 
 runtimeBaseInput.value = DEFAULT_RUNTIME_BASE;
@@ -47,6 +51,7 @@ function resetResultArea() {
   glanceBox.innerHTML = renderGlance(null);
   summaryBox.hidden = false;
   summaryBox.innerHTML = renderSummaryText(null);
+  vcovLabelBox.innerHTML = "";
   tidyTableBody.innerHTML = `
     <tr>
       <td colspan="5" class="empty-row">等待 Runtime 返回结构化 tidy。</td>
@@ -82,6 +87,10 @@ function showSummary(summaryText) {
 
 function showTidy(rows) {
   tidyTableBody.innerHTML = renderTidyRows(rows);
+}
+
+function showVcovLabel(vcovLabel) {
+  vcovLabelBox.innerHTML = renderVcovLabel(vcovLabel);
 }
 
 function showInspection(payload) {
@@ -132,6 +141,8 @@ async function inspectCurrentDataset() {
 async function runModel() {
   const datasetPath = datasetInput.value.trim();
   const formula = formulaInput.value.trim();
+  const vcovType = vcovTypeInput.value;
+  const weightsColumn = weightsColumnInput.value.trim();
 
   if (!runtimeBaseInput.value.trim() || !datasetPath || !formula) {
     showError({
@@ -153,6 +164,8 @@ async function runModel() {
       endpoint: runtimeEndpoint("/fit_model"),
       datasetPath,
       formula,
+      vcovType,
+      weightsColumn,
     });
 
     statusText.textContent =
@@ -168,6 +181,7 @@ async function runModel() {
     showWarnings(payload.warnings || []);
     showGlance(payload.glance);
     showSummary(payload.summary_text || "");
+    showVcovLabel(payload.vcov_label || "");
     showTidy(payload.tidy || []);
   } catch (message) {
     statusText.textContent = "运行失败。";

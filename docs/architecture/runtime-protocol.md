@@ -106,6 +106,7 @@
   "model_spec": {
     "model_type": "ols",
     "formula": "y ~ x1 + x2 + x3",
+    "weights": null,
     "vcov": {
       "type": "classical"
     }
@@ -215,7 +216,8 @@
 
 - `fit_model` 的默认模型类型是 `ols`
 - 当前稳定协方差标签是 `classical`
-- 后续新增 `WLS`、`HC1`、`cluster` 等能力时，必须保持现有成功/失败响应信封不变
+- `model_spec.weights` 表示 WLS 权重变量名，值必须是数据集列名；缺省或 `null` 时保持 OLS
+- 新增 `WLS`、`HC1`、`cluster` 等能力时，必须保持现有成功/失败响应信封不变
 
 ## 后续高级能力的协议预留
 
@@ -234,6 +236,7 @@
 - 新能力优先通过新增结构化字段表达
 - 不以自由命令字符串替代 `model_spec` / `options`
 - Runtime 只搬运并校验 schema，不解释计量语义
+- Runtime 不传递 Julia 内部矩阵、分布对象或任意函数闭包；自定义计算能力必须先落为白名单动作、模板或结构化参数
 
 ### 第二层：受控自定义动作 / 自定义分析模板
 

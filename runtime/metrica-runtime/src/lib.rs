@@ -31,6 +31,8 @@ pub struct ModelSpec {
     pub model_type: String,
     pub formula: String,
     pub vcov: VcovSpec,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weights: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +136,7 @@ pub fn sample_fit_model_request() -> TaskRequest {
             vcov: VcovSpec {
                 kind: "classical".to_string(),
             },
+            weights: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -161,6 +164,7 @@ pub fn sample_inspect_dataset_request() -> TaskRequest {
             vcov: VcovSpec {
                 kind: "classical".to_string(),
             },
+            weights: None,
         },
         options: RequestOptions {
             drop_missing: true,

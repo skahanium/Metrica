@@ -81,7 +81,8 @@ body {
   font-size: 0.92rem;
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -91,7 +92,8 @@ body {
   background: rgba(255, 255, 255, 0.8);
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: 2px solid rgba(11, 114, 133, 0.18);
   border-color: var(--accent);
 }
@@ -318,6 +320,20 @@ body {
   margin-bottom: 8px;
   font-size: 0.95rem;
   color: var(--text);
+}
+
+.vcov-card {
+  display: inline-grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.vcov-card span {
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .summary-card p {

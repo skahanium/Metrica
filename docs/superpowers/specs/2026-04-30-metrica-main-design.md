@@ -115,6 +115,14 @@ App 不解析 `summary()` 文本，也不依赖终端打印格式。
 - 保持公式接口与 Julia 主流生态一致
 - 将最关键的协议语义与教学行为保留在 Metrica 内部
 
+### 数值底座与自定义计算边界
+
+Core 内部的线性代数与概率计算应优先使用 Julia 生态的通用抽象，例如 `AbstractMatrix`、`AbstractVector`、`LinearAlgebra`、`Statistics` 与 `Distributions.jl`。除非序列化边界、数值稳定性或性能控制明确要求，不应把内部实现过早固定为单一矩阵类型或单一分解路径。
+
+这类灵活性只属于 Core 内部计算层。Runtime 与 App 不暴露任意矩阵对象、任意 Julia 代码或自由文本命令；所有可被用户、文档、导出或桌面端消费的结果仍必须回到结构化 `glance`、`tidy`、`augment`、`warnings`、`diagnostics` 与 `artifacts` 等协议对象。
+
+远期自定义计算应通过受控公式、结构化选项、白名单动作或已注册分析模板进入系统，而不是通过通用脚本执行入口进入系统。
+
 ### 公开公式语义
 
 公开接口按 `StatsModels.jl` 风格设计。

@@ -67,7 +67,14 @@ payload = if action == "inspect_dataset"
     inspect_dataset(dataset_path)
 else
     formula = String(request.model_spec.formula)
-    result = fit_ols_file(dataset_path, formula)
+    vcov_type = String(request.model_spec.vcov.type)
+    vcov_symbol = vcov_type == "HC1" ? :HC1 : :classical
+    has_weights = haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights)
+    result = if has_weights
+        fit_ols_file(dataset_path, formula; weights=Symbol(String(request.model_spec.weights)), vcov=vcov_symbol)
+    else
+        fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
+    end
     result_to_payload(result)
 end
 println(JSON3.write(payload))
