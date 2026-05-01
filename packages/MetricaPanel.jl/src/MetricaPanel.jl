@@ -42,14 +42,80 @@ MetricaBase.tidy(result::PanelFitResult) = result.tidy_table
 
 function MetricaBase.augment(result::PanelFitResult)
     nobs = length(result.fitted_values)
-    return MetricaBase.AugmentTable(
-        Dict(
-            :observation => collect(1.0:nobs),
-            :fitted => result.fitted_values,
-            :residual => result.residual_vector,
-        ),
-        nobs,
+    cols = Dict{Symbol, Vector{Float64}}(
+        :observation => collect(1.0:nobs),
+        :fitted => result.fitted_values,
+        :residual => result.residual_vector,
     )
+
+    # 计算标准化残差（若自由度 > 0）
+    k = length(result.coefficient_names)
+    dof = nobs - k
+    if dof > 0
+        rss = sum(abs2, result.residual_vector)
+        sigma = sqrt(rss / dof)
+        if sigma > 0
+            cols[:std_residual] = result.residual_vector ./ sigma
+        end
+    end
+
+    return MetricaBase.AugmentTable(cols, nobs)
+end
+
+# === 共享 OLS 统计量计算 ======================================================
+
+"""
+    ols_statistics(X, y, coef_names, model_sym, extra_metrics)
+
+对给定的设计矩阵 `X` 和响应向量 `y` 执行 OLS，返回系数、拟合值、残差、
+`ModelGlance` 和 `TidyTable`。各面板估计器通过本函数复用统计量计算逻辑。
+"""
+function ols_statistics(X::Matrix{Float64}, y::Vector{Float64},
+                         coef_names::Vector{Symbol}, model_sym::Symbol,
+                         extra_metrics::Dict{Symbol, <:MetricaBase.MetricValue})
+    nobs = length(y)
+    k = size(X, 2)
+    dof = nobs - k
+
+    coefficients = X \ y
+    fitted = X * coefficients
+    residuals = y - fitted
+
+    rss = sum(abs2, residuals)
+    tss = sum(abs2, y .- mean(y))
+    r2 = iszero(tss) ? 0.0 : 1.0 - rss / tss
+    adj_r2 = dof > 0 ? 1.0 - (1.0 - r2) * (nobs - 1) / dof : NaN
+    sigma = dof > 0 ? sqrt(rss / dof) : NaN
+
+    metrics = Dict{Symbol, MetricaBase.MetricValue}(
+        :r2 => r2,
+        :adj_r2 => adj_r2,
+        :sigma => sigma,
+        :rss => rss,
+        :tss => tss,
+    )
+    merge!(metrics, extra_metrics)
+
+    if dof > 0
+        XtX_inv = inv(X' * X)
+        std_errors = sqrt.(max.(diag(XtX_inv) .* sigma^2, 0.0))
+        t_stats = coefficients ./ std_errors
+        p_values = 2.0 .* (1.0 .- cdf.(TDist(dof), abs.(t_stats)))
+    else
+        std_errors = fill(NaN, k)
+        t_stats = fill(NaN, k)
+        p_values = fill(NaN, k)
+    end
+
+    tidy_rows = MetricaBase.CoefRow[
+        MetricaBase.CoefRow(coef_names[i], coefficients[i], std_errors[i], t_stats[i], p_values[i])
+        for i in 1:k
+    ]
+
+    glance_table = MetricaBase.ModelGlance(model_sym, nobs, dof, metrics, MetricaBase.ModelWarning[])
+    tidy_table = MetricaBase.TidyTable(tidy_rows, "classical")
+
+    return (; coefficients, fitted, residuals, glance_table, tidy_table)
 end
 
 """

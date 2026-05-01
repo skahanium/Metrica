@@ -98,6 +98,33 @@ test("fitModel 使用 JSON POST 调用 Runtime", async () => {
   assert.equal(payload.status, "success");
 });
 
+test("fitModel 传递面板参数到 buildFitModelRequest", async () => {
+  let capturedBody;
+
+  await fitModel({
+    endpoint: DEFAULT_RUNTIME_ENDPOINT,
+    datasetPath: "/tmp/panel.csv",
+    formula: "invest ~ mvalue + capital",
+    modelType: "panel",
+    panelId: "firm",
+    panelTime: "year",
+    panelMethod: "fe",
+    fetchImpl: async (url, options) => {
+      capturedBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        async json() { return { status: "success", result_payload: { glance: {}, tidy: [] } }; },
+      };
+    },
+  });
+
+  assert.equal(capturedBody.model_spec.model_type, "panel");
+  assert.equal(capturedBody.model_spec.panel_id, "firm");
+  assert.equal(capturedBody.model_spec.panel_time, "year");
+  assert.equal(capturedBody.model_spec.panel_method, "fe");
+  assert.equal(capturedBody.model_spec.vcov, undefined);
+});
+
 test("fitModel 将网络失败归一化为结构化错误", async () => {
   await assert.rejects(
     fitModel({

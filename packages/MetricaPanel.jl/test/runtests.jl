@@ -1,6 +1,7 @@
 using Test
 using MetricaBase
 using MetricaPanel
+using Statistics
 
 @testset "MetricaPanel 面板基础" begin
     # 构造简单的面板数据
@@ -44,12 +45,17 @@ using MetricaPanel
         @test t.vcov_label == "classical"
         @test all(row -> row.pvalue !== nothing, t.rows)
 
-        # 检查 augment
+        # 检查 augment — fitted + residual 必须在原始 y 空间成立
         a = augment(result)
         @test a isa MetricaBase.AugmentTable
         @test a.nobs == 9
         @test haskey(a.columns, :fitted)
         @test haskey(a.columns, :residual)
+        @test haskey(a.columns, :std_residual)
+
+        y_orig = [10.0, 12.0, 14.0, 15.0, 18.0, 20.0, 8.0, 10.0, 12.0]
+        @test a.columns[:fitted] + a.columns[:residual] ≈ y_orig atol=1e-10
+        @test sum(a.columns[:residual]) ≈ 0.0 atol=1e-10
     end
 
     @testset "FE 结果序列化" begin
@@ -62,6 +68,8 @@ using MetricaPanel
         @test haskey(payload["result_payload"], "augment_preview")
         @test payload["result_payload"]["glance"]["model"] == "fe"
         @test payload["result_payload"]["glance"]["metrics"]["n_ids"] == 3
+        @test haskey(payload["result_payload"]["augment_preview"], "fitted")
+        @test haskey(payload["result_payload"]["augment_preview"], "std_residual")
     end
 
     @testset "FE 不平衡面板" begin
@@ -75,6 +83,10 @@ using MetricaPanel
         result = fit_panel(unbalanced_panel, "invest ~ mvalue"; method=:fe)
         @test result isa PanelFitResult
         @test glance(result).nobs == 5
+
+        a = augment(result)
+        y_orig = [10.0, 12.0, 15.0, 18.0, 20.0]
+        @test a.columns[:fitted] + a.columns[:residual] ≈ y_orig atol=1e-10
     end
 
     @testset "RE 随机效应拟合" begin
@@ -92,6 +104,11 @@ using MetricaPanel
         t = tidy(result)
         @test length(t.rows) == 5  # intercept + 2 predictors + 2 group means
         @test all(row -> row.pvalue !== nothing, t.rows)
+
+        a = augment(result)
+        @test haskey(a.columns, :std_residual)
+        y_orig = [10.0, 12.0, 14.0, 15.0, 18.0, 20.0, 8.0, 10.0, 12.0]
+        @test a.columns[:fitted] + a.columns[:residual] ≈ y_orig atol=1e-10
     end
 
     @testset "FD 一阶差分拟合" begin
@@ -107,6 +124,13 @@ using MetricaPanel
         t = tidy(result)
         @test length(t.rows) == 2  # mvalue + capital (no intercept)
         @test all(row -> row.pvalue !== nothing, t.rows)
+
+        # augment 验证：fitted + residual = Δy（差分空间）
+        a = augment(result)
+        @test a.nobs == 6
+        @test haskey(a.columns, :std_residual)
+        @test a.columns[:fitted] + a.columns[:residual] ≈
+              result.fitted_values + result.residual_vector atol=1e-12
     end
 
     @testset "Between 组间估计拟合" begin
@@ -118,10 +142,18 @@ using MetricaPanel
         @test g.model === :between
         @test g.nobs == 3  # 3 firms (group means)
         @test haskey(g.metrics, :r2)
+        @test haskey(g.metrics, :nobs_original)
+        @test g.metrics[:nobs_original] == 9
 
         t = tidy(result)
         @test length(t.rows) == 3  # intercept + mvalue + capital
         # 当自由度为 0 时，p 值为 NaN
         @test all(row -> row.pvalue === nothing || isnan(row.pvalue), t.rows)
+
+        # augment 验证：fitted + residual = 组均值 y
+        a = augment(result)
+        @test a.nobs == 3
+        @test a.columns[:fitted] + a.columns[:residual] ≈
+              result.fitted_values + result.residual_vector atol=1e-12
     end
 end

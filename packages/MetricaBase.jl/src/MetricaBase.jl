@@ -171,10 +171,11 @@ end
 面板数据容器。
 
 存储面板结构的数据，包含个体标识和时间标识。
-`data` 可以是 DataFrame 或任何 Tables.jl 兼容容器。
+`data` 可以是 DataFrame、Dict 或任何 Tables.jl 兼容容器。
+类型参数 `T` 保留具体数据类型，便于下游分派。
 """
-struct PanelData
-    data::Any
+struct PanelData{T}
+    data::T
     id_col::Symbol
     time_col::Symbol
 end

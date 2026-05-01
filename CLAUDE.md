@@ -14,11 +14,13 @@
 
 ## 当前阶段
 
-项目处于里程碑 2 收口阶段。当前活跃计划：
-- `docs/superpowers/plans/2026-04-30-metrica-current-plan.md`
+里程碑 1/2/3 已全部完成。当前状态：
+- 里程碑 1：Base Alpha ✅
+- 里程碑 2：教学向 OLS ✅
+- 里程碑 3：面板基础 ✅
 
-架构设计：
-- `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
+总体蓝图：`Metrica.jl-计量经济学框架-完善版.md`
+主设计文档：`docs/superpowers/specs/2026-04-30-metrica-main-design.md`
 
 App 层技术栈：Tauri 2 + React 19 + TypeScript 5 + Zustand + Ant Design + AG Grid + ECharts
 Runtime 层技术栈：Rust + axum + tokio + 持久化 Julia 进程（stdin/stdout JSON lines）

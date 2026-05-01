@@ -182,15 +182,23 @@ export async function fitModel({
   endpoint = DEFAULT_RUNTIME_ENDPOINT,
   datasetPath,
   formula,
+  modelType = "ols",
   vcovType = "classical",
   weightsColumn = "",
+  panelId = "",
+  panelTime = "",
+  panelMethod = "fe",
   fetchImpl = fetch,
 }) {
   const requestBody = buildFitModelRequest({
     datasetPath,
     formula,
+    modelType,
     vcovType,
     weightsColumn,
+    panelId,
+    panelTime,
+    panelMethod,
   });
   const result = await postFitModel(endpoint, requestBody, fetchImpl);
 

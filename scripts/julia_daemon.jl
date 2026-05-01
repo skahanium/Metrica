@@ -18,52 +18,8 @@ using MetricaLinear
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))
 using .MetricaTests
 
-function diagnostics_to_dict(result)
-    bp = breusch_pagan(result)
-    white = white_test(result)
-    dw = durbin_watson(result)
-    bg = breusch_godfrey(result; p=2)
-    reset = reset_test(result)
-    jb = jarque_bera(result)
-
-    return Dict(
-        "vif" => [
-            Dict("name" => row.name, "vif" => row.vif)
-            for row in vif(result)
-        ],
-        "breusch_pagan" => Dict(
-            "statistic" => bp.statistic,
-            "pvalue" => bp.pvalue,
-            "dof" => bp.dof,
-        ),
-        "white_test" => Dict(
-            "statistic" => white.statistic,
-            "pvalue" => white.pvalue,
-            "dof" => white.dof,
-        ),
-        "durbin_watson" => Dict(
-            "statistic" => dw.statistic,
-            "pvalue" => dw.pvalue,
-        ),
-        "breusch_godfrey" => Dict(
-            "statistic" => bg.statistic,
-            "pvalue" => bg.pvalue,
-            "dof" => bg.dof,
-        ),
-        "reset_test" => Dict(
-            "statistic" => reset.statistic,
-            "pvalue" => reset.pvalue,
-            "df_num" => reset.df_num,
-            "df_den" => reset.df_den,
-        ),
-        "jarque_bera" => Dict(
-            "statistic" => jb.statistic,
-            "pvalue" => jb.pvalue,
-            "skewness" => jb.skewness,
-            "kurtosis" => jb.kurtosis,
-        ),
-    )
-end
+# 加载共享诊断函数
+include(joinpath(ENV["METRICA_REPO_ROOT"], "scripts", "diagnostics_common.jl"))
 
 function handle_request(req::Dict{String, Any})
     id = req["id"]
