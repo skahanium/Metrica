@@ -87,7 +87,8 @@ else
     else
         fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
     end
-    payload = result_to_payload(result)
+    include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+    payload = result_to_payload(result; include_augment=include_augment)
     if result isa OLSFitResult
         payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
     end

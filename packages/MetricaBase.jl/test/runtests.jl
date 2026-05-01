@@ -214,6 +214,19 @@ using MetricaBase
         @test td.vcov_label == "robust"
     end
 
+    @testset "AugmentTable 基本结构" begin
+        cols = Dict(
+            :observation => [1.0, 2.0, 3.0],
+            :fitted => [10.1, 12.3, 14.5],
+            :residual => [-0.1, 0.3, -0.5],
+        )
+        at = AugmentTable(cols, 3)
+        @test at.nobs == 3
+        @test length(at.columns) == 3
+        @test at.columns[:fitted] == [10.1, 12.3, 14.5]
+        @test at.columns[:residual] == [-0.1, 0.3, -0.5]
+    end
+
     # === 公共 API 函数接口 ===================================================
 
     @testset "函数接口存在且可调用（0 方法）" begin
@@ -237,7 +250,7 @@ using MetricaBase
             :AbstractEconModel, :AbstractFittedModel, :AbstractCovarianceSpec,
             :Severity, :info, :warning, :critical,
             :ModelWarning, :ModelError, :MetricValue,
-            :ModelGlance, :CoefRow, :TidyTable,
+            :ModelGlance, :CoefRow, :TidyTable, :AugmentTable,
             :fit, :coef, :vcov, :predict, :glance, :tidy, :augment,
         ])
         for sym in exported

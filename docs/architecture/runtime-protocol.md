@@ -200,7 +200,7 @@
 - 成功响应中的 `glance` 与 `tidy` 来自真实 OLS 拟合结果
 - `fit_ols_demo` 或纯示例载荷不得作为当前完成标准
 
-> 注意：成功响应中的 `augment_preview` 字段当前可为空数组，完整 `augment` 大表渲染在后续切片中启用。
+> 注意：成功响应中的 `augment_preview` 字段在 `options.return_augment = true` 时返回逐观测增强数据（拟合值、残差、标准化残差、杠杆值、Cook's D），默认预览前 100 行。当 `return_augment = false` 时，该字段不包含在响应中。
 
 当前默认基线为：
 

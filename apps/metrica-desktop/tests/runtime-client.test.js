@@ -21,7 +21,7 @@ test("buildFitModelRequest 生成稳定协议对象", () => {
   assert.equal(request.model_spec.model_type, "ols");
   assert.equal(request.model_spec.formula, "y ~ x1 + x2");
   assert.equal(request.options.drop_missing, true);
-  assert.equal(request.options.return_augment, false);
+  assert.equal(request.options.return_augment, true);
 });
 
 test("buildFitModelRequest 支持协方差与权重字段", () => {

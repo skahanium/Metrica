@@ -396,6 +396,39 @@ export function renderPreviewRows(rows = [], columnOrder = []) {
   `;
 }
 
+export function renderAugmentPreview(augmentPreview) {
+  if (!augmentPreview || !augmentPreview.fitted?.length) {
+    return `
+      <article class="empty-state">
+        <strong>暂无逐观测增强数据。</strong>
+        <p>设置 <code>return_augment: true</code> 后，这里会显示拟合值与残差。</p>
+      </article>
+    `;
+  }
+
+  const columns = Object.keys(augmentPreview);
+  const nobs = augmentPreview.fitted.length;
+
+  const head = columns.map((col) => `<th>${escapeHtml(col)}</th>`).join("");
+  const body = [];
+  for (let i = 0; i < nobs; i++) {
+    const cells = columns
+      .map((col) => `<td>${formatNumber(augmentPreview[col][i])}</td>`)
+      .join("");
+    body.push(`<tr>${cells}</tr>`);
+  }
+
+  return `
+    <article class="augment-section">
+      <h4>逐观测增强数据（前 ${nobs} 行）</h4>
+      <table class="tidy-table augment-table">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body.join("")}</tbody>
+      </table>
+    </article>
+  `;
+}
+
 export function renderSummaryText(summaryText) {
   if (!summaryText) {
     return `

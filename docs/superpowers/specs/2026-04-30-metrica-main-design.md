@@ -4,7 +4,7 @@
 >
 > **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现，Runtime 已迁移到 axum + 持久化 Julia 守护进程。
 >
-> **下一步边界：** 里程碑 2 已完成，当前基线稳定。后续工作可考虑：贯通 Runtime/App 对扩展诊断（White、DW、BG、RESET、JB）的结构化消费，或推进 augment 能力，或引入新模型类型。不得重开平行 mock 路线，也不得让 App 解析终端文本。
+> **下一步边界：** 里程碑 2 已完成，当前基线稳定。augment 能力已贯通。后续工作可考虑：启动里程碑 3（面板基础），或引入新模型类型。不得重开平行 mock 路线，也不得让 App 解析终端文本。
 
 ## 概述
 
@@ -34,7 +34,7 @@
 当前阶段性落点：
 
 - 已完成的最小可用边界：`fit_ols_file`、`glance`、`tidy`、结构化 warning / error、结构化 payload、Runtime 真实调用 Julia、桌面端结构化渲染
-- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现
+- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现，`augment` 能力已贯通（拟合值、残差、标准化残差、杠杆值、Cook's D）
 - 明确排除的短期捷径：前端直接调用本地 Julia 脚本、前端消费示例 JSON、Runtime 返回样例载荷冒充真实链路
 - 延后处理的高级能力：受控自定义动作 / 分析模板；当前只要求为其保留稳定接口铺垫，不落地完整模板系统
 
@@ -184,7 +184,7 @@ Core 内部的线性代数与概率计算应优先使用 Julia 生态的通用�
 - `warnings`
   - 用于教学友好展示的结构化警告对象
 
-当前允许 `augment` 暂不对外完整公开，但内部实现应保留拟合值与残差计算位置，避免后续返工。
+`augment` 能力已实现，通过 `options.return_augment = true` 可请求逐观测增强数据，包含拟合值、残差、标准化残差、杠杆值与 Cook's D。默认预览前 100 行。
 
 ### 缺失值处理
 

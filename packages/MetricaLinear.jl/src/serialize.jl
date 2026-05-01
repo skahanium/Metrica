@@ -26,7 +26,7 @@ function error_to_payload(err::MetricaBase.ModelError)
     )
 end
 
-function result_to_payload(result::OLSFitResult)
+function result_to_payload(result::OLSFitResult; include_augment::Bool=true)
     glance_table = MetricaBase.glance(result)
     tidy_table = MetricaBase.tidy(result)
     warnings = [warning_to_dict(warning) for warning in glance_table.warnings]
@@ -37,7 +37,7 @@ function result_to_payload(result::OLSFitResult)
         ""
     end
 
-    return Dict(
+    payload = Dict(
         "status" => "success",
         "messages" => [
             Dict(
@@ -71,6 +71,18 @@ function result_to_payload(result::OLSFitResult)
             "summary_text" => summary_text,
         ),
     )
+
+    if include_augment
+        augment_table = MetricaBase.augment(result)
+        max_preview = min(100, augment_table.nobs)
+        augment_preview = Dict(
+            String(key) => values[1:max_preview]
+            for (key, values) in augment_table.columns
+        )
+        payload["result_payload"]["augment_preview"] = augment_preview
+    end
+
+    return payload
 end
 
 result_to_payload(err::MetricaBase.ModelError) = error_to_payload(err)

@@ -9,6 +9,7 @@ import {
   renderDatasetSummary,
   renderDiagnostics,
   renderPreviewRows,
+  renderAugmentPreview,
   renderVcovLabel,
 } from "../src/result-view.js";
 
@@ -177,4 +178,30 @@ test("renderPreviewRows 输出预览行", () => {
   assert.match(html, /<table/);
   assert.match(html, /10/);
   assert.match(html, /x2/);
+});
+
+test("renderAugmentPreview 输出逐观测增强数据", () => {
+  const html = renderAugmentPreview({
+    observation: [1, 2, 3],
+    fitted: [10.1, 12.3, 14.5],
+    residual: [-0.1, 0.3, -0.5],
+    std_residual: [-0.19, 0.57, -0.95],
+    leverage: [0.33, 0.34, 0.33],
+    cooks_d: [0.01, 0.02, 0.03],
+  });
+
+  assert.match(html, /augment/);
+  assert.match(html, /fitted/);
+  assert.match(html, /residual/);
+  assert.match(html, /10\.1/);
+  assert.match(html, /-0\.1/);
+  assert.match(html, /leverage/);
+  assert.match(html, /cooks_d/);
+});
+
+test("renderAugmentPreview 无数据时显示空状态", () => {
+  const html = renderAugmentPreview(null);
+
+  assert.match(html, /暂无逐观测增强数据/);
+  assert.match(html, /return_augment/);
 });

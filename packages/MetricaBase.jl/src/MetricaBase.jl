@@ -15,6 +15,7 @@ export AbstractEconModel,
     ModelGlance,
     CoefRow,
     TidyTable,
+    AugmentTable,
     fit,
     coef,
     vcov,
@@ -140,6 +141,20 @@ end
 struct TidyTable
     rows::Vector{CoefRow}
     vcov_label::String
+end
+
+"""
+逐观测值增强表（拟合值、残差、诊断量等）。
+
+由 `augment()` 返回。列式存储，每列为一个 `Vector{Float64}`。
+标准列包括 `:observation`、`:fitted`、`:residual`，可选列包括
+`:std_residual`、`:leverage`、`:cooks_d` 等。
+
+下游可通过 `table.columns[:fitted]` 访问指定列。
+"""
+struct AugmentTable
+    columns::Dict{Symbol, Vector{Float64}}
+    nobs::Int
 end
 
 # === 公共 API 函数（接口桩）==================================================

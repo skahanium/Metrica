@@ -53,7 +53,7 @@ export function buildFitModelRequest({
     model_spec: modelSpec,
     options: {
       drop_missing: true,
-      return_augment: false,
+      return_augment: true,
     },
   };
 }

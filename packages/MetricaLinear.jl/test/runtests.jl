@@ -141,15 +141,64 @@ end
     @test haskey(ok_payload, "result_payload")
     @test haskey(ok_payload["result_payload"], "glance")
     @test haskey(ok_payload["result_payload"], "tidy")
+    @test haskey(ok_payload["result_payload"], "augment_preview")
     @test ok_payload["result_payload"]["vcov_label"] == "classical"
     @test ok_payload["result_payload"]["glance"]["metrics"]["adj_r2"] isa Real
     @test length(ok_payload["result_payload"]["warnings"]) >= 1
+    @test haskey(ok_payload["result_payload"]["augment_preview"], "fitted")
+    @test haskey(ok_payload["result_payload"]["augment_preview"], "residual")
+    @test length(ok_payload["result_payload"]["augment_preview"]["fitted"]) == 7
+
+    # 测试 include_augment=false
+    ok_payload_no_augment = result_to_payload(ok; include_augment=false)
+    @test !haskey(ok_payload_no_augment["result_payload"], "augment_preview")
 
     missing_col = fit_ols_file(DEMO_CSV, "y ~ x9")
     err_payload = result_to_payload(missing_col)
     @test err_payload["status"] == "error"
     @test length(err_payload["messages"]) == 1
     @test err_payload["messages"][1]["code"] == "unknown_variable"
+end
+
+@testset "augment 能力" begin
+    ok = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
+    at = augment(ok)
+    @test at isa MetricaBase.AugmentTable
+    @test at.nobs == 7
+    @test length(at.columns) == 6
+    @test haskey(at.columns, :observation)
+    @test haskey(at.columns, :fitted)
+    @test haskey(at.columns, :residual)
+    @test haskey(at.columns, :std_residual)
+    @test haskey(at.columns, :leverage)
+    @test haskey(at.columns, :cooks_d)
+    @test at.columns[:observation] == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+    @test length(at.columns[:fitted]) == 7
+    @test length(at.columns[:residual]) == 7
+
+    # 数值恒等式：fitted + residual = 实际响应值
+    y = ok.response_vector
+    fitted = at.columns[:fitted]
+    residuals = at.columns[:residual]
+    @test fitted ≈ ok.fitted_values atol=1e-12
+    @test residuals ≈ ok.residual_vector atol=1e-12
+    @test fitted + residuals ≈ y atol=1e-12
+    @test sum(residuals) ≈ 0.0 atol=1e-10
+
+    # 标准化残差 = 残差 / sigma
+    sigma = glance(ok).metrics[:sigma]
+    @test sigma > 0
+    @test at.columns[:std_residual] ≈ residuals ./ sigma atol=1e-12
+
+    # 杠杆值范围与秩恒等式：0 ≤ h_ii < 1，Σ h_ii = k
+    leverage = at.columns[:leverage]
+    k = size(ok.design_matrix, 2)
+    @test all(0.0 .<= leverage .< 1.0)
+    @test sum(leverage) ≈ k atol=1e-10
+
+    # Cook's D 非负
+    cooks_d = at.columns[:cooks_d]
+    @test all(cooks_d .>= 0.0)
 end
 
 @testset "数据检查载荷输出" begin
