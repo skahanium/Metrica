@@ -25,6 +25,7 @@ const filePicker = document.getElementById("file-picker");
 const formulaInput = document.getElementById("formula-input");
 const vcovTypeInput = document.getElementById("vcov-type");
 const weightsColumnInput = document.getElementById("weights-column");
+const clusterColumnInput = document.getElementById("cluster-column");
 const runButton = document.getElementById("run-model");
 const statusText = document.getElementById("status-text");
 const errorBox = document.getElementById("error-box");
@@ -150,6 +151,7 @@ async function runModel() {
   const formula = formulaInput.value.trim();
   const vcovType = vcovTypeInput.value;
   const weightsColumn = weightsColumnInput.value.trim();
+  const clusterColumn = (clusterColumnInput?.value || "").trim();
 
   if (!runtimeBaseInput.value.trim() || !datasetPath || !formula) {
     showError({
@@ -173,6 +175,7 @@ async function runModel() {
       formula,
       vcovType,
       weightsColumn,
+      clusterColumn,
     });
 
     statusText.textContent =

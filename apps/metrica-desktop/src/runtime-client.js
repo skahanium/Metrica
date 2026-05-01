@@ -18,6 +18,7 @@ export function buildFitModelRequest({
   formula,
   vcovType = "classical",
   weightsColumn = "",
+  clusterColumn = "",
   projectId = "alpha-demo",
   workingDir = DEFAULT_WORKING_DIR,
 }) {
@@ -31,6 +32,10 @@ export function buildFitModelRequest({
   const trimmedWeights = weightsColumn.trim();
   if (trimmedWeights) {
     modelSpec.weights = trimmedWeights;
+  }
+  const trimmedCluster = clusterColumn.trim();
+  if (trimmedCluster) {
+    modelSpec.cluster_column = trimmedCluster;
   }
 
   return {

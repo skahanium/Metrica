@@ -36,6 +36,18 @@ test("buildFitModelRequest 支持协方差与权重字段", () => {
   assert.equal(request.model_spec.weights, "x1");
 });
 
+test("buildFitModelRequest 支持聚类变量字段", () => {
+  const request = buildFitModelRequest({
+    datasetPath: "/tmp/demo.csv",
+    formula: "y ~ x1 + x2",
+    vcovType: "cluster",
+    clusterColumn: "group_id",
+  });
+
+  assert.equal(request.model_spec.vcov.type, "cluster");
+  assert.equal(request.model_spec.cluster_column, "group_id");
+});
+
 test("fitModel 使用 JSON POST 调用 Runtime", async () => {
   let capturedUrl;
   let capturedOptions;

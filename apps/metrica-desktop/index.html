@@ -43,12 +43,18 @@
         <select id="vcov-type">
           <option value="classical">classical</option>
           <option value="HC1">HC1</option>
+          <option value="cluster">cluster</option>
         </select>
       </label>
 
       <label class="field">
         <span>WLS 权重列（可选）</span>
         <input id="weights-column" type="text" placeholder="例如 x1" />
+      </label>
+
+      <label class="field">
+        <span>聚类变量（可选，用于 cluster 协方差）</span>
+        <input id="cluster-column" type="text" placeholder="例如 group_id" />
       </label>
 
       <button id="run-model" type="button">运行模型</button>

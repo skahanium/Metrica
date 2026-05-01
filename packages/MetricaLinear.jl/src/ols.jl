@@ -91,7 +91,7 @@ end
 
 成功时返回 `nothing`；失败时返回 `ModelError`。
 """
-function validate_model_columns(dataset, model_columns::Vector{Symbol}, weights::Union{Nothing, Symbol})
+function validate_model_columns(dataset, model_columns::Vector{Symbol}, weights::Union{Nothing, Symbol}, cluster::Union{Nothing, Symbol})
     available_columns = Set(Symbol.(names(dataset)))
     missing_columns = [name for name in model_columns if name ∉ available_columns]
 
@@ -111,17 +111,29 @@ function validate_model_columns(dataset, model_columns::Vector{Symbol}, weights:
         )
     end
 
+    if !isnothing(cluster) && cluster ∉ available_columns
+        return MetricaBase.ModelError(
+            :unknown_cluster_variable,
+            "聚类变量不存在",
+            "指定的聚类变量无法在数据集中找到：$(cluster)。",
+            "请检查聚类变量名是否与数据列一致。",
+        )
+    end
+
     return nothing
 end
 
 """
 从数据集中筛除模型相关列中含缺失值的行，构建 `ModelFrame` 与 `ModelMatrix`。
 
-返回 `(filtered_dataset, model_frame, model_matrix, X, y, weight_values, n_total, n_effective)`
+返回 `(filtered_dataset, model_frame, model_matrix, X, y, weight_values, cluster_values, n_total, n_effective)`
 或 `ModelError`。
 """
-function prepare_model_data(dataset, model_formula, model_columns, weights::Union{Nothing, Symbol})
+function prepare_model_data(dataset, model_formula, model_columns, weights::Union{Nothing, Symbol}, cluster::Union{Nothing, Symbol})
     required_columns = isnothing(weights) ? model_columns : unique([model_columns; weights])
+    if !isnothing(cluster)
+        required_columns = unique([required_columns; cluster])
+    end
     filtered_dataset = dataset[completecases(dataset[:, required_columns]), :]
     n_total = nrow(dataset)
     n_effective = nrow(filtered_dataset)
@@ -167,7 +179,13 @@ function prepare_model_data(dataset, model_formula, model_columns, weights::Unio
         wv
     end
 
-    return (filtered_dataset, model_frame, model_matrix, X, y, weight_values, n_total, n_effective)
+    cluster_values = if isnothing(cluster)
+        nothing
+    else
+        filtered_dataset[!, cluster]
+    end
+
+    return (filtered_dataset, model_frame, model_matrix, X, y, weight_values, cluster_values, n_total, n_effective)
 end
 
 """
@@ -224,9 +242,11 @@ end
 """
 计算系数的方差-协方差矩阵与标准误。
 
+`cluster_values` 仅在 `vcov === :cluster` 时使用，包含每个观测的聚类标识。
+
 返回 `(vcov_matrix, stderror)` 或 `ModelError`。
 """
-function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float64}, nobs::Int, dof::Int, vcov::Symbol)
+function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float64}, nobs::Int, dof::Int, vcov::Symbol, cluster_values::Union{Nothing, AbstractVector})
     ncoef = size(X_eff, 2)
     xtx = transpose(X_eff) * X_eff
     xtx_inv = inv(xtx)
@@ -243,12 +263,45 @@ function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float6
             meat += effective_residuals[index]^2 .* (xi * transpose(xi))
         end
         scale .* (xtx_inv * meat * xtx_inv)
+    elseif vcov === :cluster
+        if isnothing(cluster_values)
+            return MetricaBase.ModelError(
+                :missing_cluster_variable,
+                "缺少聚类变量",
+                "cluster 协方差需要指定聚类变量。",
+                "请在请求中提供 cluster_column 字段。",
+            )
+        end
+
+        # 按聚类标识分组计算聚类稳健协方差
+        unique_clusters = unique(cluster_values)
+        G = length(unique_clusters)
+
+        G > 1 || return MetricaBase.ModelError(
+            :single_cluster,
+            "聚类数量不足",
+            "聚类稳健标准误要求至少包含 2 个聚类。",
+            "当前数据仅包含 1 个聚类，请更换聚类变量或使用 classical/HC1。",
+        )
+
+        meat = zeros(ncoef, ncoef)
+        for cluster_id in unique_clusters
+            cluster_indices = findall(value -> isequal(value, cluster_id), cluster_values)
+            Xg = X_eff[cluster_indices, :]
+            eg = effective_residuals[cluster_indices]
+            score_g = transpose(Xg) * eg
+            meat += score_g * transpose(score_g)
+        end
+
+        # Stata 风格小样本修正: c = G/(G-1) * (N-1)/(N-k)
+        correction = (G / (G - 1)) * ((nobs - 1) / dof)
+        correction .* (xtx_inv * meat * xtx_inv)
     else
         return MetricaBase.ModelError(
             :unsupported_vcov,
             "协方差类型暂不支持",
-            "当前仅支持 classical 与 HC1。",
-            "请先使用 `classical` 或 `HC1`。",
+            "当前仅支持 classical、HC1 与 cluster。",
+            "请使用 `classical`、`HC1` 或 `cluster`。",
         )
     end
 
@@ -290,7 +343,14 @@ function assemble_tidy_table(coefficients::Vector{Float64}, stderror::Vector{Flo
         for index in eachindex(coefficients)
     ]
 
-    return MetricaBase.TidyTable(tidy_rows, vcov === :HC1 ? "HC1" : "classical")
+    vcov_label = if vcov === :HC1
+        "HC1"
+    elseif vcov === :cluster
+        "cluster"
+    else
+        "classical"
+    end
+    return MetricaBase.TidyTable(tidy_rows, vcov_label)
 end
 
 # === 主入口 ====================================================================
@@ -305,6 +365,7 @@ function fit_ols_file(
     formula::AbstractString;
     weights::Union{Nothing, Symbol}=nothing,
     vcov::Symbol=:classical,
+    cluster::Union{Nothing, Symbol}=nothing,
 )
     dataset = load_dataset(path)
     dataset isa MetricaBase.ModelError && return dataset
@@ -314,13 +375,13 @@ function fit_ols_file(
 
     model_columns = collect_term_symbols(model_formula)
 
-    err = validate_model_columns(dataset, model_columns, weights)
+    err = validate_model_columns(dataset, model_columns, weights, cluster)
     err isa MetricaBase.ModelError && return err
 
-    prepared = prepare_model_data(dataset, model_formula, model_columns, weights)
+    prepared = prepare_model_data(dataset, model_formula, model_columns, weights, cluster)
     prepared isa MetricaBase.ModelError && return prepared
 
-    (_, model_frame, _, X, y, weight_values, n_total, n_effective) = prepared
+    (_, model_frame, _, X, y, weight_values, cluster_values, n_total, n_effective) = prepared
     nobs = length(y)
     ncoef = size(X, 2)
 
@@ -331,7 +392,7 @@ function fit_ols_file(
     X_eff, y_eff, model_label = apply_weights(X, y, weight_values)
     coefficients, fitted, residuals, effective_residuals = compute_ols_estimates(X, y, X_eff, y_eff)
 
-    vcov_result = compute_vcov(X_eff, effective_residuals, nobs, dof, vcov)
+    vcov_result = compute_vcov(X_eff, effective_residuals, nobs, dof, vcov, cluster_values)
     vcov_result isa MetricaBase.ModelError && return vcov_result
     _, stderror = vcov_result
 

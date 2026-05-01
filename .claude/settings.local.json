@@ -35,7 +35,9 @@
       "Bash(ls:*)",
       "Bash(./runtime/metrica-runtime/target/debug/metrica-runtime serve:*)",
       "Bash(curl -s --request POST http://127.0.0.1:47821/fit_model -H 'Content-Type: application/json' -d '{\"task_id\":\"test-1\",\"action\":\"fit_model\",\"project_context\":{\"project_id\":\"test\",\"working_dir\":\"/Users/skahanium/Metrica/apps/metrica-desktop\"},\"dataset_ref\":{\"source\":\"file\",\"path\":\"/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv\",\"format\":\"csv\"},\"model_spec\":{\"model_type\":\"ols\",\"formula\":\"y ~ x1 + x2\",\"vcov\":{\"type\":\"classical\"}},\"options\":{\"drop_missing\":true,\"return_augment\":false}}')",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(npm test *)",
+      "Bash(git *)"
     ]
   }
 }

@@ -181,6 +181,27 @@ export function renderVcovLabel(vcovLabel) {
   `;
 }
 
+function renderDiagnosticBlock(title, description, fields) {
+  const cards = fields
+    .map(
+      ([label, value]) => `
+        <div class="glance-card">
+          <span>${escapeHtml(label)}</span>
+          <strong>${formatNumber(value)}</strong>
+        </div>
+      `
+    )
+    .join("");
+
+  return `
+    <article class="diagnostics-block">
+      <h4>${escapeHtml(title)}</h4>
+      <p class="diag-desc">${escapeHtml(description)}</p>
+      <div class="glance-grid diagnostics-grid">${cards}</div>
+    </article>
+  `;
+}
+
 export function renderDiagnostics(diagnostics) {
   if (!diagnostics) {
     return `
@@ -191,74 +212,70 @@ export function renderDiagnostics(diagnostics) {
     `;
   }
 
+  const blocks = [];
+
+  // VIF
   const vifRows = Array.isArray(diagnostics.vif) ? diagnostics.vif : [];
-  const vifMarkup = vifRows.length
-    ? `
+  if (vifRows.length) {
+    const vifTable = `
       <table class="tidy-table diagnostics-table">
-        <thead>
-          <tr>
-            <th>变量</th>
-            <th>VIF</th>
-          </tr>
-        </thead>
+        <thead><tr><th>变量</th><th>VIF</th></tr></thead>
         <tbody>
-          ${vifRows
-            .map(
-              (row) => `
-                <tr>
-                  <td>${escapeHtml(row.name)}</td>
-                  <td>${formatNumber(row.vif)}</td>
-                </tr>
-              `
-            )
-            .join("")}
+          ${vifRows.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${formatNumber(row.vif)}</td></tr>`).join("")}
         </tbody>
       </table>
-    `
-    : `
-      <article class="empty-state">
-        <strong>暂无 VIF 结果。</strong>
-        <p>模型没有返回可展示的共线性诊断行。</p>
-      </article>
     `;
+    blocks.push(`<article class="diagnostics-block"><h4>VIF（多重共线性）</h4><p class="diag-desc">VIF > 10 表示存在严重共线性。</p>${vifTable}</article>`);
+  }
 
-  const bp = diagnostics.breusch_pagan;
-  const bpMarkup = bp
-    ? `
-      <div class="glance-grid diagnostics-grid">
-        <div class="glance-card">
-          <span>统计量</span>
-          <strong>${formatNumber(bp.statistic)}</strong>
-        </div>
-        <div class="glance-card">
-          <span>p 值</span>
-          <strong>${formatNumber(bp.pvalue)}</strong>
-        </div>
-        <div class="glance-card">
-          <span>自由度</span>
-          <strong>${formatNumber(bp.dof)}</strong>
-        </div>
-      </div>
-    `
-    : `
-      <article class="empty-state">
-        <strong>暂无 Breusch-Pagan 结果。</strong>
-        <p>模型没有返回异方差诊断。</p>
-      </article>
-    `;
+  // 辅助：构建检验卡片块
+  const testBlocks = [
+    {
+      key: "breusch_pagan",
+      title: "Breusch-Pagan（异方差）",
+      desc: "H₀: 同方差。p < 0.05 表示存在异方差。",
+      fields: (d) => [["LM 统计量", d.statistic], ["p 值", d.pvalue], ["自由度", d.dof]],
+    },
+    {
+      key: "white_test",
+      title: "White 检验（异方差）",
+      desc: "含二次项辅助回归。H₀: 同方差。",
+      fields: (d) => [["LM 统计量", d.statistic], ["p 值", d.pvalue], ["自由度", d.dof]],
+    },
+    {
+      key: "durbin_watson",
+      title: "Durbin-Watson（一阶自相关）",
+      desc: "DW ≈ 2 表示无自相关，< 2 为正自相关，> 2 为负自相关。",
+      fields: (d) => [["DW 统计量", d.statistic], ["p 值（正态近似）", d.pvalue]],
+    },
+    {
+      key: "breusch_godfrey",
+      title: "Breusch-Godfrey（2 阶自相关）",
+      desc: "H₀: 无直到 2 阶的自相关。",
+      fields: (d) => [["LM 统计量", d.statistic], ["p 值", d.pvalue], ["自由度", d.dof]],
+    },
+    {
+      key: "reset_test",
+      title: "RESET 检验（模型设定）",
+      desc: "H₀: 模型设定正确。添加 ŷ² 与 ŷ³ 检验遗漏的非线性。",
+      fields: (d) => [["F 统计量", d.statistic], ["p 值", d.pvalue], ["分子 df", d.df_num], ["分母 df", d.df_den]],
+    },
+    {
+      key: "jarque_bera",
+      title: "Jarque-Bera（残差正态性）",
+      desc: "H₀: 残差服从正态分布。",
+      fields: (d) => [["JB 统计量", d.statistic], ["p 值", d.pvalue], ["偏度", d.skewness], ["峰度", d.kurtosis]],
+    },
+  ];
 
-  return `
-    <section class="diagnostics-section">
-      <article class="diagnostics-block">
-        <h4>VIF</h4>
-        ${vifMarkup}
-      </article>
-      <article class="diagnostics-block">
-        <h4>Breusch-Pagan</h4>
-        ${bpMarkup}
-      </article>
-    </section>
-  `;
+  for (const tb of testBlocks) {
+    const data = diagnostics[tb.key];
+    if (data) {
+      blocks.push(renderDiagnosticBlock(tb.title, tb.desc, tb.fields(data)));
+    }
+  }
+
+  return `<section class="diagnostics-section">${blocks.join("")}</section>`;
 }
 
 export function renderWarningsMarkup(warnings = []) {

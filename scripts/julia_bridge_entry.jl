@@ -13,6 +13,12 @@ using .MetricaTests
 
 function diagnostics_to_dict(result)
     bp = breusch_pagan(result)
+    white = white_test(result)
+    dw = durbin_watson(result)
+    bg = breusch_godfrey(result; p=2)
+    reset = reset_test(result)
+    jb = jarque_bera(result)
+
     return Dict(
         "vif" => [
             Dict(
@@ -26,6 +32,32 @@ function diagnostics_to_dict(result)
             "pvalue" => bp.pvalue,
             "dof" => bp.dof,
         ),
+        "white_test" => Dict(
+            "statistic" => white.statistic,
+            "pvalue" => white.pvalue,
+            "dof" => white.dof,
+        ),
+        "durbin_watson" => Dict(
+            "statistic" => dw.statistic,
+            "pvalue" => dw.pvalue,
+        ),
+        "breusch_godfrey" => Dict(
+            "statistic" => bg.statistic,
+            "pvalue" => bg.pvalue,
+            "dof" => bg.dof,
+        ),
+        "reset_test" => Dict(
+            "statistic" => reset.statistic,
+            "pvalue" => reset.pvalue,
+            "df_num" => reset.df_num,
+            "df_den" => reset.df_den,
+        ),
+        "jarque_bera" => Dict(
+            "statistic" => jb.statistic,
+            "pvalue" => jb.pvalue,
+            "skewness" => jb.skewness,
+            "kurtosis" => jb.kurtosis,
+        ),
     )
 end
 
@@ -37,10 +69,21 @@ payload = if action == "inspect_dataset"
 else
     formula = String(request.model_spec.formula)
     vcov_type = String(request.model_spec.vcov.type)
-    vcov_symbol = vcov_type == "HC1" ? :HC1 : :classical
+    vcov_symbol = if vcov_type == "HC1"
+        :HC1
+    elseif vcov_type == "cluster"
+        :cluster
+    else
+        :classical
+    end
     has_weights = haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights)
-    result = if has_weights
+    has_cluster = haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column)
+    result = if has_weights && has_cluster
+        fit_ols_file(dataset_path, formula; weights=Symbol(String(request.model_spec.weights)), vcov=vcov_symbol, cluster=Symbol(String(request.model_spec.cluster_column)))
+    elseif has_weights
         fit_ols_file(dataset_path, formula; weights=Symbol(String(request.model_spec.weights)), vcov=vcov_symbol)
+    elseif has_cluster
+        fit_ols_file(dataset_path, formula; vcov=vcov_symbol, cluster=Symbol(String(request.model_spec.cluster_column)))
     else
         fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
     end

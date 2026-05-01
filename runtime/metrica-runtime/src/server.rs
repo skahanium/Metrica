@@ -111,13 +111,17 @@ async fn handle_model_request(
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
     let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
 
-    let params = json!({
+    let mut params = json!({
         "dataset_path": dataset_path,
         "formula": request.model_spec.formula,
         "model_type": request.model_spec.model_type,
         "vcov": request.model_spec.vcov.kind,
         "weights": request.model_spec.weights,
     });
+
+    if let Some(ref col) = request.model_spec.cluster_column {
+        params["cluster_column"] = json!(col);
+    }
 
     let action = expected_action.to_string();
     let result = {

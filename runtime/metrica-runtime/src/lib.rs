@@ -48,6 +48,8 @@ pub struct ModelSpec {
     pub vcov: VcovSpec,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weights: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,6 +147,7 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
                 kind: "classical".to_string(),
             },
             weights: None,
+            cluster_column: None,
         },
         options: RequestOptions {
             drop_missing: true,

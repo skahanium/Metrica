@@ -20,6 +20,12 @@ using .MetricaTests
 
 function diagnostics_to_dict(result)
     bp = breusch_pagan(result)
+    white = white_test(result)
+    dw = durbin_watson(result)
+    bg = breusch_godfrey(result; p=2)
+    reset = reset_test(result)
+    jb = jarque_bera(result)
+
     return Dict(
         "vif" => [
             Dict("name" => row.name, "vif" => row.vif)
@@ -29,6 +35,32 @@ function diagnostics_to_dict(result)
             "statistic" => bp.statistic,
             "pvalue" => bp.pvalue,
             "dof" => bp.dof,
+        ),
+        "white_test" => Dict(
+            "statistic" => white.statistic,
+            "pvalue" => white.pvalue,
+            "dof" => white.dof,
+        ),
+        "durbin_watson" => Dict(
+            "statistic" => dw.statistic,
+            "pvalue" => dw.pvalue,
+        ),
+        "breusch_godfrey" => Dict(
+            "statistic" => bg.statistic,
+            "pvalue" => bg.pvalue,
+            "dof" => bg.dof,
+        ),
+        "reset_test" => Dict(
+            "statistic" => reset.statistic,
+            "pvalue" => reset.pvalue,
+            "df_num" => reset.df_num,
+            "df_den" => reset.df_den,
+        ),
+        "jarque_bera" => Dict(
+            "statistic" => jb.statistic,
+            "pvalue" => jb.pvalue,
+            "skewness" => jb.skewness,
+            "kurtosis" => jb.kurtosis,
         ),
     )
 end
@@ -46,15 +78,23 @@ function handle_request(req::Dict{String, Any})
             dataset_path = params["dataset_path"]
             formula = params["formula"]
             vcov_type = params["vcov"]
-            vcov_symbol = vcov_type == "HC1" ? :HC1 : :classical
+            vcov_symbol = if vcov_type == "HC1"
+                :HC1
+            elseif vcov_type == "cluster"
+                :cluster
+            else
+                :classical
+            end
             weights = get(params, "weights", nothing)
             weights_sym = isnothing(weights) || isempty(weights) ? nothing : Symbol(weights)
+            cluster_col = get(params, "cluster_column", nothing)
+            cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
 
-            result = if isnothing(weights_sym)
-                fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
-            else
-                fit_ols_file(dataset_path, formula; weights=weights_sym, vcov=vcov_symbol)
-            end
+            result = fit_ols_file(dataset_path, formula;
+                vcov=vcov_symbol,
+                weights=weights_sym,
+                cluster=cluster_sym,
+            )
 
             payload = result_to_payload(result)
             if result isa OLSFitResult

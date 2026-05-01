@@ -689,21 +689,29 @@ Metrica/
 
 建议把最初 3 个里程碑定义为：
 
-### 里程碑 1：Base Alpha
+### 里程碑 1：Base Alpha ✅ 已完成（2026-04 ~ 2026-05）
 
-- 可定义模型类型
-- 可从公式与表数据构建 `ModelFrame`
-- 可返回标准化结果对象
-- 可被输出层消费
+- ✅ 可定义模型类型 — `AbstractEconModel`、`AbstractFittedModel`、`AbstractCovarianceSpec`
+- ✅ 可从公式与表数据构建 `ModelFrame` — `parse_formula_term` + `ModelFrame(formula, data)`
+- ✅ 可返回标准化结果对象 — `ModelGlance`、`CoefRow`、`TidyTable`、`ModelWarning`、`ModelError`
+- ✅ 可被输出层消费 — `MetricaOutput.jl` 通过 `summary_card` / `markdown_regtable` 消费
 
-### 里程碑 2：教学向 OLS
+> **完成细节：** 协议内核 7 个 API 桩（fit/coef/vcov/predict/glance/tidy/augment）已定义，
+> `MetricaBase.jl` 零依赖，`MetricaLinear.jl` 实现了真实 OLS 链路。
+> 所有结构化类型均为 `MetricValue` 约束，severity/warning 分三级体系。
 
-- OLS + WLS
-- 经典/HC1/Cluster 协方差
-- 终端 summary + Markdown/LaTeX 表格
-- 基础诊断检验
+### 里程碑 2：教学向 OLS ✅ 已完成（2026-04 ~ 2026-05）
 
-> **当前 alpha 切片状态：** 里程碑 2 的完整范围（含 WLS、HC1/Cluster 等）将分步交付。第一条 alpha 垂直切片仅覆盖 OLS + 经典协方差，其余能力在 alpha 链路验证通过后依次追加。
+- ✅ OLS + WLS — `fit_ols_file` 支持 `weights` 关键字，`apply_weights` 做 sqrt 变换
+- ✅ 经典/HC1/Cluster 协方差 — `compute_vcov` 覆盖 `:classical` / `:HC1` / `:cluster`（Stata 风格小样本修正）
+- ✅ 终端 summary + Markdown 表格 — `summary_card`（人可读摘要）+ `markdown_regtable`（管道语法）
+- ✅ 基础诊断检验 — 全部 7 项已实现并贯通全链路：
+  VIF、Breusch-Pagan、White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera
+
+> **完成细节：** Runtime 已升级为 axum 0.8 + 持久化 Julia 守护进程（stdin/stdout JSON lines），
+> 桌面 App（wry/tao）通过 HTTP API 消费结构化结果。全链路 `Core → Runtime → App` 已端到端验证。
+> 诊断载荷由 `diagnostics_to_dict` 在 `julia_daemon.jl` / `julia_bridge_entry.jl` 中统一构造，
+> 前端 `renderDiagnostics` 渲染全部 7 项检验。测试总数 294（Rust 16 + Julia 278 + Frontend 16），零失败。
 
 ### 里程碑 3：面板基础
 
@@ -720,21 +728,21 @@ Metrica/
 
 ### 16.1 元包与子包版本协调
 
-子包（`MetricaBase.jl`、`MetricaLinear.jl` 等）各自独立维护语义版本，`Metrica.jl` 元包通过 `[compat]` 约束锁定子包兼容版本。建议所有子包初期统一使用 `0.1.x` 开发版本，直到 API 稳定后同步升至 `1.0.0`。
+子包（`MetricaBase.jl`、`MetricaLinear.jl` 等）各自独立维护语义版本，`Metrica.jl` 元包通过 `[compat]` 约束锁定子包兼容版本。子包当前统一使用 `0.1.x` 开发版本。里程碑 1 / 2 完成后，`0.1.0 → 0.2.0` gate 条件已满足，建议择机发布 `0.2.0`。
 
 ### 16.2 版本 Gates
 
-| 版本跃迁 | Gate 条件 |
-|----------|----------|
-| `0.1.0` → `0.2.0` | Base 接口冻结、OLS 完整链路打通、Runtime 协议稳定、App 可演示 |
+| 版本跃迁 | Gate 条件 | 状态 |
+|----------|----------|------|
+| `0.1.0` → `0.2.0` | Base 接口冻结、OLS 完整链路打通、Runtime 协议稳定、App 可演示 | ✅ 已完成（2026-05-01） |
 | `0.2.0` → `0.9.0` | Linear/Panel/Robust/Output/Tests/Margins 六包功能就绪、教学数据集完整、Pluto 教程上线 |
 | `0.9.0` → `1.0.0` | 至少两个教学学期在真实课堂中使用无重大 API 投诉、与 Stata/R 对齐测试全部通过、性能基准达标 |
 
 ### 16.3 首次公开发布建议时机
 
-- `MetricaBase.jl`：里程碑 1 完成后即可在 Julia 注册表发布 `0.1.0`
-- `Metrica.jl` 元包：里程碑 2 完成后首次发布，确保用户可 `add Metrica` 获得一站式体验
-- 桌面 App：里程碑 3 完成后提供首个可下载二进制包
+- `MetricaBase.jl`：里程碑 1 已完成 ✅，可在 Julia 注册表发布 `0.1.0`
+- `Metrica.jl` 元包：里程碑 2 已完成 ✅，具备首次发布条件，用户可 `add Metrica` 获得一站式体验
+- 桌面 App：里程碑 2 已提供可演示桌面二进制，里程碑 3 完成后提供首个正式可下载包
 
 ### 16.4 弃用策略
 
