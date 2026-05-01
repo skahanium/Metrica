@@ -5,6 +5,7 @@ module MetricaBase
 export AbstractEconModel,
     AbstractFittedModel,
     AbstractCovarianceSpec,
+    AbstractPanelModel,
     Severity,
     info,
     warning,
@@ -16,6 +17,7 @@ export AbstractEconModel,
     CoefRow,
     TidyTable,
     AugmentTable,
+    PanelData,
     fit,
     coef,
     vcov,
@@ -61,6 +63,14 @@ abstract type AbstractFittedModel end
 （经典、HC1、聚类等）及其所需参数。
 """
 abstract type AbstractCovarianceSpec end
+
+"""
+面板模型的抽象父类型。
+
+子类型应编码面板估计方法（FE、RE、FD、Between 等）及其所需参数。
+面板模型需要个体标识和时间标识来定义面板结构。
+"""
+abstract type AbstractPanelModel <: AbstractEconModel end
 
 # === 消息与错误载荷 ==========================================================
 
@@ -155,6 +165,18 @@ end
 struct AugmentTable
     columns::Dict{Symbol, Vector{Float64}}
     nobs::Int
+end
+
+"""
+面板数据容器。
+
+存储面板结构的数据，包含个体标识和时间标识。
+`data` 可以是 DataFrame 或任何 Tables.jl 兼容容器。
+"""
+struct PanelData
+    data::Any
+    id_col::Symbol
+    time_col::Symbol
 end
 
 # === 公共 API 函数（接口桩）==================================================

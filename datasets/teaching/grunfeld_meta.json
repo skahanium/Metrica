@@ -1,0 +1,54 @@
+{
+  "name": "Grunfeld Investment Data",
+  "description": "经典 Grunfeld 投资数据集，包含 20 家美国大型公司的投资、市值和资本存量数据。",
+  "source": "Wooldridge, J.M. (2016). Introductory Econometrics: A Modern Approach.",
+  "period": "1935-1954",
+  "n_firms": 20,
+  "n_years": 20,
+  "n_observations": 400,
+  "balanced": true,
+  "variables": {
+    "firm": {
+      "type": "categorical",
+      "description": "公司标识符（1-20）",
+      "role": "id"
+    },
+    "year": {
+      "type": "int",
+      "description": "年份（1935-1954）",
+      "role": "time"
+    },
+    "invest": {
+      "type": "float",
+      "description": "总投资（百万美元）",
+      "role": "response"
+    },
+    "mvalue": {
+      "type": "float",
+      "description": "公司市值（百万美元）",
+      "role": "predictor"
+    },
+    "capital": {
+      "type": "float",
+      "description": "资本存量（百万美元）",
+      "role": "predictor"
+    }
+  },
+  "recommended_formulas": [
+    "invest ~ mvalue + capital",
+    "invest ~ mvalue",
+    "invest ~ capital"
+  ],
+  "recommended_models": [
+    "FE（固定效应）",
+    "RE（随机效应）",
+    "Between（组间估计）"
+  ],
+  "tutorials": [
+    "面板数据基础",
+    "固定效应 vs 随机效应",
+    "Hausman 检验"
+  ],
+  "license": "Public Domain",
+  "created": "2026-05-01"
+}

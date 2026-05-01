@@ -227,6 +227,24 @@ using MetricaBase
         @test at.columns[:residual] == [-0.1, 0.3, -0.5]
     end
 
+    @testset "PanelData 基本结构" begin
+        # 使用简单字典模拟 DataFrame
+        data = Dict(
+            :firm => [1, 1, 2, 2],
+            :year => [1, 2, 1, 2],
+            :invest => [10.0, 12.0, 15.0, 18.0],
+        )
+        pd = PanelData(data, :firm, :year)
+        @test pd.id_col === :firm
+        @test pd.time_col === :year
+        @test length(pd.data[:firm]) == 4
+    end
+
+    @testset "AbstractPanelModel 类型层级" begin
+        # 验证 AbstractPanelModel 是 AbstractEconModel 的子类型
+        @test AbstractPanelModel <: AbstractEconModel
+    end
+
     # === 公共 API 函数接口 ===================================================
 
     @testset "函数接口存在且可调用（0 方法）" begin
@@ -248,9 +266,10 @@ using MetricaBase
     @testset "导出完整性" begin
         exported = Set([
             :AbstractEconModel, :AbstractFittedModel, :AbstractCovarianceSpec,
+            :AbstractPanelModel,
             :Severity, :info, :warning, :critical,
             :ModelWarning, :ModelError, :MetricValue,
-            :ModelGlance, :CoefRow, :TidyTable, :AugmentTable,
+            :ModelGlance, :CoefRow, :TidyTable, :AugmentTable, :PanelData,
             :fit, :coef, :vcov, :predict, :glance, :tidy, :augment,
         ])
         for sym in exported
