@@ -66,7 +66,7 @@ test("renderVcovLabel 输出协方差标签", () => {
   assert.match(html, /HC1/);
 });
 
-test("renderDiagnostics 输出结构化诊断结果", () => {
+test("renderDiagnostics 输出全部 7 项诊断结果", () => {
   const html = renderDiagnostics({
     vif: [
       { name: "x1", vif: 1.25 },
@@ -77,13 +77,64 @@ test("renderDiagnostics 输出结构化诊断结果", () => {
       pvalue: 0.0736,
       dof: 2,
     },
+    white_test: {
+      statistic: 5.1,
+      pvalue: 0.0778,
+      dof: 2,
+    },
+    durbin_watson: {
+      statistic: 1.85,
+      pvalue: 0.62,
+    },
+    breusch_godfrey: {
+      statistic: 1.2,
+      pvalue: 0.5488,
+      dof: 2,
+    },
+    reset_test: {
+      statistic: 0.45,
+      pvalue: 0.6453,
+      df_num: 2,
+      df_den: 4,
+    },
+    jarque_bera: {
+      statistic: 0.82,
+      pvalue: 0.6637,
+      skewness: 0.15,
+      kurtosis: 2.8,
+    },
   });
 
+  // VIF
   assert.match(html, /VIF/);
   assert.match(html, /x1/);
   assert.match(html, /1\.2500/);
+
+  // Breusch-Pagan
   assert.match(html, /Breusch-Pagan/);
   assert.match(html, /0\.0736/);
+
+  // White
+  assert.match(html, /White/);
+  assert.match(html, /0\.0778/);
+
+  // Durbin-Watson
+  assert.match(html, /Durbin-Watson/);
+  assert.match(html, /1\.85/);
+
+  // Breusch-Godfrey
+  assert.match(html, /Breusch-Godfrey/);
+  assert.match(html, /0\.5488/);
+
+  // RESET
+  assert.match(html, /RESET/);
+  assert.match(html, /0\.6453/);
+
+  // Jarque-Bera
+  assert.match(html, /Jarque-Bera/);
+  assert.match(html, /0\.6637/);
+  assert.match(html, /0\.15/);
+  assert.match(html, /2\.8/);
 });
 
 test("renderError 输出错误与 hint", () => {

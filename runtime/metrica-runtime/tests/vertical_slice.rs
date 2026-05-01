@@ -68,8 +68,45 @@ fn fit_model_returns_structured_diagnostics() {
     assert_eq!(response.status, "success");
     let payload = response.result_payload.expect("payload");
     let diagnostics = payload.get("diagnostics").expect("diagnostics");
+
+    // VIF
     assert!(diagnostics.get("vif").and_then(|value| value.as_array()).is_some());
-    assert!(diagnostics.get("breusch_pagan").is_some());
+
+    // Breusch-Pagan
+    let bp = diagnostics.get("breusch_pagan").expect("breusch_pagan");
+    assert!(bp.get("statistic").is_some());
+    assert!(bp.get("pvalue").is_some());
+    assert!(bp.get("dof").is_some());
+
+    // White
+    let white = diagnostics.get("white_test").expect("white_test");
+    assert!(white.get("statistic").is_some());
+    assert!(white.get("pvalue").is_some());
+    assert!(white.get("dof").is_some());
+
+    // Durbin-Watson
+    let dw = diagnostics.get("durbin_watson").expect("durbin_watson");
+    assert!(dw.get("statistic").is_some());
+
+    // Breusch-Godfrey
+    let bg = diagnostics.get("breusch_godfrey").expect("breusch_godfrey");
+    assert!(bg.get("statistic").is_some());
+    assert!(bg.get("pvalue").is_some());
+    assert!(bg.get("dof").is_some());
+
+    // RESET
+    let reset = diagnostics.get("reset_test").expect("reset_test");
+    assert!(reset.get("statistic").is_some());
+    assert!(reset.get("pvalue").is_some());
+    assert!(reset.get("df_num").is_some());
+    assert!(reset.get("df_den").is_some());
+
+    // Jarque-Bera
+    let jb = diagnostics.get("jarque_bera").expect("jarque_bera");
+    assert!(jb.get("statistic").is_some());
+    assert!(jb.get("pvalue").is_some());
+    assert!(jb.get("skewness").is_some());
+    assert!(jb.get("kurtosis").is_some());
 }
 
 #[test]

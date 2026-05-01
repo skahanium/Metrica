@@ -711,7 +711,7 @@ Metrica/
 > **完成细节：** Runtime 已升级为 axum 0.8 + 持久化 Julia 守护进程（stdin/stdout JSON lines），
 > 桌面 App（wry/tao）通过 HTTP API 消费结构化结果。全链路 `Core → Runtime → App` 已端到端验证。
 > 诊断载荷由 `diagnostics_to_dict` 在 `julia_daemon.jl` / `julia_bridge_entry.jl` 中统一构造，
-> 前端 `renderDiagnostics` 渲染全部 7 项检验。测试总数 294（Rust 16 + Julia 278 + Frontend 16），零失败。
+> 前端 `renderDiagnostics` 渲染全部 7 项检验。测试总数 155（Rust 16 + Julia 123 + Frontend 16），零失败。
 
 ### 里程碑 3：面板基础
 

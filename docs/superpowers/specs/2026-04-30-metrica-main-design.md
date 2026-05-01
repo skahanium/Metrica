@@ -2,9 +2,9 @@
 
 > **状态：当前主设计。** 本文件是当前 `Core -> Runtime -> App` 主链路的唯一设计锚点。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
 >
-> **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。
+> **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现，Runtime 已迁移到 axum + 持久化 Julia 守护进程。
 >
-> **下一步边界：** 后续工作应优先贯通 Runtime/App 对 WLS、HC1 与基础诊断的结构化消费，并补强数值可信度测试；不得重开平行 mock 路线，也不得让 App 解析终端文本。
+> **下一步边界：** 里程碑 2 已完成，当前基线稳定。后续工作可考虑：贯通 Runtime/App 对扩展诊断（White、DW、BG、RESET、JB）的结构化消费，或推进 augment 能力，或引入新模型类型。不得重开平行 mock 路线，也不得让 App 解析终端文本。
 
 ## 概述
 
@@ -34,7 +34,7 @@
 当前阶段性落点：
 
 - 已完成的最小可用边界：`fit_ols_file`、`glance`、`tidy`、结构化 warning / error、结构化 payload、Runtime 真实调用 Julia、桌面端结构化渲染
-- 当前正在推进的边界：Runtime/App 贯通 WLS、HC1 与基础诊断选项，并补强数值可信度测试
+- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现
 - 明确排除的短期捷径：前端直接调用本地 Julia 脚本、前端消费示例 JSON、Runtime 返回样例载荷冒充真实链路
 - 延后处理的高级能力：受控自定义动作 / 分析模板；当前只要求为其保留稳定接口铺垫，不落地完整模板系统
 
@@ -58,7 +58,8 @@
 `packages/` 负责真实计量能力与结构化结果语义。
 
 - `MetricaBase.jl` 只定义共享协议、结果类型、警告/错误类型与公共接口，不承载 OLS 数值实现。
-- `MetricaLinear.jl` 提供真实 OLS/WLS 与协方差选项，并将结果封装为 Metrica 自有结构化对象。
+- `MetricaLinear.jl` 提供真实 OLS/WLS 与协方差选项（包括 Cluster 协方差），并将结果封装为 Metrica 自有结构化对象。
+- `MetricaTests.jl` 提供扩展诊断能力（VIF、Breusch-Pagan、White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）。
 - Core 不向 Runtime 或 App 暴露第三方包内部结果对象。
 
 ### Runtime
@@ -68,7 +69,8 @@
 - 接收 `inspect_dataset` 请求
 - 接收 `fit_model` 请求
 - 做轻量输入校验与路径整理
-- 通过 Julia CLI 子进程执行真实拟合
+- 通过 axum HTTP 框架暴露端点
+- 管理持久化 Julia 进程的生命周期
 - 返回结构化成功或失败响应
 
 Runtime 不得重做计量逻辑，不得解释系数或重新计算统计量。
@@ -219,7 +221,7 @@ Core 内部的线性代数与概率计算应优先使用 Julia 生态的通用�
 
 ### 执行方式
 
-Runtime 通过一次一调用的 Julia CLI 子进程执行真实模型任务。
+Runtime 通过 axum HTTP 框架 + 持久化 Julia 进程执行真实模型任务。
 
 选择该方式的原因：
 
@@ -227,6 +229,8 @@ Runtime 通过一次一调用的 Julia CLI 子进程执行真实模型任务。
 - 调试最直接
 - 崩溃隔离清晰
 - 当前基线更容易验证成功/失败路径
+- 持久化进程减少冷启动时间
+- 支持会话状态与数据集缓存
 
 ### 请求与响应
 
@@ -245,7 +249,8 @@ Runtime 的职责只包括：
 
 - 输入字段的最小完整性校验
 - 调用参数规范化
-- 启动 Julia 子进程
+- 通过 axum HTTP 框架暴露端点
+- 管理持久化 Julia 进程的生命周期
 - 捕获 stdout/stderr、退出码与超时
 - 将 Julia 返回的 JSON 响应转发为稳定桌面协议
 
@@ -254,7 +259,7 @@ Runtime 的职责只包括：
 - 有一个能被桌面端稳定调用的 `fit_model` 执行入口
 - 有一个能被桌面端稳定调用的 `inspect_dataset` 执行入口
 - 对成功与失败都返回统一结构化响应
-- 不要求在本阶段引入常驻 worker、任务队列或复杂调度
+- 支持持久化 Julia 进程的会话管理
 
 ## 面向后期高级能力的当前铺垫
 
@@ -290,10 +295,13 @@ Runtime 的职责只包括：
 - 数据摘要区
 - 数据预览表
 - 公式输入
+- 协方差类型选择
+- 可选权重列输入
 - 运行按钮
 - 运行中状态
 - `glance` 摘要区
 - `tidy` 系数表
+- diagnostics 区（VIF、Breusch-Pagan 等）
 - warnings 区
 - error 区
 
@@ -377,14 +385,17 @@ App 只消费 Runtime 返回的结构化 JSON。
 - 有效样本为空
 - 设计矩阵奇异
 - 截距默认存在与显式去截距
+- WLS 权重拟合
+- HC1/Cluster 协方差选项
+- 扩展诊断（VIF、Breusch-Pagan、White、DW、BG、RESET、JB）
 
 ### Runtime 测试
 
 至少覆盖以下场景：
 
 - `fit_model` 请求成功序列化
-- Julia 子进程成功返回结构化 `glance` 与 `tidy`
-- Julia 子进程返回结构化模型错误
+- Julia 进程成功返回结构化 `glance` 与 `tidy`
+- Julia 进程返回结构化模型错误
 - Julia 进程启动失败或输出非法 JSON 时生成稳定执行级错误
 
 ### App 验证
@@ -394,6 +405,7 @@ App 只消费 Runtime 返回的结构化 JSON。
 - 选择 demo CSV
 - 输入一个有效 OLS 公式并运行
 - 结果页出现关键摘要指标与系数表
+- 诊断区可显示 VIF 与 Breusch-Pagan 结果
 - 警告区可显示删样提示
 - 错误区可显示公式错误或拟合错误
 
@@ -402,7 +414,7 @@ App 只消费 Runtime 返回的结构化 JSON。
 以下条件构成当前基线，后续扩展不得破坏：
 
 1. 桌面端可选择本地 CSV 并发起真实 `fit_model`
-2. Runtime 实际调用 Julia 子进程，而不是 mock
+2. Runtime 实际调用 Julia 持久化进程，而不是 mock
 3. Julia 真实完成 OLS 拟合并返回结构化 `glance` 与 `tidy`
 4. 缺失值删样可端到端显示为教学友好 warning
 5. 至少两类失败可端到端展示为可读错误

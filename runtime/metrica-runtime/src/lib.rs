@@ -186,7 +186,18 @@ pub fn sample_success_response() -> TaskResponse {
             },
             "tidy": [],
             "augment_preview": [],
-            "diagnostics": [],
+            "diagnostics": {
+                "vif": [
+                    { "name": "x1", "vif": 1.25 },
+                    { "name": "x2", "vif": 2.5 }
+                ],
+                "breusch_pagan": { "statistic": 3.2, "pvalue": 0.0736, "dof": 2 },
+                "white_test": { "statistic": 5.1, "pvalue": 0.0778, "dof": 2 },
+                "durbin_watson": { "statistic": 1.85, "pvalue": 0.62 },
+                "breusch_godfrey": { "statistic": 1.2, "pvalue": 0.5488, "dof": 2 },
+                "reset_test": { "statistic": 0.45, "pvalue": 0.6453, "df_num": 2, "df_den": 4 },
+                "jarque_bera": { "statistic": 0.82, "pvalue": 0.6637, "skewness": 0.15, "kurtosis": 2.8 }
+            },
             "warnings": []
         })),
     }

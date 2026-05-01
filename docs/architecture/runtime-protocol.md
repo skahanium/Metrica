@@ -12,33 +12,23 @@
 
 ## 传输方式
 
-### 当前实现（手写 HTTP）
+### 当前实现（axum HTTP）
 
-当前最小真实链路通过本地 HTTP 传输协议暴露 Runtime：
+当前链路通过 axum HTTP 框架暴露 Runtime：
 
 - 默认绑定：`127.0.0.1:47821`
 - `POST /inspect_dataset`
 - `OPTIONS /inspect_dataset`
 - `POST /fit_model`
 - `OPTIONS /fit_model`
+- `GET /health`（会话状态）
+- `GET /session/env`（变量环境）
 
 该 HTTP 层只负责搬运结构化请求与响应，不承载计量逻辑本身。
 
-### 目标架构（axum + 持久化 Julia）
-
-升级为 axum HTTP 框架 + 持久化 Julia 进程：
-
-- 保留现有 HTTP 端点兼容性
-- 新增 `GET /health`（会话状态）
-- 新增 `GET /session/env`（变量环境）
-
 ## Julia 进程模型
 
-### 当前实现（进程/请求）
-
-每次请求启动一个 Julia 子进程，用完即杀。优点是崩溃隔离清晰；缺点是每次冷启动 3-30 秒，无会话状态。
-
-### 目标架构（持久化进程）
+### 当前实现（持久化进程）
 
 应用启动时拉起 Julia 进程，持久运行，通过 stdin/stdout JSON lines 通信：
 
