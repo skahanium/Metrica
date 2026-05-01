@@ -16,26 +16,35 @@ function createTaskId() {
 export function buildFitModelRequest({
   datasetPath,
   formula,
+  modelType = "ols",
   vcovType = "classical",
   weightsColumn = "",
   clusterColumn = "",
+  panelId = "",
+  panelTime = "",
+  panelMethod = "fe",
   projectId = "alpha-demo",
   workingDir = DEFAULT_WORKING_DIR,
 }) {
   const modelSpec = {
-    model_type: "ols",
+    model_type: modelType,
     formula,
-    vcov: {
-      type: vcovType,
-    },
   };
-  const trimmedWeights = weightsColumn.trim();
-  if (trimmedWeights) {
-    modelSpec.weights = trimmedWeights;
-  }
-  const trimmedCluster = clusterColumn.trim();
-  if (trimmedCluster) {
-    modelSpec.cluster_column = trimmedCluster;
+
+  if (modelType === "panel") {
+    modelSpec.panel_id = panelId;
+    modelSpec.panel_time = panelTime;
+    modelSpec.panel_method = panelMethod;
+  } else {
+    modelSpec.vcov = { type: vcovType };
+    const trimmedWeights = weightsColumn.trim();
+    if (trimmedWeights) {
+      modelSpec.weights = trimmedWeights;
+    }
+    const trimmedCluster = clusterColumn.trim();
+    if (trimmedCluster) {
+      modelSpec.cluster_column = trimmedCluster;
+    }
   }
 
   return {

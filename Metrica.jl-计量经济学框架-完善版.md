@@ -713,14 +713,17 @@ Metrica/
 > 诊断载荷由 `diagnostics_to_dict` 在 `julia_daemon.jl` / `julia_bridge_entry.jl` 中统一构造，
 > 前端 `renderDiagnostics` 渲染全部 7 项检验。测试总数 155（Rust 16 + Julia 123 + Frontend 16），零失败。
 
-### 里程碑 3：面板基础
+### 里程碑 3：面板基础 ✅ 已完成（2026-05）
 
-- `PanelData`
-- FE / RE / FD
-- 基础面板诊断
-- Pluto 入门教程
+- ✅ `PanelData` — 面板数据容器，含 `data`、`id_col`、`time_col`
+- ✅ FE / RE / FD / Between — 四种面板估计器已实现
+- ✅ 基础面板诊断 — `glance` / `tidy` / `augment` 结构化输出
+- ✅ Grunfeld 教学数据集 — 20 家公司 × 20 年
+- ✅ Runtime/App 贯通 — 面板模型可通过 `model_type = "panel"` 请求
 
-做到这 3 个里程碑后，Metrica 就已经不是”规划中的大项目”，而会成为一个真正可教学、可演示、可扩展的 Julia 计量框架雏形。
+> **完成细节：** `MetricaPanel.jl` 包已创建，包含 FE（组内去均值）、RE（Mundlak）、FD（一阶差分）、Between（组间估计）四种估计器。Grunfeld 数据集已创建并附带元数据。Runtime 桥接脚本已支持面板拟合，App 已支持面板模型请求构造。
+
+做到这 3 个里程碑后，Metrica 就已经不是"规划中的大项目"，而会成为一个真正可教学、可演示、可扩展的 Julia 计量框架雏形。
 
 ---
 

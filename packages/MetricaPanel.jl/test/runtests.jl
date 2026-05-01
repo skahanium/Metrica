@@ -76,4 +76,52 @@ using MetricaPanel
         @test result isa PanelFitResult
         @test glance(result).nobs == 5
     end
+
+    @testset "RE 随机效应拟合" begin
+        result = fit_panel(panel_data, "invest ~ mvalue + capital"; method=:re)
+        @test result isa PanelFitResult
+        @test result.method === :re
+
+        g = glance(result)
+        @test g.model === :re
+        @test g.nobs == 9
+        @test haskey(g.metrics, :r2)
+        @test haskey(g.metrics, :n_ids)
+        @test g.metrics[:n_ids] == 3
+
+        t = tidy(result)
+        @test length(t.rows) == 5  # intercept + 2 predictors + 2 group means
+        @test all(row -> row.pvalue !== nothing, t.rows)
+    end
+
+    @testset "FD 一阶差分拟合" begin
+        result = fit_panel(panel_data, "invest ~ mvalue + capital"; method=:fd)
+        @test result isa PanelFitResult
+        @test result.method === :fd
+
+        g = glance(result)
+        @test g.model === :fd
+        @test g.nobs == 6  # 3 firms * (3-1) periods
+        @test haskey(g.metrics, :r2)
+
+        t = tidy(result)
+        @test length(t.rows) == 2  # mvalue + capital (no intercept)
+        @test all(row -> row.pvalue !== nothing, t.rows)
+    end
+
+    @testset "Between 组间估计拟合" begin
+        result = fit_panel(panel_data, "invest ~ mvalue + capital"; method=:between)
+        @test result isa PanelFitResult
+        @test result.method === :between
+
+        g = glance(result)
+        @test g.model === :between
+        @test g.nobs == 3  # 3 firms (group means)
+        @test haskey(g.metrics, :r2)
+
+        t = tidy(result)
+        @test length(t.rows) == 3  # intercept + mvalue + capital
+        # 当自由度为 0 时，p 值为 NaN
+        @test all(row -> row.pvalue === nothing || isnan(row.pvalue), t.rows)
+    end
 end

@@ -48,6 +48,23 @@ test("buildFitModelRequest 支持聚类变量字段", () => {
   assert.equal(request.model_spec.cluster_column, "group_id");
 });
 
+test("buildFitModelRequest 支持面板模型", () => {
+  const request = buildFitModelRequest({
+    datasetPath: "/tmp/panel.csv",
+    formula: "invest ~ mvalue + capital",
+    modelType: "panel",
+    panelId: "firm",
+    panelTime: "year",
+    panelMethod: "fe",
+  });
+
+  assert.equal(request.model_spec.model_type, "panel");
+  assert.equal(request.model_spec.panel_id, "firm");
+  assert.equal(request.model_spec.panel_time, "year");
+  assert.equal(request.model_spec.panel_method, "fe");
+  assert.equal(request.model_spec.vcov, undefined);
+});
+
 test("fitModel 使用 JSON POST 调用 Runtime", async () => {
   let capturedUrl;
   let capturedOptions;

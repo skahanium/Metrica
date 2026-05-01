@@ -68,12 +68,21 @@ end
 function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::Symbol=:fe)
     if method === :fe
         return fit_fe(panel_data, formula)
+    elseif method === :re
+        return fit_re(panel_data, formula)
+    elseif method === :fd
+        return fit_fd(panel_data, formula)
+    elseif method === :between
+        return fit_between(panel_data, formula)
     else
         error("面板估计方法 :$method 尚未实现")
     end
 end
 
 include("fe.jl")
+include("re.jl")
+include("fd.jl")
+include("between.jl")
 include("serialize.jl")
 
 end

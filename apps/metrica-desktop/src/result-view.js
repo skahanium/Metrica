@@ -26,6 +26,8 @@ function formatMetricLabel(label) {
     sigma: "Sigma",
     rss: "RSS",
     tss: "TSS",
+    n_ids: "个体数",
+    n_times: "时期数",
   };
 
   return knownLabels[label] || label;
