@@ -32,3 +32,62 @@ end
     result = keep(df, [:x])
     @test names(result.df) == ["x"]
 end
+
+@testset "operate_chain success writes derived csv" begin
+    df = DataFrame(x = [1, 2, 3], y = [4, 5, 6])
+    output_path = tempname() * ".csv"
+    result = operate_chain(
+        df,
+        Dict{String, Any}[
+            Dict("op" => "filter", "args" => Dict{String, Any}("condition" => "x >= 2")),
+            Dict("op" => "generate", "args" => Dict{String, Any}("name" => "z", "expr" => "x + y")),
+        ];
+        output_path,
+        preview_rows = 1,
+    )
+
+    @test result["status"] == "ok"
+    @test result["result"]["dataset_path"] == output_path
+    @test isfile(output_path)
+    @test length(result["preview"]["rows"]) == 1
+    @test length(result["operations"]) == 2
+    rm(output_path; force = true)
+end
+
+@testset "operate_chain failure does not write output" begin
+    df = DataFrame(x = [1, 2, 3], y = [4, 5, 6])
+    output_path = tempname() * ".csv"
+    result = operate_chain(
+        df,
+        Dict{String, Any}[
+            Dict("op" => "generate", "args" => Dict{String, Any}("name" => "z", "expr" => "missing_col + 1")),
+        ];
+        output_path,
+    )
+
+    @test result["status"] == "error"
+    @test result["error"]["op_index"] == 1
+    @test occursin("missing_col", result["error"]["message"])
+    @test !isfile(output_path)
+end
+
+@testset "operate_chain merge missing file reports structured error" begin
+    df = DataFrame(id = [1, 2], x = [10, 20])
+    result = operate_chain(
+        df,
+        Dict{String, Any}[
+            Dict(
+                "op" => "merge",
+                "args" => Dict{String, Any}(
+                    "with" => "/tmp/metrica-missing-file.csv",
+                    "on" => ["id"],
+                    "how" => "inner",
+                ),
+            ),
+        ],
+    )
+
+    @test result["status"] == "error"
+    @test result["error"]["op_index"] == 1
+    @test occursin("metrica-missing-file.csv", result["error"]["message"])
+end

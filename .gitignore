@@ -95,6 +95,7 @@ venv/
 *.egg-info/
 .eggs/
 dist/
+*.tsbuildinfo
 build/
 *.egg
 
@@ -107,6 +108,7 @@ temp/
 *.temp
 *.cache
 .cache/
+**/.metrica/
 
 # --- 基准测试 / 性能分析 ---
 *.prof

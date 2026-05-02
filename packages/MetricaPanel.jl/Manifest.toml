@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "25c094b5beebbcbd99f54baadffc68b40d56d1ea"
+project_hash = "30561ec9a2c3690f046c09888f678f7b209ff98d"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -17,6 +17,11 @@ version = "1.11.0"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
+
+[[deps.Combinatorics]]
+git-tree-sha1 = "c761b00e7755700f9cdf5b02039939d1359330e1"
+uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+version = "1.1.0"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -104,10 +109,36 @@ version = "1.16.0"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
     Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
+[[deps.FixedEffectModels]]
+deps = ["DataFrames", "FixedEffects", "LinearAlgebra", "PrecompileTools", "Printf", "Reexport", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels", "Tables", "Vcov"]
+git-tree-sha1 = "e9b6128d2cc9b533fa4206fafba1685031e6aee1"
+uuid = "9d5cd8c9-2029-5cab-9928-427838db53e3"
+version = "1.13.1"
+
+[[deps.FixedEffects]]
+deps = ["GroupedArrays", "LinearAlgebra", "PrecompileTools", "Printf", "StatsBase"]
+git-tree-sha1 = "c6c860a4896f22352fdbd3417dfd8266830aeabf"
+uuid = "c8885935-8500-56a7-9867-7708b20db0eb"
+version = "3.1.0"
+
+    [deps.FixedEffects.extensions]
+    CUDAExt = "CUDA"
+    MetalExt = "Metal"
+
+    [deps.FixedEffects.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+
 [[deps.Future]]
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 version = "1.11.0"
+
+[[deps.GroupedArrays]]
+deps = ["DataAPI", "Missings", "PrecompileTools"]
+git-tree-sha1 = "c732f2e650180e595939d2662c59a6181baa89a2"
+uuid = "6407cd72-fade-4a84-8a1e-56e431fc1533"
+version = "0.3.5"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
@@ -200,7 +231,7 @@ uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 version = "0.1.0"
 
 [[deps.MetricaPanel]]
-deps = ["DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "Statistics", "StatsModels"]
+deps = ["DataFrames", "Distributions", "FixedEffectModels", "LinearAlgebra", "MetricaBase", "Statistics", "StatsModels"]
 path = "."
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "0.1.0"
@@ -453,6 +484,12 @@ version = "1.11.0"
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 version = "1.11.0"
+
+[[deps.Vcov]]
+deps = ["Combinatorics", "GroupedArrays", "LinearAlgebra", "PrecompileTools", "StatsAPI", "StatsBase", "Tables"]
+git-tree-sha1 = "667e09e4c9774c40614f3597d4907ed6249ac997"
+uuid = "ec2bfdc2-55df-4fc9-b9ae-4958c2cf2486"
+version = "0.8.3"
 
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]

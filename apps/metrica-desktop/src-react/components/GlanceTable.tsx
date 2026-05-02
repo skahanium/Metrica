@@ -1,7 +1,6 @@
 import { useModelStore } from '../stores/modelStore';
 import { EmptyState } from './EmptyState';
 import { Descriptions, Card } from 'antd';
-import type { GlanceResult } from '../types/protocol';
 
 const METRIC_LABELS: Record<string, string> = {
   r2: 'R²',

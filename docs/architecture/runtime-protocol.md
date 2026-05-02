@@ -4,6 +4,7 @@
 
 - `inspect_dataset`
 - `fit_model`
+- `transform`
 - `export_result`
 - `explain_warning`
 
@@ -21,6 +22,8 @@
 - `OPTIONS /inspect_dataset`
 - `POST /fit_model`
 - `OPTIONS /fit_model`
+- `POST /transform`
+- `OPTIONS /transform`
 - `GET /health`（会话状态）
 - `GET /session/env`（变量环境）
 
@@ -37,6 +40,7 @@
 │              axum HTTP 服务                   │
 │  POST /fit_model     → 转发到 Julia 会话     │
 │  POST /inspect_dataset → 转发到 Julia 会话   │
+│  POST /transform     → 转发到 Julia 会话      │
 │  GET  /health        → 返回会话状态          │
 └──────────────────┬───────────────────────────┘
                    │
@@ -141,6 +145,53 @@
 }
 ```
 
+### 数据变换请求
+
+`/transform` 使用与 `fit_model` 一致的 Task 信封。Runtime 只负责解析项目工作目录、解析输入路径、生成派生 CSV 输出路径，并把结构化操作链转发给 Julia `MetricaData.jl`；具体数据语义不在 Rust 侧实现。
+
+```json
+{
+  "task_id": "transform-001",
+  "action": "transform",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  },
+  "dataset_ref": {
+    "source": "file",
+    "path": "data/source.csv",
+    "format": "csv"
+  },
+  "operations": [
+    {
+      "op": "filter",
+      "args": {
+        "condition": "year >= 2015"
+      }
+    },
+    {
+      "op": "generate",
+      "args": {
+        "name": "log_gdp",
+        "expr": "log(gdp)"
+      }
+    }
+  ],
+  "options": {
+    "preview_rows": 10,
+    "persist_output": true
+  }
+}
+```
+
+当 `options.persist_output = true` 时，Runtime 将输出路径固定为：
+
+```text
+<working_dir>/.metrica/derived/<task_id>.csv
+```
+
+`.metrica/derived/` 是运行期派生数据目录，不进入版本控制。操作链具有事务语义：任一步失败时不写派生 CSV，响应中返回失败步骤序号和原因。
+
 ## 成功响应示例
 
 ```json
@@ -162,6 +213,51 @@
     "diagnostics": [],
     "warnings": [],
     "summary_text": "model=ols, nobs=128, dof=124, r2=0.81"
+  }
+}
+```
+
+### 数据变换成功响应示例
+
+```json
+{
+  "task_id": "transform-001",
+  "status": "success",
+  "messages": [],
+  "artifacts": [],
+  "result_payload": {
+    "operation": "chain",
+    "status": "ok",
+    "result": {
+      "nrows": 128,
+      "ncols": 6,
+      "notes": "执行 2 个数据操作。",
+      "dataset_path": "/path/to/project/.metrica/derived/transform-001.csv"
+    },
+    "preview": {
+      "columns": ["country", "year", "gdp", "log_gdp"],
+      "rows": [
+        {
+          "country": "France",
+          "year": 2015,
+          "gdp": 2420.0,
+          "log_gdp": 7.7915
+        }
+      ]
+    },
+    "warnings": [],
+    "operations": [
+      {
+        "operation": "filter",
+        "status": "ok",
+        "result": {
+          "nrows": 128,
+          "ncols": 5,
+          "notes": "保留满足条件 year >= 2015 的行。"
+        },
+        "warnings": []
+      }
+    ]
   }
 }
 ```
@@ -254,6 +350,44 @@
 }
 ```
 
+### 数据变换错误响应示例
+
+```json
+{
+  "task_id": "transform-001",
+  "status": "error",
+  "messages": [
+    {
+      "level": "error",
+      "code": "DATA_TRANSFORM_FAILED",
+      "text": "数据操作链执行失败。",
+      "hint": "请检查失败步骤的字段名、表达式或外部文件路径。"
+    }
+  ],
+  "result_payload": {
+    "operation": "chain",
+    "status": "error",
+    "warnings": [],
+    "error": {
+      "op_index": 2,
+      "message": "列 gdp 不存在。"
+    },
+    "operations": [
+      {
+        "operation": "filter",
+        "status": "ok",
+        "result": {
+          "nrows": 128,
+          "ncols": 5,
+          "notes": "保留满足条件 year >= 2015 的行。"
+        },
+        "warnings": []
+      }
+    ]
+  }
+}
+```
+
 ## 错误响应示例
 
 ```json
@@ -276,8 +410,10 @@
 当前可执行端到端链路为：
 
 - 本地 CSV 输入 → `fit_model` 动作 → `ols` 或 `panel` 模型类型
+- 本地 CSV 输入 → `transform` 动作 → 派生 CSV → `fit_model` 动作
 - 结构化的 `glance` 与 `tidy` 响应载荷
 - 面板模型的结构化 `diagnostics` 响应载荷
+- 数据操作链的结构化 `preview`、`operations` 与错误定位
 - 删行与拟合错误的警告/消息传播
 
 主设计与当前实施顺序见：

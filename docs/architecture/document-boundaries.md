@@ -47,12 +47,29 @@
 - 长期产品愿景
 - 生态方向
 - 战略性包拆分
+- 阶段 `S1-S6` 的最高层边界
+- 阶段划分原则与历史编号映射规则
 
 不拥有：
 
 - 当前冲刺范围
 - Runtime 线协议示例
 - 桌面 MVP 执行细节
+
+### `docs/roadmap/`
+
+拥有：
+
+- 阶段级施工指引
+- 各阶段的交付口径、施工原则与验收边界
+- `S6` AI 增强层的未来预留约束
+
+不拥有：
+
+- 当前冲刺任务清单
+- 字段级 Runtime schema
+- 具体组件实现细节
+- 对根目录总体蓝图的覆盖权
 
 ### `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
 
@@ -83,6 +100,47 @@
 - 项目长期愿景
 - 子系统字段级完整 schema
 - 远期可视化、IV/GLS 或动态面板模型设计
+
+### `docs/superpowers/plans/2026-05-02-milestone-4-panel-diagnostics-datasets-plan.md`
+
+拥有：
+
+- 里程碑 4 面板诊断与教学数据集的验收记录
+- Hausman、固定效应 F、Breusch-Pagan LM 的阶段口径
+- PWT / NLSY 教学数据入口的阶段记录
+
+不拥有：
+
+- 当前实施任务清单
+- 远期面板模型完整路线
+- 阶段 `S1-S6` 的总体路线
+
+### `docs/superpowers/specs/2026-05-02-metrica-milestone-5-design.md`
+
+拥有：
+
+- 里程碑 5 地基升级与数据能力的设计口径
+- React 工作台升级、`MetricaData.jl`、Runtime `/transform` 的边界
+- M5 非目标与收口约束
+
+不拥有：
+
+- M6 以后模型族路线
+- `S4-S6` 的施工细节
+- 根目录总体蓝图的长期目标
+
+### `docs/superpowers/plans/2026-05-02-milestone-5-implementation-plan.md`
+
+拥有：
+
+- 里程碑 5 的当前实施步骤与验证门禁
+- M5 技术债务清理、Track A / Track B 的任务拆分
+
+不拥有：
+
+- 长期产品愿景
+- 阶段级路线替代权
+- M10 以后模型族设计
 
 ### `docs/architecture/runtime-protocol.md`
 
@@ -123,3 +181,9 @@
 2. 不为短期阶段新增平行主 `spec` / `plan`。
 3. 若确需新增文档，必须先说明为什么现有文档无法承载，并同步更新本文档。
 4. 删除或重命名文档后，必须检查全仓库引用，避免悬空链接。
+
+## 历史编号保留规则
+
+- 旧 `M` 号可以继续存在于 milestone `spec/plan`、测试记录与完成总结中。
+- 新阶段叙事统一使用 `S1-S6`，旧 `M` 号只作为历史映射，不再单独承担长期路线表达。
+- `docs/superpowers/specs/` 只负责当前活跃里程碑设计，不负责重写总体阶段体系。

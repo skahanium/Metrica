@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task.
 
-状态：待启动
+状态：已完成
 设计规格：`docs/superpowers/specs/2026-05-03-milestone-7-panel-models-design.md`
 
 **Goal:** 将 MetricaPanel.jl 从教学口径升级为研究口径，补全 HDFE、Driscoll-Kraay、CRE、面板 IV。

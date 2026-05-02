@@ -8,6 +8,22 @@ use metrica_runtime::{
 };
 use std::sync::{Arc, Mutex};
 
+async fn spawn_test_runtime() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+    let root = repo_root();
+    let julia_project = root.join("packages").join("MetricaLinear.jl");
+    let session = JuliaSession::start(&root.to_string_lossy(), &julia_project.to_string_lossy())
+        .expect("Julia session should start");
+    let app = build_router(Arc::new(Mutex::new(session)));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind test runtime");
+    let addr = listener.local_addr().expect("test runtime address");
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve test runtime");
+    });
+    (addr, server)
+}
+
 #[test]
 fn fit_model_returns_real_payload_shape() {
     let request = sample_fit_model_request();
@@ -199,27 +215,26 @@ fn inspect_dataset_accepts_paths_relative_to_project_context() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn transform_filter_operation_returns_ok() {
-    let root = repo_root();
-    let julia_project = root.join("packages").join("MetricaLinear.jl");
-    let session = JuliaSession::start(&root.to_string_lossy(), &julia_project.to_string_lossy())
-        .expect("Julia session should start");
-    let app = build_router(Arc::new(Mutex::new(session)));
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind test runtime");
-    let addr = listener.local_addr().expect("test runtime address");
-    let server = tokio::spawn(async move {
-        axum::serve(listener, app).await.expect("serve test runtime");
-    });
-
+    let (addr, server) = spawn_test_runtime().await;
     let client = reqwest::Client::new();
 
     let body = serde_json::json!({
-        "dataset_path": concat!(env!("CARGO_MANIFEST_DIR"), "/../../datasets/teaching/pwt_productivity_panel.csv"),
+        "task_id": "transform-ok",
+        "action": "transform",
+        "project_context": {
+            "project_id": "alpha-demo",
+            "working_dir": concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
+        },
+        "dataset_ref": {
+            "source": "file",
+            "path": "datasets/teaching/pwt_productivity_panel.csv",
+            "format": "csv"
+        },
         "operations": [
             {"op": "filter", "args": {"condition": "year >= 2015"}},
             {"op": "generate", "args": {"name": "log_output", "expr": "log(output_per_worker)"}}
-        ]
+        ],
+        "options": {"preview_rows": 5, "persist_output": true}
     })
     .to_string();
 
@@ -233,7 +248,59 @@ async fn transform_filter_operation_returns_ok() {
 
     assert_eq!(resp.status(), 200);
     let json: serde_json::Value = resp.json().await.expect("response should be JSON");
+    assert_eq!(json["task_id"], "transform-ok");
     assert_eq!(json["status"], "success");
     assert!(json["result_payload"]["result"]["nrows"].as_u64().unwrap() > 0);
+    let derived_path = json["result_payload"]["result"]["dataset_path"]
+        .as_str()
+        .expect("derived dataset path");
+    assert!(std::path::Path::new(derived_path).is_file());
+    assert!(derived_path.contains(".metrica/derived/transform-ok.csv"));
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn transform_failure_does_not_write_output() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let derived_path = repo_root()
+        .join(".metrica")
+        .join("derived")
+        .join("transform-fail.csv");
+    let _ = std::fs::remove_file(&derived_path);
+
+    let body = serde_json::json!({
+        "task_id": "transform-fail",
+        "action": "transform",
+        "project_context": {
+            "project_id": "alpha-demo",
+            "working_dir": concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
+        },
+        "dataset_ref": {
+            "source": "file",
+            "path": "datasets/teaching/pwt_productivity_panel.csv",
+            "format": "csv"
+        },
+        "operations": [
+            {"op": "generate", "args": {"name": "bad", "expr": "missing_col + 1"}}
+        ],
+        "options": {"preview_rows": 5, "persist_output": true}
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/transform"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /transform should succeed");
+
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("response should be JSON");
+    assert_eq!(json["task_id"], "transform-fail");
+    assert_eq!(json["status"], "error");
+    assert_eq!(json["result_payload"]["error"]["op_index"], 1);
+    assert!(!derived_path.is_file());
     server.abort();
 }

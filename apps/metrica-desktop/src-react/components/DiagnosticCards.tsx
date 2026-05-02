@@ -1,8 +1,11 @@
-import { Card, Descriptions, Tag, Empty } from 'antd';
+import { Card, Descriptions, Tag } from 'antd';
 import { useModelStore } from '../stores/modelStore';
 import type { DiagnosticResult, OLSDiagnostics, PanelDiagnostics } from '../types/protocol';
+import { EmptyState } from './EmptyState';
 
-const OLS_DIAG_META: Array<{ key: keyof OLSDiagnostics; label: string; description: string }> = [
+type OlsDiagnosticKey = Exclude<keyof OLSDiagnostics, 'vif'>;
+
+const OLS_DIAG_META: Array<{ key: OlsDiagnosticKey; label: string; description: string }> = [
   { key: 'breusch_pagan', label: 'Breusch-Pagan 异方差检验', description: 'H0: 同方差' },
   { key: 'white_test', label: 'White 异方差检验', description: 'H0: 同方差' },
   { key: 'durbin_watson', label: 'Durbin-Watson 自相关检验', description: 'H0: 无一阶自相关' },
@@ -44,10 +47,10 @@ function DiagCard({ label, description, result }: { label: string; description: 
 
 export function DiagnosticCards() {
   const lastResult = useModelStore((s) => s.lastResult);
-  if (!lastResult) return <Empty title="尚未运行模型" />;
+  if (!lastResult) return <EmptyState title="尚未运行模型" />;
 
   const diag = lastResult.diagnostics;
-  if (!diag) return <Empty title="无诊断结果" />;
+  if (!diag) return <EmptyState title="无诊断结果" />;
 
   if (isPanelDiagnostics(diag)) {
     return (

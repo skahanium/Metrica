@@ -1,49 +1,48 @@
-# Metrica 主设计：真实 OLS 基线与里程碑 2/3
+# Metrica 主设计：稳定主链路与 S1/S2 事实基线
 
-> **状态：当前主设计。** 本文件是当前 `Core -> Runtime -> App` 主链路的唯一设计锚点。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
+> **状态：当前主设计锚点。** 本文件用于记录当前稳定主链路与 `S1/S2` 的事实基线。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
 >
-> **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现，Runtime 已迁移到 axum + 持久化 Julia 守护进程。augment 能力已贯通。里程碑 3（面板基础）已完成，包含 `MetricaPanel.jl` 包、FE/RE/FD/Between 四种面板估计器、Grunfeld 教学数据集，以及 `model_type = "panel"` 的 Runtime/App 结构化贯通。
+> **当前事实基线：** 仓库已经完成 `S1` 与 `S2` 对应的主要里程碑收口。真实 OLS/WLS/IV/GLS 全链路已贯通，`glance`、`tidy`、`augment`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染与基础数据操作工作流均已落地。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现；面板能力已覆盖 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 与升级后的结构化诊断；Runtime 已迁移到 axum + 持久化 Julia 守护进程，App 已完成 React 工作台与结构化结果消费。
 >
-> **下一步边界：** 里程碑 2 和 3 已完成，当前基线稳定。里程碑 4 的第一个垂直切片是面板诊断与教学数据集：Hausman、固定效应 F、Breusch-Pagan LM，以及 PWT / NLSY 教学数据入口。不得重开平行 mock 路线，也不得让 App 解析终端文本。
+> **下一步边界：** 当前主线不再停留在 OLS/面板能力补全，而是进入 `S3` 入口：结果与报告系统、项目文件、运行记录、数据谱系与桌面产品化收口。不得重开平行 mock 路线，也不得让 App 解析终端文本。
 
 ## 概述
 
 本设计文档定义 Metrica 当前阶段最核心的产品与架构目标：
 
-**以 “本地 CSV 导入 + 真实数据检查 + 真实 OLS/WLS/面板拟合 + 结构化结果 + 桌面渲染 + 教学友好警告” 作为当前稳定主链路。**
+**以 “本地 CSV 导入 + 真实数据检查 + 数据操作 + 真实线性/面板拟合 + 结构化结果 + 桌面工作台渲染 + 教学友好警告” 作为当前稳定主链路。**
 
 这不是一个演示级 mock 切片，也不是占位式联调；它是后续所有模型能力、输出能力、桌面能力与教学能力的基石。
 
 本文档将当前真实实现路线固定为：
 
-- 真实 `OLS` 与基础面板模型
+- 真实线性模型族与面板模型族
 - `StatsModels.jl` 风格公式语义
 - 混合依赖策略：CSV/表/公式使用成熟生态，Metrica 自主掌握 OLS 结果语义
 - `Runtime -> Julia` 通过子进程 CLI 执行真实桥接
 
 ## 目标
 
-当前阶段的目标不是扩大模型覆盖面，而是沿着已经成立的真实主链路继续加固协议、数值可信度与教学体验，并验证以下前提：
+当前阶段的目标不是继续扩张核心模型覆盖面，而是沿着已经成立的真实主链路进入报告、复现与产品化收口，并保持以下前提成立：
 
 1. `MetricaBase.jl` 的结构化协议足以作为 Core、Runtime、App 三层的稳定共享边界。
 2. `MetricaLinear.jl` 可以在不依赖 GUI、也不暴露第三方回归对象的前提下，提供真实 OLS 能力。
 3. `runtime/metrica-runtime` 可以通过 Julia 子进程稳定执行 `inspect_dataset` 与 `fit_model` 两类任务，并传递结构化成功/失败载荷。
 4. `apps/metrica-desktop` 可以只消费结构化数据检查结果与模型结果对象，而不回退到解析终端文本。
-5. 教学友好行为在第一条链路中是协议级能力，而不是 UI 补丁。
+5. 教学友好行为在当前工作台中仍是协议级能力，而不是 UI 补丁。
 
 当前阶段性落点：
 
-- 已完成的最小可用边界：`fit_ols_file`、`glance`、`tidy`、结构化 warning / error、结构化 payload、Runtime 真实调用 Julia、桌面端结构化渲染
-- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现，`augment` 能力已贯通（拟合值、残差、标准化残差、杠杆值、Cook's D），面板基础已实现并贯通（`MetricaPanel.jl` 包、FE/RE/FD/Between 四种估计器、Grunfeld 数据集、Runtime `panel` 请求、App 结构化渲染）
+- 已完成的最小可用边界：`fit_ols_file`、统一 `fit` 入口、`glance`、`tidy`、`augment`、结构化 warning / error、结构化 payload、Runtime 真实调用 Julia、桌面端结构化渲染与数据操作主链路
+- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1、IV/2SLS、GLS 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现；面板能力已贯通 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 与升级诊断；React 工作台与 `/transform` 数据工作流已实现并收口
 - 明确排除的短期捷径：前端直接调用本地 Julia 脚本、前端消费示例 JSON、Runtime 返回样例载荷冒充真实链路
-- 延后处理的高级能力：受控自定义动作 / 分析模板；当前只要求为其保留稳定接口铺垫，不落地完整模板系统
+- 延后处理的高级能力：完整报告系统、项目文件与运行记录之外的高级研究专题与 AI 增强层；当前只要求为其保留稳定接口铺垫，不落地完整自动化系统
 
 ## 非目标
 
 本设计明确不包含以下内容：
 
-- IV、GLS 等尚未进入当前稳定链路的新模型族
-- 多模型对比工作流
+- 多模型对比工作流的完整产品化
 - 完整 `augment` 大表渲染
 - 完整诊断图系统
 - 用户任意脚本执行
@@ -58,8 +57,9 @@
 `packages/` 负责真实计量能力与结构化结果语义。
 
 - `MetricaBase.jl` 只定义共享协议、结果类型、警告/错误类型与公共接口，不承载 OLS 数值实现。
-- `MetricaLinear.jl` 提供真实 OLS/WLS 与协方差选项（包括 Cluster 协方差），并将结果封装为 Metrica 自有结构化对象。
-- `MetricaTests.jl` 提供扩展诊断能力（VIF、Breusch-Pagan、White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）。
+- `MetricaLinear.jl` 提供真实 OLS/WLS/IV/GLS 与协方差选项（包括 Cluster 协方差），并将结果封装为 Metrica 自有结构化对象。
+- `MetricaDiagnostics.jl` 提供扩展诊断能力（VIF、Breusch-Pagan、White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）。
+- `MetricaPanel.jl` 提供基础与研究口径面板能力，包括 FE/RE/FD/Between、HDFE、CRE、Panel IV 与相关诊断。
 - Core 不向 Runtime 或 App 暴露第三方包内部结果对象。
 
 ### Runtime
@@ -75,30 +75,31 @@
 
 Runtime 不得重做计量逻辑，不得解释系数或重新计算统计量。
 
-当前实现要求补充：
+当前实现约束：
 
-- Runtime 必须成为前端触发 OLS 的唯一执行入口
-- Runtime 可以转发结构化结果，但不得复制 Julia 侧的 OLS 语义或统计计算
-- 在真实子进程桥接完成前，不得把样例响应测试通过误报为“真实 OLS 全链路已打通”
+- Runtime 继续作为前端触发真实模型任务与数据任务的唯一执行入口
+- Runtime 可以转发结构化结果，但不得复制 Julia 侧的计量语义或统计计算
+- 不得把样例响应测试通过误报为“真实主链路已打通”
 
 ### App
 
-`apps/metrica-desktop` 负责最小但真实的桌面工作流。
+`apps/metrica-desktop` 负责真实且可扩展的桌面工作台主链路。
 
 - 选择本地 CSV
 - 触发数据检查
-- 输入 OLS 公式
+- 执行基础数据操作
+- 输入线性或面板模型公式
 - 触发运行
 - 渲染结构化列摘要与预览表
 - 渲染结构化 `glance`、`tidy`、warnings 与错误
 
 App 不解析 `summary()` 文本，也不依赖终端打印格式。
 
-当前实现要求补充：
+当前实现约束：
 
-- App 必须通过 Runtime 发起真实 `fit_model`
-- App 必须渲染结构化 `glance`、`tidy`、warnings 与错误
-- 在真实调用 Runtime 前，不得把壳层页面或占位 banner 视为“基本可用前端”
+- App 必须继续通过 Runtime 发起真实 `fit_model` / `transform`
+- App 必须继续渲染结构化 `glance`、`tidy`、warnings、diagnostics 与数据操作结果
+- 不得把壳层页面或占位 banner 视为“基本可用前端”
 
 ## Julia 端设计
 

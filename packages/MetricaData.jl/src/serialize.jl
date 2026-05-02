@@ -3,7 +3,7 @@ using DataFrames, CSV
 """
 将 OpResult 序列化为 Dict（Runtime 可直接序列化为 JSON）。
 """
-function result_to_dict(result::OpResult)
+function result_to_dict(result::OpResult; preview_rows::Int = 10)
     d = Dict{String, Any}(
         "operation" => result.operation,
         "status" => result.status,
@@ -14,7 +14,7 @@ function result_to_dict(result::OpResult)
             "ncols" => ncol(result.df),
             "notes" => result.notes,
         )
-        preview_n = min(10, nrow(result.df))
+        preview_n = min(preview_rows, nrow(result.df))
         d["preview"] = Dict(
             "columns" => String.(names(result.df)),
             "rows" => [Dict(String.(names(result.df)) .=> collect(r)) for r in eachrow(first(result.df, preview_n))],
@@ -68,25 +68,60 @@ function operate(df::DataFrame, op::Dict{String, Any})
 end
 
 """
-    operate_chain(df, operations::Vector{Dict})
+    operate_chain(df, operations::Vector{Dict}; output_path = nothing, preview_rows = 10)
 
 顺序执行多个操作。任一操作失败则停止并返回错误。
 """
-function operate_chain(df::DataFrame, operations::Vector{Dict{String, Any}})
+function operate_chain(
+    df::DataFrame,
+    operations::Vector{Dict{String, Any}};
+    output_path::Union{Nothing, AbstractString} = nothing,
+    preview_rows::Int = 10,
+)
     results = Dict{String, Any}[]
     current_df = df
+
+    if isempty(operations)
+        result = result_to_dict(OpResult("noop", current_df; notes = "未执行数据操作。"); preview_rows)
+        if output_path !== nothing
+            CSV.write(output_path, current_df)
+            result["result"]["dataset_path"] = String(output_path)
+        end
+        result["operations"] = results
+        return result
+    end
+
     for (i, op) in enumerate(operations)
-        result = operate(current_df, op)
+        result = try
+            operate(current_df, op)
+        catch err
+            OpResult(
+                get(op, "op", "unknown"),
+                nothing;
+                error = Dict(
+                    "op_index" => i,
+                    "message" => sprint(showerror, err),
+                ),
+            )
+        end
         if result.status == "error"
-            result_dict = result_to_dict(result)
-            result_dict["error"] = Dict("op_index" => i, "message" => get(result.error, "message", "Unknown error"))
+            result_dict = result_to_dict(result; preview_rows)
+            result_dict["error"] = Dict(
+                "op_index" => i,
+                "message" => get(result.error, "message", "Unknown error"),
+            )
             result_dict["status"] = "error"
+            result_dict["operations"] = results
             return result_dict
         end
-        push!(results, result_to_dict(result))
+        push!(results, result_to_dict(result; preview_rows))
         current_df = result.df
     end
     final = copy(last(results))
+    if output_path !== nothing
+        CSV.write(output_path, current_df)
+        final["result"]["dataset_path"] = String(output_path)
+    end
     final["operations"] = results
     return final
 end

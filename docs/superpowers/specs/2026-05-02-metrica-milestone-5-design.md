@@ -1,9 +1,11 @@
 # 里程碑 5：地基升级与数据能力
 
-状态：实施中；当前第一优先级是恢复并保持绿色基线
+状态：已完成；本设计文档保留为 M5 的历史设计依据
 日期：2026-05-02
 
-> **收口约束：** 里程碑 5 已经开始实施。在 `MetricaData.jl`、Runtime `/transform` 与 React App 的门禁测试全部恢复绿色前，不开启 IV、GLS、GMM 等新模型阶段，也不扩大 App 工作流范围。
+> **新阶段归属：** 本文档属于 `S1（协议与工作台地基）`。`M5` 保留为当前活跃里程碑编号，不单独承担长期阶段叙事。
+
+> **历史收口约束：** M5 实施期间，需在 `MetricaData.jl`、Runtime `/transform` 与 React App 的门禁测试全部恢复绿色前，不开启 IV、GLS、GMM 等新模型阶段，也不扩大 App 工作流范围。M5 保留当前 wry/tao 桌面壳，不迁移到完整 Tauri 2 插件架构。该约束现已完成收口。
 
 ## 背景
 
@@ -41,8 +43,10 @@
     <Layout>
       <Header>          — 菜单栏、运行按钮、加载状态
       <Sider>           — 数据源面板、变量浏览器
-      <Content>
+          <Content>
+        <ModelForm>     — 使用当前 activePath 拟合原始或派生数据
         <Tabs>
+          <DataTab>     — 数据操作链、操作历史、结构化预览
           <GlanceTab>   — AG Grid 渲染 glance 指标表
           <TidyTab>     — AG Grid 渲染系数表（排序、筛选、虚拟滚动）
           <DiagTab>     — ECharts 诊断图 + 检验结果卡片
@@ -58,7 +62,8 @@
 
 **appStore**：`{ activeTab, isLoading, error }`
 **modelStore**：`{ modelType, formula, options, lastResult }`
-**datasetStore**：`{ filePath, summary, preview }`
+**datasetStore**：`{ sourcePath, activePath, summary, isDerived }`
+**transformStore**：`{ operations, history, lastTransformResult, isTransforming }`
 
 ### 文件结构
 
@@ -77,6 +82,9 @@ apps/metrica-desktop/
       AugmentPreview.tsx
       DataSourcePanel.tsx
       ModelForm.tsx
+      DataOperationsPanel.tsx
+      OperationHistory.tsx
+      DataPreviewTable.tsx
     stores/
       appStore.ts
       modelStore.ts
@@ -103,6 +111,7 @@ apps/metrica-desktop/
 
 - [ ] 现有全部功能等价（OLS + Panel 拟合、诊断展示、数据预览、错误/警告渲染）
 - [ ] 现有测试用例在新 UI 上全部通过（`npm test`）
+- [ ] 模型拟合使用 `datasetStore.activePath`，数据变换成功后可直接用派生 CSV 拟合
 - [ ] Ant Design 组件替换原生 HTML 控件
 - [ ] AG Grid 替换手写 table（支持排序、筛选、虚拟滚动）
 - [ ] ECharts 替换文本式诊断输出（至少：残差直方图、QQ plot）
@@ -168,23 +177,38 @@ packages/MetricaData.jl/
 ```
 POST /transform
 {
-  "dataset_path": "...",
+  "task_id": "transform-001",
+  "action": "transform",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  },
+  "dataset_ref": {
+    "source": "file",
+    "path": "data/source.csv",
+    "format": "csv"
+  },
   "operations": [
     {"op": "filter", "args": {"condition": "gdp > 0"}},
     {"op": "generate", "args": {"name": "log_gdp", "expr": "log(gdp)"}},
     {"op": "merge", "args": {"with": "...", "on": ["country", "year"], "how": "inner"}}
-  ]
+  ],
+  "options": {
+    "preview_rows": 10,
+    "persist_output": true
+  }
 }
 ```
 
-支持操作链——一次请求顺序执行多个操作，Julia 侧保证事务性（任一操作失败则整体回滚，返回错误）。
+支持操作链——一次请求顺序执行多个操作，Julia 侧保证事务性（任一操作失败则整体回滚，返回错误）。M5 默认持久化输出，派生 CSV 写入 `<working_dir>/.metrica/derived/<task_id>.csv`，`result_payload.result.dataset_path` 指向该文件。
 
 ### 验收标准
 
 - [ ] 每个数据操作函数有独立 Julia 单元测试
-- [ ] `/transform` 端点 Rust 集成测试（多操作链、错误回滚、不合法参数）
+- [ ] `/transform` 端点 Rust 集成测试自启动 axum router，覆盖多操作链、错误回滚、不合法参数
 - [ ] App 侧数据管理面板（Track A 完成后接入）
 - [ ] 操作历史列表 + 实时预览
+- [ ] 变换成功后 `datasetStore.activePath` 自动切换到派生 CSV
 - [ ] 结构化错误指明失败的操作序号和原因
 
 ## 非目标
@@ -193,6 +217,7 @@ POST /transform
 - 不引入新的数据存储引擎（继续使用 CSV + DataFrame）
 - 不做数据库接入
 - 不做实时协作或云同步
+- 不做完整 Tauri 2 插件化文件对话框；该能力进入 M9 产品化或后续桌面增强
 
 ## 技术债务清理（随 M5 一同处理）
 

@@ -3,16 +3,16 @@
 ## 1. 项目定位
 
 **项目名称**：`Metrica.jl`  
-**目标**：构建 Julia 生态中统一、现代、教学友好、可扩展的计量经济学框架，并在中长期形成超越 `statsmodels`、对标并逐步超越 Stata 的完整产品形态。  
+**目标**：构建 Julia 生态中统一、现代、教学友好、可扩展的计量经济学框架，并在中长期形成覆盖常见教学与应用研究工作流的原生桌面计量工作台。Metrica 不追求复刻 Stata 的全部命令生态，而是优先在结构化结果、教学解释、现代桌面体验与 Julia 数值底座上形成清晰优势。
 **首要受众**：经济学、金融学、管理学学生与教师  
-**兼顾受众**：研究人员、方法开发者、第三方扩展作者
+**兼顾受众**：使用常见实证方法的研究人员
 
 Metrica 的核心成功标准不是“模型列表最多”，而是同时做到：
 
 - 一致：所有模型共享统一接口与结果语义
-- 可靠：结果可与 Stata、R、statsmodels 系统对齐
+- 可靠：关键模型有稳定黄金样例测试，结果不随实现细节漂移
 - 易学：错误清晰、输出清楚、教程完备、默认值合理
-- 可扩展：第三方模型、协方差、检验、输出、可视化可无缝接入
+- 可演进：核心协议足以承载后续模型、输出、可视化与 AI 助手，但不提前承诺插件市场或开放脚本生态
 - 高性能：关键路径低分配、数值稳定、适配大样本与高维设定
 
 ---
@@ -34,17 +34,30 @@ Metrica 的核心成功标准不是“模型列表最多”，而是同时做到
 - 内置教学数据与 Pluto 教程
 - 与教科书写法接近的公式体验
 
-### 2.3 Monorepo 多包联邦架构
+### 2.3 克制的产品终局
+
+Metrica 的现实终局不是“替代 Stata 的全部生态”，而是成为一个在教学和常见应用研究中足够可靠、足够现代、足够清楚的桌面计量工作台。当前路线明确放弃：
+
+- 复刻完整命令脚本生态
+- 插件市场与第三方扩展平台
+- 云协作、多用户平台与通用项目市场
+- 与 Stata/R/Python 的全量系统互验套件
+
+同时保留一个远期空间：当结构化结果、诊断、数据谱系与项目工作流足够稳定后，可发展 **AI 原生计量助手**。该能力必须消费结构化协议对象，不得退化为解析文本输出或执行任意自由脚本。
+
+### 2.4 Monorepo 多包联邦架构
 
 建议使用一个主仓库维护多个 Julia 包：
 
 - `MetricaBase.jl`
 - `MetricaLinear.jl`
-- `MetricaRobust.jl`
 - `MetricaPanel.jl`
-- `MetricaTests.jl`
+- `MetricaDiagnostics.jl`
+- `MetricaData.jl`
 - `MetricaOutput.jl`
-- `MetricaViz.jl`
+- `MetricaDiscrete.jl`（远期）
+- `MetricaCausal.jl`（远期）
+- `MetricaTimeSeries.jl`（远期）
 - `Metrica.jl`（元包）
 
 这样能兼顾：
@@ -52,9 +65,9 @@ Metrica 的核心成功标准不是“模型列表最多”，而是同时做到
 - 版本边界清晰
 - 统一 CI / 文档 / benchmark / issue 管理
 - 子包可独立测试与演进
-- 用户仍可通过元包获得”一站式体验”
+- 用户仍可通过元包获得“一站式体验”
 
-### 2.4 版本体系对照
+### 2.5 版本体系对照
 
 本蓝图同时使用三套编号体系，其对应关系如下：
 
@@ -66,6 +79,28 @@ Metrica 的核心成功标准不是“模型列表最多”，而是同时做到
 | v2（完整 DSL） | 阶段 4 以后 | 远期 | 时序算子、动态面板 DSL 等 |
 
 > 简记：阶段编号 = 执行顺序；里程碑 = 对外交付节点；公式版本 = 公式子系统的内部成熟度。
+
+### 2.6 阶段划分原则
+
+Metrica 的长期路线不再按粗放的大阶段分桶，而按以下四个维度共同排序：
+
+1. **必要性**：优先覆盖最常用、最能支撑教学与常规研究的能力。
+2. **闭环能力**：优先建设能形成 `Core -> Runtime -> App -> Output` 完整工作流的能力。
+3. **依赖顺序**：先完成协议、运行时、结果语义与工作台地基，再扩张模型族。
+4. **长期实现难度**：对高复杂专题保持节奏控制，避免过早挤占高必要能力的资源。
+
+因此，新阶段体系采用“必要性优先，兼顾长期难度与依赖顺序”的排序方式。旧 `M` 编号继续保留，但仅作为历史映射和具体里程碑引用，不再单独承担长期阶段叙事。
+
+### 2.7 新阶段编号与旧里程碑映射
+
+| 新阶段 | 名称 | 目标摘要 | 旧 `M` 编号映射 |
+|--------|------|----------|----------------|
+| `S1` | 协议与工作台地基 | 建立稳定协议、Runtime、App 与基础数据/模型主链路 | `M1-M5` |
+| `S2` | 核心实证工作台 | 完成线性与面板能力闭环 | `M6-M7` |
+| `S3` | 复现与报告产品化 | 完成报告、项目文件、运行记录与产品化闭环 | `M8-M9` |
+| `S4` | 高频应用研究模型 | 覆盖 GLM、因果推断、基础时间序列、复杂抽样 | `M10-M13` |
+| `S5` | 高级研究专题 | 承载 GMM、动态面板、多方程系统与其他高复杂专题 | `M14+` |
+| `S6` | AI 增强与研究助理层 | 在结构化对象稳定后提供受控 AI 增强能力 | 旧 `M20` |
 
 ---
 
@@ -91,23 +126,22 @@ graph TB
     subgraph modules["模型模块"]
         L["MetricaLinear.jl ✓"]
         PN["MetricaPanel.jl ✓"]
-        TS["MetricaTimeSeries.jl (远期)"]
-        DC["MetricaDiscrete.jl (远期)"]
-        CA["MetricaCausal.jl (远期)"]
+        DC["MetricaDiscrete.jl (S4 / M10)"]
+        CA["MetricaCausal.jl (S4 / M11)"]
+        TS["MetricaTimeSeries.jl (S4 / M12)"]
     end
 
     subgraph infra["基础设施模块"]
-        RB["MetricaRobust.jl ✓"]
-        TT["MetricaTests.jl ✓"]
-        MG["MetricaMargins.jl (远期)"]
+        DT["MetricaData.jl ✓"]
+        TT["MetricaDiagnostics.jl ✓"]
+        MG["MetricaMargins.jl (S4+)"]
         O["MetricaOutput.jl ✓"]
-        V["MetricaViz.jl (远期)"]
     end
 
     subgraph product["产品层"]
         DOC["Documenter 文档站"]
-        PL["Pluto 教程"]
-        APP["未来 GUI / 原生应用"]
+        APP["Tauri / React 桌面工作台"]
+        AI["AI 增强层 (S6 / 旧 M20)"]
     end
 
     M --> base
@@ -118,7 +152,7 @@ graph TB
     product --> M
 ```
 
-> 标注说明：`✓` = 已有明确阶段规划；`(远期)` = 阶段 4 或尚未排入路线图，首批交付范围待定。
+> 标注说明：`✓` = 已进入当前实现或明确规划；`S4 / M10` 等表示所属新阶段及其历史里程碑映射；`S6 / 旧 M20` 表示 AI 能力属于远期增强层，而非独立的当前施工阶段。
 
 ---
 
@@ -236,7 +270,7 @@ augment(model, data=nothing)
 - `tidy(model)`：参数级长表
 - `augment(model)`：观测级附加结果
 
-这能让 `MetricaOutput.jl`、`MetricaViz.jl`、Pluto 教程、未来 GUI 都消费结构化结果，而不是反向解析文本 summary。
+这能让 `MetricaOutput.jl`、桌面 App、教程、报告系统与未来 AI 助手都消费结构化结果，而不是反向解析文本 summary。
 
 ---
 
@@ -291,7 +325,7 @@ supports_loglikelihood(::Type{<:SomeMLEModel}) = Val(true)
 
 - 输出层可按能力自适应渲染
 - 可视化层可判断是否能画特定诊断图
-- 第三方扩展作者只需声明能力而不是改动主干代码
+- App 与 Runtime 可以通过能力声明减少硬编码模型分支
 
 ---
 
@@ -361,35 +395,37 @@ supports_loglikelihood(::Type{<:SomeMLEModel}) = Val(true)
 
 ---
 
-## 9. 插件系统设计
+## 9. 内部能力发现设计
 
-### 9.1 不只是“注册模型名”
+### 9.1 不建设开放插件生态
 
-插件系统应支持注册以下能力：
+Metrica 当前路线不建设开放插件市场、任意脚本入口或第三方扩展平台。这里的“注册”仅指仓库内各 Core 包向输出层、Runtime 与 App 声明自身能力，避免 UI 和导出系统硬编码模型细节。
+
+内部能力发现应支持声明以下内容：
 
 - 模型类型
 - 拟合结果类型
 - 支持的协方差规范
 - 支持的检验列表
-- 支持的输出扩展
-- 支持的图形诊断
+- 支持的输出字段
+- 支持的诊断图类型
 
-### 9.2 推荐注册内容
+### 9.2 推荐声明内容
 
 ```julia
 register_extension!(
-    name = :MyModel,
-    model_type = MyModel,
-    fitted_type = MyModelResult,
+    name = :OLS,
+    model_type = OLSModel,
+    fitted_type = OLSFitResult,
     category = :linear,
     capabilities = [:coef, :vcov, :predict, :glance, :tidy],
-    description = "Custom econometric estimator"
+    description = "Ordinary least squares"
 )
 ```
 
 ### 9.3 注册表存储与发现机制
 
-`register_extension!` 函数由 `MetricaBase.jl` 提供，第一阶段采用内存中的全局 `Dict{Symbol, ExtensionEntry}` 作为注册表。后续可按需迁移为持久化方案（如 TOML 文件或 Julia 包扩展机制）。
+`register_extension!` 函数由 `MetricaBase.jl` 提供，第一阶段采用内存中的全局 `Dict{Symbol, ExtensionEntry}` 作为注册表。该机制服务于本仓库内部模块协作，不承诺稳定的第三方插件 API。
 
 各下游消费者可通过以下查询接口发现已注册扩展：
 
@@ -398,129 +434,75 @@ register_extension!(
 - `list_tests(model_type)` — 查询某模型支持的诊断检验
 - `get_extension(name)` — 按名称获取完整注册信息
 
-这使得 Output 层能自适应渲染（如"该模型支持 r²，因此展示 r² 卡片"），App 层能动态构建模型选择器，而无需硬编码模型列表。
+这使得 Output 层能自适应渲染（如“该模型支持 r²，因此展示 r² 卡片”），App 层能动态构建模型选择器，而无需硬编码模型列表。
 
 ### 9.4 技术路线
 
-- Julia 1.12+ 为主，优先依赖现代包扩展机制（如 `Requires.jl` 或 `PackageExtensions.jl`）
+- Julia 1.12+ 为主，优先使用显式模块加载与轻量注册表
 - 避免过度依赖运行时黑魔法
-- 扩展发现要服务于文档、输出层和 GUI，而不仅仅是 `fit`
+- 能力发现要服务于文档、输出层、Runtime 与 App，而不仅仅是 `fit`
 
 ---
 
-## 10. 模块路线重构
+## 10. 阶段路线重构
 
-原路线图按学科主题拆分是合理的，但从工程上看，建议进一步重排为“协议验证型阶段”。
+当前路线采用 `S1-S6` 新阶段体系。详细施工指引位于 `docs/roadmap/`，本蓝图只保留阶段边界、排序依据与历史映射。
 
-### 阶段 0：仓库与工程基建
+### `S1`：协议与工作台地基（映射旧 `M1-M5`）
 
-- monorepo 结构
-- 子包模板与共享 CI
-- 统一格式化、测试、文档、benchmark 规范
-- 示例数据与 golden test 目录布局
+目标是把 `Core -> Runtime -> App -> Output` 的稳定主链路做成可靠底座。
 
-### 阶段 1：`MetricaBase.jl`
+- Base 协议、统一结果语义、错误/警告码体系
+- Runtime 结构化请求/响应、任务状态、取消与日志基础
+- App 的数据导入、检查、基础操作、结果展示主工作流
+- 当前已完成与进行中的 OLS/WLS、基础诊断、基础面板、数据操作地基
 
-- 抽象类型
-- 核心 API
-- `glance / tidy / augment`
-- 模型帧与缺失值处理
-- 公式扩展挂点
-- capability 协议
-- 插件注册协议
-- 统一错误/警告机制
+### `S2`：核心实证工作台（映射旧 `M6-M7`）
 
-### 阶段 2A：`MetricaLinear.jl`
+目标是覆盖最常用、最必要、最能支撑教学与常规论文的线性与面板能力闭环。
 
-第一批只建议聚焦：
+- OLS/WLS 成熟化、统一 `fit/predict`
+- IV/2SLS、GLS/FGLS、稳健/cluster 协方差
+- HDFE、CRE、Panel IV、面板诊断升级
+- 多模型比较、黄金样例、教学数据集收口
 
-- OLS
-- WLS
-- 基础 GLS
-- IV/2SLS
+### `S3`：复现与报告产品化（映射旧 `M8-M9`）
 
-`LIML / GMM / SUR / 3SLS` 可以列为 `2A.5` 或 `2B`，不要在第一轮一次性全部压进来。
+目标是把“能算”升级为“能做完整项目”。
 
-### 阶段 2B：`MetricaRobust.jl`
+- 模型表系统与结构化导出
+- 项目文件、运行记录、数据谱系、结果复现
+- 安装包、最近项目、错误恢复、最小课堂/示例工程
+- 报告工作流成为统一出口，而不是附加功能
 
-优先级建议：
+### `S4`：高频应用研究模型（映射旧 `M10-M13`）
 
-- OLS 经典协方差
-- HC0-HC3
-- 单向 Cluster
-- Newey-West
+目标是覆盖常见应用研究中最常用、教学和论文都高频的模型族。
 
-`HC4-HC5`、双向聚类、多向聚类、Bootstrap 可作为增强阶段。
+- GLM / 有限因变量：Logit、Probit、Poisson、边际效应
+- 因果推断：DID、event study、IPW、matching、treatment effects
+- 基础时间序列：ARIMA、VAR、单位根、协整、预测
+- 复杂抽样：pweights、strata、PSU、survey-aware regression
 
-### 阶段 2C：`MetricaOutput.jl`
+### `S5`：高级研究专题（映射旧 `M14+`）
 
-因为教学优先，输出层应比高阶估计器更早落地：
+目标是承载必要性次于 `S4`、但对长期竞争力重要的高复杂专题。
 
-- 终端 summary
-- `regtable`
-- Markdown / LaTeX / HTML
-- 描述统计表
+- 一般 GMM 与过识别检验体系
+- 动态面板（Arellano-Bond / System GMM）
+- SUR / 联立方程
+- 分位数回归
+- 非线性 / 门限回归
+- 非参数 / 半参数
+- ARCH/GARCH、空间、久期、贝叶斯
 
-### 阶段 2D：`MetricaTests.jl`
+### `S6`：AI 增强与研究助理层（映射旧 `M20`）
 
-优先诊断检验：
+`S6` 不是孤立的大阶段，而是建立在 `S1-S5` 结构化对象成熟后的远期增强层。
 
-- Breusch-Pagan
-- White
-- Durbin-Watson
-- Breusch-Godfrey
-- RESET
-- VIF
-- Jarque-Bera
-
-### 阶段 2E：`MetricaPanel.jl`
-
-先做：
-
-- `PanelData`
-- Fixed Effects
-- Random Effects
-- Between
-- First Difference
-
-动态面板 GMM 不建议过早进入首批交付。
-
-### 阶段 2F：`MetricaMargins.jl`
-
-Margins 是教学体验的关键环节（学生需要理解"x 变化一单位，y 平均变化多少"），应在面板之后、可视化之前落地：
-
-- 平均边际效应 (AME)
-- 代表性值处的边际效应 (MEM / MER)
-- 连续变量与分类变量的差异化处理
-- 与 `tidy` 兼容的结构化输出
-
-### 阶段 2G：`MetricaViz.jl`
-
-Viz 负责所有图形诊断与可视化，消费 `glance / tidy / augment` 而非解析终端文本：
-
-- 残差诊断图（残差 vs 拟合、QQ、尺度-位置）
-- 系数图（森林图/coefplot）
-- 边际效应图
-- 基于 Makie 的主题与图层系统
-
-Output 管"表"，Viz 管"图"——两者共享 glance/tidy/augment 消费模式，但互不依赖。
-
-### 阶段 3：教学与产品化增强
-
-- Pluto 教程
-- 内置教材数据集
-- Documenter 文档站
-- 错误提示与解释性警告增强
-- 示例项目与课堂作业模板
-
-### 阶段 4 以后
-
-以下模块已有架构预留，但首批交付范围待验证当前链路后再细化：
-
-- **时间序列 (MetricaTimeSeries.jl)**：AR/MA/ARMA、滞后选择、单位根检验、协整检验
-- **离散选择 (MetricaDiscrete.jl)**：Logit/Probit、多项 Logit、有序 Logit
-- **因果推断 (MetricaCausal.jl)**：DID、RDD、IV 扩展、匹配方法
-- **原生应用 / GUI**：完整插件市场、项目模板系统、云端协作
+- 基于 `RunRecord`、`DataLineage`、`DiagnosticFinding`、`ModelComparison` 的解释与建议
+- 教学解释、报告草稿、下一步分析建议
+- 受控动作预览与确认，不开放任意脚本执行
 
 ---
 
@@ -591,7 +573,7 @@ Output 管"表"，Viz 管"图"——两者共享 glance/tidy/augment 消费模�
 
 每个估计器至少应满足：
 
-- 与 Stata / R / statsmodels 对齐测试
+- 关键黄金样例测试覆盖系数、标准误、样本量与主要诊断字段
 - 默认测试精度目标不低于 6 位有效数字
 - 对病态矩阵、近奇异、权重极端值有稳定性测试
 
@@ -624,7 +606,7 @@ Output 管"表"，Viz 管"图"——两者共享 glance/tidy/augment 消费模�
 | 测试类型 | 目录位置 | 用途 | 示例 |
 |---------|---------|------|------|
 | **单元测试** | `test/runtests.jl`（各子包内） | 验证接口契约、数据类型、边界条件 | 确保 `glance` 返回结构正确的 `ModelGlance` |
-| **数值对齐测试** | `test/golden/`（各子包内） | 与 Stata/R/statsmodels 结果逐位对比 | OLS 系数与标准误精度 ≥ 6 位有效数字 |
+| **黄金样例测试** | `test/golden/`（各子包内） | 固定少量关键模型的预期结果，防止数值漂移 | OLS / IV / FE / Logit / DID / Poisson 的小型样例 |
 | **集成测试** | `test/integration/`（各子包内） | 验证跨包协作链路 | Base → Linear → Output 完整调用链 |
 | **文档示例测试** | 源码 docstring 中 | 确保文档示例始终可运行 | `julia --project -e "using Pkg; Pkg.test()"` 自动执行 |
 | **性能基准** | `benchmarks/`（仓库根） | 追踪性能不退化 | 小/中/大样本拟合吞吐与内存分配 |
@@ -632,13 +614,13 @@ Output 管"表"，Viz 管"图"——两者共享 glance/tidy/augment 消费模�
 #### 数据集布局
 
 - `datasets/teaching/` — 教学用小型数据集（Wooldridge、Stock-Watson、Angrist-Pischke、Greene）
-- `datasets/golden/` — 数值对齐参考数据集，附 Stata/R/statsmodels 参考输出文件
+- `datasets/golden/` — 黄金样例数据集，附 Metrica 预期结构化输出
 - `datasets/bench/` — 性能基准用模拟大数据集（≥ 1M 行）
 
 #### CI 配置
 
 - Julia 版本矩阵：当前稳定版 + LTS
-- 每个 PR 须通过单元测试 + 数值对齐测试
+- 每个 PR 须通过单元测试 + 黄金样例测试
 - benchmark 监控在 `main` 分支合并后异步执行
 - 文档示例测试随单元测试一同运行
 
@@ -651,14 +633,17 @@ Metrica/
 ├── packages/
 │   ├── MetricaBase.jl/
 │   ├── MetricaLinear.jl/
-│   ├── MetricaRobust.jl/
 │   ├── MetricaPanel.jl/
-│   ├── MetricaTests.jl/
-│   ├── MetricaMargins.jl/
+│   ├── MetricaDiagnostics.jl/
+│   ├── MetricaData.jl/
 │   ├── MetricaOutput.jl/
-│   ├── MetricaViz.jl/
+│   ├── MetricaDiscrete.jl/
+│   ├── MetricaCausal.jl/
+│   ├── MetricaTimeSeries.jl/
 │   └── Metrica.jl/
 ├── docs/
+│   ├── architecture/
+│   └── roadmap/
 ├── tutorials/
 ├── datasets/
 ├── benchmarks/
@@ -677,11 +662,12 @@ Metrica/
 - 把项目核心从“模型清单”升级为“协议内核”
 - 明确了 `MetricaBase.jl` 的职责边界，避免胖核心
 - 引入 `glance / tidy / augment` 作为统一结果层
-- 引入 capability / trait 协议，保证插件生态优雅扩展
+- 引入 capability / trait 协议，保证输出层、Runtime 与 App 能按能力消费结果
 - 明确采用 `Tables.jl` 抽象而非仅绑定 `DataFrame`
 - 把输出层提前到面板和高阶模型之前，更符合教学优先路线
 - 调整线性回归与稳健协方差的首批交付范围，降低首轮复杂度
 - 明确将“错误提示、样本追踪、默认输出”提升为一等设计目标
+- 收缩终局目标：不复刻完整 Stata 生态，不建设开放插件/脚本平台，但为 AI 原生计量助手保留结构化协议空间
 
 ---
 
@@ -723,7 +709,18 @@ Metrica/
 
 > **完成细节：** `MetricaPanel.jl` 包已创建，包含 FE（组内去均值）、RE（Mundlak）、FD（一阶差分）、Between（组间估计）四种估计器。Grunfeld 数据集已创建并附带元数据。Runtime 桥接脚本已支持面板拟合，App 已支持面板模型请求构造。
 
-做到这 3 个里程碑后，Metrica 就已经不是"规划中的大项目"，而会成为一个真正可教学、可演示、可扩展的 Julia 计量框架雏形。
+做到这 3 个里程碑后，Metrica 就已经不是“规划中的大项目”，而会成为一个真正可教学、可演示、可演进的 Julia 计量框架雏形。
+
+### 后续里程碑压缩路线
+
+后续路线不再追求“超越 Stata 的全部生态”，而是按新阶段体系推进：
+
+- **`S1`：协议与工作台地基** — 稳定主链路、数据能力与当前基础模型
+- **`S2`：核心实证工作台** — 线性/面板成熟化与教学数据集收口
+- **`S3`：复现与报告产品化** — 报告导出、项目文件、运行记录与桌面产品化
+- **`S4`：高频应用研究模型** — GLM、因果推断、基础时间序列、复杂抽样
+- **`S5`：高级研究专题** — GMM、动态面板、多方程系统等高复杂专题
+- **`S6`：AI 增强与研究助理层** — 仅在结构化协议、项目谱系与诊断对象稳定后进入设计
 
 ---
 
@@ -738,8 +735,8 @@ Metrica/
 | 版本跃迁 | Gate 条件 | 状态 |
 |----------|----------|------|
 | `0.1.0` → `0.2.0` | Base 接口冻结、OLS 完整链路打通、Runtime 协议稳定、App 可演示 | ✅ 已完成（2026-05-01） |
-| `0.2.0` → `0.9.0` | Linear/Panel/Robust/Output/Tests/Margins 六包功能就绪、教学数据集完整、Pluto 教程上线 |
-| `0.9.0` → `1.0.0` | 至少两个教学学期在真实课堂中使用无重大 API 投诉、与 Stata/R 对齐测试全部通过、性能基准达标 |
+| `0.2.0` → `0.9.0` | M5-M8 完成，数据管理、线性/面板成熟化、报告导出与桌面主链路均可端到端验证 |
+| `0.9.0` → `1.0.0` | M9 完成，至少一个完整教学工作流可安装、可重跑、可导出，核心黄金样例与性能基准稳定 |
 
 ### 16.3 首次公开发布建议时机
 
@@ -758,9 +755,9 @@ Metrica/
 Metrica 最有机会成功的路径，不是“把所有计量模型尽快做完”，而是：
 
 1. 先做稳定、优雅、可扩展的协议内核  
-2. 再用线性回归和输出层验证核心设计  
+2. 再用线性回归、面板模型、数据管理和输出层验证核心设计
 3. 用教学体验建立用户基础  
-4. 用面板、稳健协方差、诊断与文档逐步拉开与一般 Julia 包的差距  
-5. 最后再迈向 Stata 级工作流与原生应用产品
+4. 用报告导出、桌面项目工作流与常见应用研究模型逐步拉开与一般 Julia 包的差距
+5. 在结构化结果和项目谱系稳定后，再评估 AI 原生计量助手
 
-如果按照这条路线推进，Metrica 的独特优势将不是“Julia 版 statsmodels”，而是一个真正为教学、研究与未来应用产品统一设计的现代计量经济学生态。
+如果按照这条路线推进，Metrica 的独特优势将不是“Julia 版 statsmodels”或“复刻 Stata”，而是一个真正为教学、常见应用研究与未来 AI 辅助工作流统一设计的现代计量工作台。

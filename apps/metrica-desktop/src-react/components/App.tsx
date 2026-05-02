@@ -10,6 +10,9 @@ import { DiagnosticCharts } from './DiagnosticCharts';
 import { AugmentPreview } from './AugmentPreview';
 import { ErrorPanel } from './ErrorPanel';
 import { WarningPanel } from './WarningPanel';
+import { DataOperationsPanel } from './DataOperationsPanel';
+import { OperationHistory } from './OperationHistory';
+import { DataPreviewTable } from './DataPreviewTable';
 import { useAppStore } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
 
@@ -35,6 +38,7 @@ export function App() {
               activeKey={activeTab}
               onChange={setActiveTab}
               items={[
+                { key: 'data', label: '数据处理', children: <><DataOperationsPanel /><OperationHistory /><DataPreviewTable /></> },
                 { key: 'glance', label: '模型概览', children: <GlanceTable /> },
                 { key: 'tidy', label: '系数表', children: <TidyTable /> },
                 { key: 'diagnostics', label: '诊断', children: <><DiagnosticCards /><DiagnosticCharts /></> },
