@@ -6,6 +6,8 @@ export AbstractEconModel,
     AbstractFittedModel,
     AbstractCovarianceSpec,
     AbstractPanelModel,
+    AbstractLinearModel,
+    AbstractLinearFitResult,
     Severity,
     info,
     warning,
@@ -24,7 +26,14 @@ export AbstractEconModel,
     predict,
     glance,
     tidy,
-    augment
+    augment,
+    stderror,
+    confint,
+    nobs,
+    dof,
+    r2,
+    fitted,
+    residuals
 
 # === 严重程度枚举 ============================================================
 
@@ -71,6 +80,22 @@ abstract type AbstractCovarianceSpec end
 面板模型需要个体标识和时间标识来定义面板结构。
 """
 abstract type AbstractPanelModel <: AbstractEconModel end
+
+"""
+线性模型族的抽象父类型。
+
+OLS、WLS、IV/2SLS、GLS 等线性模型均应继承此类型。
+用于统一 `fit` 泛型分派和协议方法分派。
+"""
+abstract type AbstractLinearModel <: AbstractEconModel end
+
+"""
+线性模型拟合结果的抽象父类型。
+
+所有线性模型的拟合结果（OLSFitResult、IVFitResult、GLSFitResult）
+均应继承此类型，以统一 `coef`、`vcov`、`predict` 等协议方法的分派。
+"""
+abstract type AbstractLinearFitResult <: AbstractFittedModel end
 
 # === 消息与错误载荷 ==========================================================
 
@@ -223,5 +248,40 @@ function tidy end
 具体列集合由各模型实现决定。
 """
 function augment end
+
+"""
+从已拟合结果中提取标准误向量。
+"""
+function stderror end
+
+"""
+计算系数的置信区间。默认置信水平为 0.95。
+"""
+function confint end
+
+"""
+返回拟合所用的有效观测数。
+"""
+function nobs end
+
+"""
+返回模型的残差自由度。
+"""
+function dof end
+
+"""
+返回模型的 R² 决定系数。
+"""
+function r2 end
+
+"""
+返回拟合值向量。
+"""
+function fitted end
+
+"""
+返回残差向量。
+"""
+function residuals end
 
 end
