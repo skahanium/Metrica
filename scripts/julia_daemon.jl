@@ -96,7 +96,7 @@ function handle_request(req::Dict{String, Any})
                 result = fit(IVModel, formula, dataset_path;
                     instruments=instruments, endog=endog_columns,
                     vcov=vcov_symbol, cluster_column=cluster_sym)
-                payload = result_to_payload(result; include_augment=include_augment)
+                payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
 
             elseif model_type == "gls"
                 omega_fn = r -> Matrix{Float64}(I, length(r), length(r))
@@ -105,7 +105,7 @@ function handle_request(req::Dict{String, Any})
 
                 result = fit(GLSModel, formula, dataset_path;
                     omega_fn=omega_fn, vcov=vcov_symbol)
-                payload = result_to_payload(result; include_augment=include_augment)
+                payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
             else
                 vcov_type = params["vcov"]
                 vcov_symbol = if vcov_type == "HC1"
@@ -126,7 +126,7 @@ function handle_request(req::Dict{String, Any})
                     cluster=cluster_sym,
                 )
 
-                payload = result_to_payload(result; include_augment=include_augment)
+                payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
                 if result isa OLSFitResult
                     payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
                 end
