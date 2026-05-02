@@ -265,3 +265,59 @@ end
     old = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
     @test old isa OLSFitResult
 end
+
+@testset "IV/2SLS 链路" begin
+    iv_csv, iv_io = mktemp()
+    close(iv_io)
+    write(iv_csv, """y,x1,x2,z1,z2
+10,1,5,3,8
+12,2,3,5,6
+14,3,1,7,4
+20,2,6,4,9
+22,3,4,6,7
+24,4,2,8,5
+30,5,7,9,10
+32,6,5,11,8
+""")
+
+    iv_result = fit(IVModel, "y ~ x1 + x2", iv_csv;
+                    instruments=["z1", "z2"], endog=["x2"])
+    @test iv_result isa IVFitResult
+    @test iv_result isa AbstractLinearFitResult
+    @test glance(iv_result).model === :iv
+    @test glance(iv_result).nobs == 8
+    @test length(tidy(iv_result).rows) == 3
+
+    @test length(iv_result.first_stage_stats) >= 1
+
+    @test haskey(glance(iv_result).metrics, :r2)
+    @test haskey(glance(iv_result).metrics, :sigma)
+    @test all(row -> row.pvalue !== nothing, tidy(iv_result).rows)
+
+    at = augment(iv_result)
+    @test at isa AugmentTable
+    @test at.nobs == 8
+
+    p = predict(iv_result)
+    @test length(p) == 8
+
+    ci = predict(iv_result; interval=:confidence, level=0.95)
+    @test ci isa NamedTuple
+    @test all(ci.lower .<= ci.predictions .<= ci.upper)
+
+    payload = result_to_payload(iv_result)
+    @test payload["status"] == "success"
+    @test haskey(payload["result_payload"], "first_stage_stats")
+
+    missing_inst = fit(IVModel, "y ~ x1 + x2", iv_csv;
+                       instruments=["z9"], endog=["x2"])
+    @test missing_inst isa ModelError
+    @test missing_inst.code === :unknown_instrument_variable
+
+    bad_endog = fit(IVModel, "y ~ x1", iv_csv;
+                    instruments=["z1"], endog=["x2"])
+    @test bad_endog isa ModelError
+    @test bad_endog.code === :endog_not_in_formula
+
+    rm(iv_csv; force=true)
+end
