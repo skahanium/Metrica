@@ -194,3 +194,29 @@ fn inspect_dataset_accepts_paths_relative_to_project_context() {
     assert!(payload.get("preview_rows").is_some());
 }
 
+#[test]
+fn transform_filter_operation_returns_ok() {
+    let client = reqwest::blocking::Client::new();
+
+    let body = serde_json::json!({
+        "dataset_path": concat!(env!("CARGO_MANIFEST_DIR"), "/../../datasets/teaching/pwt_productivity_panel.csv"),
+        "operations": [
+            {"op": "filter", "args": {"condition": "year >= 2015"}},
+            {"op": "generate", "args": {"name": "log_output", "expr": "log(output_per_worker)"}}
+        ]
+    })
+    .to_string();
+
+    let resp = client
+        .post("http://127.0.0.1:47821/transform")
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .expect("POST /transform should succeed");
+
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().expect("response should be JSON");
+    assert_eq!(json["status"], "success");
+    assert!(json["result_payload"]["nrows"].as_u64().unwrap() > 0);
+}
+
