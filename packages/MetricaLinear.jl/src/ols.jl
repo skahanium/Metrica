@@ -427,6 +427,7 @@ function fit_ols_file(
         fitted,
         residuals,
         coefficient_names,
+        coefficients,
         vcov_matrix,
         stderror,
     )
@@ -500,6 +501,6 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
     return OLSFitResult(
         String(formula), glance_table, tidy_table,
         Matrix{Float64}(X), copy(y), fitted, residuals,
-        coefficient_names, vcov_matrix, stderror,
+        coefficient_names, coefficients, vcov_matrix, stderror,
     )
 end

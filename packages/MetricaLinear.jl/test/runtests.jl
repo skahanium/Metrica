@@ -1,5 +1,6 @@
 using Test
-using MetricaBase
+using MetricaBase: fit, coef, vcov, stderror, nobs, dof, r2, fitted, residuals, predict,
+    glance, tidy, augment, ModelError, ModelWarning, AugmentTable, AbstractLinearModel, AbstractLinearFitResult
 using MetricaLinear
 
 const DEMO_CSV = joinpath(
@@ -163,7 +164,7 @@ end
 @testset "augment 能力" begin
     ok = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
     at = augment(ok)
-    @test at isa MetricaBase.AugmentTable
+    @test at isa AugmentTable
     @test at.nobs == 7
     @test length(at.columns) == 6
     @test haskey(at.columns, :observation)
@@ -216,4 +217,51 @@ end
     missing_payload = inspect_dataset("/tmp/does-not-exist.csv")
     @test missing_payload["status"] == "error"
     @test missing_payload["messages"][1]["code"] == "dataset_not_found"
+end
+
+@testset "统一 fit 接口与协议方法" begin
+    ok = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+
+    @test ok isa OLSFitResult
+    @test ok isa AbstractLinearFitResult
+
+    c = coef(ok)
+    @test c isa Vector{Pair{Symbol,Float64}}
+    @test length(c) == 3
+
+    v = vcov(ok)
+    @test v isa Matrix{Float64}
+    @test size(v) == (3, 3)
+
+    se = stderror(ok)
+    @test se isa Vector{Float64}
+    @test length(se) == 3
+    @test all(se .> 0)
+
+    @test nobs(ok) == 7
+    @test dof(ok) == 4
+    @test r2(ok) ≈ 0.993321819228555
+
+    f = fitted(ok)
+    @test length(f) == 7
+    @test f ≈ ok.fitted_values
+
+    r = residuals(ok)
+    @test length(r) == 7
+    @test sum(r) ≈ 0.0 atol=1e-10
+
+    p = predict(ok)
+    @test length(p) == 7
+    @test p ≈ ok.fitted_values atol=1e-12
+
+    ci = predict(ok; interval=:confidence, level=0.95)
+    @test ci isa NamedTuple{(:predictions, :lower, :upper)}
+    @test all(ci.lower .<= ci.predictions .<= ci.upper)
+
+    pi = predict(ok; interval=:prediction, level=0.95)
+    @test pi isa NamedTuple{(:predictions, :lower, :upper)}
+    @test all((pi.upper .- pi.lower) .>= (ci.upper .- ci.lower) .- 1e-10)
+
+    old = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
+    @test old isa OLSFitResult
 end

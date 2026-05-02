@@ -34,6 +34,7 @@ struct OLSFitResult <: MetricaBase.AbstractLinearFitResult
     fitted_values::Vector{Float64}
     residual_vector::Vector{Float64}
     coefficient_names::Vector{Symbol}
+    coefficient_values::Vector{Float64}
     vcov_matrix::Matrix{Float64}
     stderror_values::Vector{Float64}
 end
@@ -83,7 +84,7 @@ function MetricaBase.augment(result::OLSFitResult)
     )
 end
 
-MetricaBase.coef(result::OLSFitResult) = result.coefficient_names .=> result.fitted_values[1:length(result.coefficient_names)]
+MetricaBase.coef(result::OLSFitResult) = result.coefficient_names .=> result.coefficient_values
 MetricaBase.vcov(result::OLSFitResult) = result.vcov_matrix
 MetricaBase.stderror(result::OLSFitResult) = result.stderror_values
 MetricaBase.nobs(result::OLSFitResult) = length(result.response_vector)
@@ -96,7 +97,7 @@ function MetricaBase.predict(result::OLSFitResult;
                              newdata::Union{Nothing,Matrix{Float64}}=nothing,
                              interval::Symbol=:none, level::Float64=0.95)
     X = isnothing(newdata) ? result.design_matrix : newdata
-    predictions = X * result.fitted_values[1:length(result.coefficient_names)]
+    predictions = X * result.coefficient_values
 
     interval === :none && return predictions
 
