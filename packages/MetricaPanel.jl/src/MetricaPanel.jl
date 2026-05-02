@@ -7,7 +7,8 @@ using MetricaBase
 using Statistics
 using StatsModels
 
-export PanelModel, PanelFitResult, fit_panel, fit_hdfde, panel_diagnostics, result_to_payload
+export PanelModel, PanelFitResult, fit_panel, fit_hdfde, panel_diagnostics, result_to_payload,
+    compute_dk_vcov, compute_iv_dk_vcov
 
 """
 面板模型规格对象。
@@ -150,6 +151,7 @@ end
 
 include("fe.jl")
 include("hdfde.jl")
+include("dk.jl")
 include("re.jl")
 include("fd.jl")
 include("between.jl")
