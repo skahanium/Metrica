@@ -1,4 +1,5 @@
 using Test
+using DataFrames
 using MetricaBase
 using MetricaPanel
 using Statistics
@@ -217,4 +218,108 @@ end
         @test diagnostics["fixed_effect_f"]["available"] == true
         @test diagnostics["breusch_pagan_lm"]["available"] == true
     end
+end
+
+@testset "M7 HDFE 高维固定效应" begin
+    df = DataFrame(
+        firm = repeat(1:3, inner=4),
+        year = repeat(1:4, outer=3),
+        y = [10.0, 12.0, 14.0, 16.0, 20.0, 22.0, 24.0, 26.0, 30.0, 32.0, 34.0, 36.0],
+        x1 = [1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 5.0, 3.0, 4.0, 5.0, 6.0],
+    )
+    pd = PanelData(df, :firm, :year)
+
+    result = fit_hdfde(pd, "y ~ x1"; fe_spec=[:firm])
+    @test result isa PanelFitResult
+    @test result.method === :hdfde
+    @test length(result.fitted_values) == 12
+    @test tidy(result).rows[1].name === :x1
+
+    result2 = fit_hdfde(pd, "y ~ x1"; fe_spec=[:firm, :year])
+    @test result2 isa PanelFitResult
+    @test result2.method === :hdfde
+
+    # fit_panel dispatch
+    result3 = fit_panel(pd, "y ~ x1"; method=:hdfde, fe_spec=[:firm])
+    @test result3 isa PanelFitResult
+end
+
+@testset "M7 CRE/Mundlak" begin
+    df = DataFrame(
+        firm = repeat(1:3, inner=4),
+        year = repeat(1:4, outer=3),
+        y = [10.0, 12.0, 14.0, 16.0, 20.0, 22.0, 24.0, 26.0, 30.0, 32.0, 34.0, 36.0],
+        x1 = [1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 5.0, 3.0, 4.0, 5.0, 6.0],
+    )
+    pd = PanelData(df, :firm, :year)
+
+    result = fit_crea(pd, "y ~ x1")
+    @test result isa PanelFitResult
+    @test result.method === :cre
+    @test any(startswith(String(r.name), "group_mean_") for r in tidy(result).rows)
+
+    # fit_panel dispatch
+    result2 = fit_panel(pd, "y ~ x1"; method=:cre)
+    @test result2 isa PanelFitResult
+    @test result2.method === :cre
+end
+
+@testset "M7 面板 IV" begin
+    df = DataFrame(
+        firm = repeat(1:5, inner=4),
+        year = repeat(1:4, outer=5),
+        y = randn(20) .+ 10,
+        x1 = randn(20),
+        z1 = randn(20),
+    )
+    pd = PanelData(df, :firm, :year)
+
+    result = fit_panel_iv(pd, "y ~ x1"; instruments=["z1"], endog=["x1"])
+    @test result isa PanelIVFitResult
+    @test glance(result).model === :panel_iv
+    @test length(tidy(result).rows) == 2
+    @test length(result.first_stage_stats) == 1
+    @test haskey(result.first_stage_stats, :x1)
+end
+
+@testset "M7 Driscoll-Kraay" begin
+    df = DataFrame(
+        firm = repeat(1:5, inner=4),
+        year = repeat(1:4, outer=5),
+        y = randn(20) .+ 10,
+        x1 = randn(20),
+    )
+    pd = PanelData(df, :firm, :year)
+
+    fe_result = fit_panel(pd, "y ~ x1"; method=:fe)
+    X = hcat(ones(20), Float64.(df[!, :x1]))
+    dk_result = compute_dk_vcov(fe_result.residual_vector, X, pd)
+    @test dk_result isa Tuple
+    vcov_mat, se = dk_result
+    @test length(se) == 2
+    @test all(se .> 0)
+end
+
+@testset "M7 升级诊断" begin
+    gf = DataFrame(
+        firm = repeat(1:3, inner=4),
+        year = repeat(1:4, outer=3),
+        invest = [317.99, 391.85, 410.19, 257.70, 247.68, 330.57, 461.46, 512.80, 308.20, 395.81, 420.73, 400.60],
+        mvalue = [3078.5, 4691.2, 5668.6, 5022.4, 2759.4, 3812.5, 5006.8, 5869.3, 2768.9, 4303.5, 5459.1, 5324.6],
+        capital = [2.8, 52.6, 156.9, 209.2, 302.4, 360.7, 478.3, 555.4, 206.4, 336.5, 462.3, 476.7],
+    )
+    panel_data = PanelData(gf, :firm, :year)
+
+    diag = panel_diagnostics(panel_data, "invest ~ mvalue + capital")
+
+    # Hausman 检验（小样本可能不可用）
+    @test diag["hausman"]["method"] == "hausman_fe_re_v2"
+    @test diag["hausman"]["available"] isa Bool
+
+    # BP LM 支持平衡面板
+    @test diag["breusch_pagan_lm"]["available"] == true
+    @test diag["breusch_pagan_lm"]["method"] == "breusch_pagan_re_lm"
+
+    # F 检验
+    @test diag["fixed_effect_f"]["available"] == true
 end
