@@ -1,4 +1,3 @@
-pub mod http;
 pub mod julia_bridge;
 pub mod julia_session;
 pub mod server;
@@ -6,7 +5,7 @@ pub mod server;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-pub use http::{build_http_response, default_bind_addr, serve_http, HttpResponse};
+pub use server::default_bind_addr;
 pub use julia_bridge::execute_fit_model;
 pub use julia_session::JuliaSession;
 pub use server::{build_router, serve as serve_axum};

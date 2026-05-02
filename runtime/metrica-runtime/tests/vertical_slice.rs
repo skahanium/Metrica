@@ -1,17 +1,9 @@
 //! Alpha 垂直切片：真实 Julia 桥与最小 HTTP 传输测试。
 
 use metrica_runtime::{
-    build_http_response, execute_fit_model, sample_fit_model_request,
-    sample_inspect_dataset_request, sample_panel_fit_model_request, HttpResponse,
+    execute_fit_model, sample_fit_model_request, sample_inspect_dataset_request,
+    sample_panel_fit_model_request,
 };
-
-fn response_header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
-    response
-        .headers
-        .iter()
-        .find(|(key, _)| *key == name)
-        .map(|(_, value)| value.as_str())
-}
 
 #[test]
 fn fit_model_returns_real_payload_shape() {
@@ -202,66 +194,3 @@ fn inspect_dataset_accepts_paths_relative_to_project_context() {
     assert!(payload.get("preview_rows").is_some());
 }
 
-#[test]
-fn options_fit_model_returns_cors_headers() {
-    let response = build_http_response("OPTIONS", "/fit_model", &[]).expect("options response");
-
-    assert_eq!(response.status_code, 204);
-    assert_eq!(
-        response_header(&response, "Access-Control-Allow-Origin"),
-        Some("*")
-    );
-    assert_eq!(
-        response_header(&response, "Access-Control-Allow-Methods"),
-        Some("GET, POST, OPTIONS")
-    );
-    assert_eq!(
-        response_header(&response, "Access-Control-Allow-Headers"),
-        Some("Content-Type")
-    );
-}
-
-#[test]
-fn post_fit_model_returns_json_with_cors_headers() {
-    let request_body =
-        serde_json::to_vec(&sample_fit_model_request()).expect("serialize sample request");
-    let response = build_http_response("POST", "/fit_model", &request_body).expect("post response");
-
-    assert_eq!(response.status_code, 200);
-    assert_eq!(
-        response_header(&response, "Content-Type"),
-        Some("application/json")
-    );
-    assert_eq!(
-        response_header(&response, "Access-Control-Allow-Origin"),
-        Some("*")
-    );
-
-    let task_response: metrica_runtime::TaskResponse =
-        serde_json::from_slice(&response.body).expect("decode task response");
-    assert_eq!(task_response.status, "success");
-    assert!(task_response.result_payload.is_some());
-}
-
-#[test]
-fn post_inspect_dataset_returns_json_with_cors_headers() {
-    let request_body = serde_json::to_vec(&sample_inspect_dataset_request())
-        .expect("serialize sample inspect request");
-    let response =
-        build_http_response("POST", "/inspect_dataset", &request_body).expect("post response");
-
-    assert_eq!(response.status_code, 200);
-    assert_eq!(
-        response_header(&response, "Content-Type"),
-        Some("application/json")
-    );
-    assert_eq!(
-        response_header(&response, "Access-Control-Allow-Origin"),
-        Some("*")
-    );
-
-    let task_response: metrica_runtime::TaskResponse =
-        serde_json::from_slice(&response.body).expect("decode task response");
-    assert_eq!(task_response.status, "success");
-    assert!(task_response.result_payload.is_some());
-}

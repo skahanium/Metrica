@@ -14,6 +14,12 @@ use crate::julia_bridge::execute_fit_model;
 use crate::julia_session::JuliaSession;
 use crate::{health_summary, repo_root, Message, TaskRequest, TaskResponse};
 
+const DEFAULT_BIND_ADDR: &str = "127.0.0.1:47821";
+
+pub fn default_bind_addr() -> &'static str {
+    DEFAULT_BIND_ADDR
+}
+
 pub type SharedSession = Arc<Mutex<JuliaSession>>;
 
 /// 构建含所有路由和 CORS 中间件的 axum Router。
