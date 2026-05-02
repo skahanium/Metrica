@@ -104,6 +104,11 @@ fn fit_model_forwards_panel_request_to_julia() {
         .get("residual")
         .and_then(|value| value.as_array())
         .is_some());
+
+    let diagnostics = payload.get("diagnostics").expect("diagnostics");
+    assert!(diagnostics.get("hausman").is_some());
+    assert!(diagnostics.get("fixed_effect_f").is_some());
+    assert!(diagnostics.get("breusch_pagan_lm").is_some());
 }
 
 #[test]

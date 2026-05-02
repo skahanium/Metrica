@@ -41,7 +41,9 @@ else
 
         result = fit_panel(panel_data, formula; method=panel_method)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
-        MetricaPanel.result_to_payload(result; include_augment=include_augment)
+        payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
+        payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
+        payload
     else
         # OLS/WLS 模型拟合
         vcov_type = String(request.model_spec.vcov.type)

@@ -1,0 +1,95 @@
+{
+  "name": "Penn World Table Productivity Teaching Panel",
+  "description": "从 PWT 10.01 生成的教学用国家生产率面板子集，覆盖 12 个经济体 1990-2019 年。",
+  "source": "Penn World Table version 10.01, Groningen Growth and Development Centre, University of Groningen.",
+  "doi": "10.34894/QT5BCC",
+  "source_url": "https://dataverse.nl/dataset.xhtml?persistentId=doi:10.34894/QT5BCC",
+  "license": "CC-BY-4.0",
+  "period": "1990-2019",
+  "n_countries": 12,
+  "n_observations": 360,
+  "balanced": true,
+  "variables": {
+    "country": {
+      "type": "string",
+      "description": "国家或经济体名称",
+      "role": "label"
+    },
+    "isocode": {
+      "type": "string",
+      "description": "ISO 三字母经济体代码",
+      "role": "id"
+    },
+    "year": {
+      "type": "int",
+      "description": "年份",
+      "role": "time"
+    },
+    "rgdpo": {
+      "type": "float",
+      "description": "产出侧实际 GDP（PWT rgdpo）",
+      "role": "source"
+    },
+    "pop": {
+      "type": "float",
+      "description": "人口（百万）",
+      "role": "source"
+    },
+    "emp": {
+      "type": "float",
+      "description": "就业人数（百万）",
+      "role": "source"
+    },
+    "hc": {
+      "type": "float",
+      "description": "人力资本指数",
+      "role": "predictor"
+    },
+    "cn": {
+      "type": "float",
+      "description": "资本存量（PWT cn）",
+      "role": "source"
+    },
+    "ctfp": {
+      "type": "float",
+      "description": "当前购买力平价下 TFP 水平",
+      "role": "optional_predictor"
+    },
+    "output_per_worker": {
+      "type": "float",
+      "description": "rgdpo / emp",
+      "role": "derived"
+    },
+    "capital_per_worker": {
+      "type": "float",
+      "description": "cn / emp",
+      "role": "derived"
+    },
+    "log_output_per_worker": {
+      "type": "float",
+      "description": "log(output_per_worker)",
+      "role": "response"
+    },
+    "log_capital_per_worker": {
+      "type": "float",
+      "description": "log(capital_per_worker)",
+      "role": "predictor"
+    }
+  },
+  "recommended_formulas": [
+    "log_output_per_worker ~ log_capital_per_worker + hc",
+    "log_output_per_worker ~ log_capital_per_worker",
+    "ctfp ~ hc"
+  ],
+  "recommended_models": [
+    "FE（固定效应）",
+    "RE（随机效应）",
+    "Between（组间估计）"
+  ],
+  "tutorials": [
+    "国家生产率面板",
+    "固定效应与随机效应比较",
+    "Hausman 检验"
+  ],
+  "created": "2026-05-02"
+}

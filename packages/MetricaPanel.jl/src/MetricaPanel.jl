@@ -7,7 +7,7 @@ using MetricaBase
 using Statistics
 using StatsModels
 
-export PanelModel, PanelFitResult, fit_panel, result_to_payload
+export PanelModel, PanelFitResult, fit_panel, panel_diagnostics, result_to_payload
 
 """
 面板模型规格对象。
@@ -149,6 +149,7 @@ include("fe.jl")
 include("re.jl")
 include("fd.jl")
 include("between.jl")
+include("diagnostics.jl")
 include("serialize.jl")
 
 end

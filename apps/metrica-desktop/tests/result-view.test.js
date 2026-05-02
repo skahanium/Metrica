@@ -158,6 +158,41 @@ test("renderDiagnostics 输出全部 7 项诊断结果", () => {
   assert.match(html, /2\.8/);
 });
 
+test("renderDiagnostics 输出面板诊断结果", () => {
+  const html = renderDiagnostics({
+    hausman: {
+      available: true,
+      statistic: 4.2,
+      pvalue: 0.0404,
+      dof: 2,
+      method: "hausman_fe_re_diagonal_v1",
+      note: "H0: RE 估计量一致。",
+    },
+    fixed_effect_f: {
+      available: true,
+      statistic: 18.5,
+      pvalue: 0.0001,
+      df_num: 11,
+      df_den: 346,
+      method: "pooled_vs_fe_f",
+      note: "H0: 个体固定效应整体不显著。",
+    },
+    breusch_pagan_lm: {
+      available: false,
+      method: "breusch_pagan_re_lm_balanced_v1",
+      note: "当前 Breusch-Pagan LM v1 仅支持平衡面板。",
+    },
+  });
+
+  assert.match(html, /Hausman/);
+  assert.match(html, /0\.0404/);
+  assert.match(html, /固定效应 F/);
+  assert.match(html, /18\.5000/);
+  assert.match(html, /Breusch-Pagan LM/);
+  assert.match(html, /不可用/);
+  assert.match(html, /平衡面板/);
+});
+
 test("renderError 输出错误与 hint", () => {
   const html = renderError({
     text: "公式中的变量无法在数据集中找到：x9。",

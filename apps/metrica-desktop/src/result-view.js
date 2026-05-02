@@ -204,6 +204,33 @@ function renderDiagnosticBlock(title, description, fields) {
   `;
 }
 
+function renderUnavailableDiagnosticBlock(title, diagnostic) {
+  return `
+    <article class="diagnostics-block">
+      <h4>${escapeHtml(title)}</h4>
+      <p class="diag-desc">${escapeHtml(diagnostic?.note || "当前诊断不可用。")}</p>
+      <div class="glance-grid diagnostics-grid">
+        <div class="glance-card">
+          <span>状态</span>
+          <strong>不可用</strong>
+        </div>
+        <div class="glance-card">
+          <span>方法</span>
+          <strong>${escapeHtml(diagnostic?.method || "未提供")}</strong>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderStructuredDiagnosticBlock(title, description, diagnostic, fields) {
+  if (diagnostic?.available === false) {
+    return renderUnavailableDiagnosticBlock(title, diagnostic);
+  }
+
+  return renderDiagnosticBlock(title, description, fields(diagnostic));
+}
+
 export function renderDiagnostics(diagnostics) {
   if (!diagnostics) {
     return `
@@ -268,12 +295,30 @@ export function renderDiagnostics(diagnostics) {
       desc: "H₀: 残差服从正态分布。",
       fields: (d) => [["JB 统计量", d.statistic], ["p 值", d.pvalue], ["偏度", d.skewness], ["峰度", d.kurtosis]],
     },
+    {
+      key: "hausman",
+      title: "Hausman（FE vs RE）",
+      desc: "H₀: RE 估计量一致。p < 0.05 时通常更倾向 FE。",
+      fields: (d) => [["χ² 统计量", d.statistic], ["p 值", d.pvalue], ["自由度", d.dof], ["方法", d.method]],
+    },
+    {
+      key: "fixed_effect_f",
+      title: "固定效应 F 检验",
+      desc: "H₀: 个体固定效应整体不显著。",
+      fields: (d) => [["F 统计量", d.statistic], ["p 值", d.pvalue], ["分子 df", d.df_num], ["分母 df", d.df_den]],
+    },
+    {
+      key: "breusch_pagan_lm",
+      title: "Breusch-Pagan LM（随机效应）",
+      desc: "H₀: 随机效应方差为 0，pooled OLS 足够。",
+      fields: (d) => [["LM 统计量", d.statistic], ["p 值", d.pvalue], ["自由度", d.dof], ["方法", d.method]],
+    },
   ];
 
   for (const tb of testBlocks) {
     const data = diagnostics[tb.key];
     if (data) {
-      blocks.push(renderDiagnosticBlock(tb.title, tb.desc, tb.fields(data)));
+      blocks.push(renderStructuredDiagnosticBlock(tb.title, tb.desc, data, tb.fields));
     }
   }
 

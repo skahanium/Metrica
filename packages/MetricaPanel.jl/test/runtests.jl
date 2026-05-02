@@ -3,6 +3,26 @@ using MetricaBase
 using MetricaPanel
 using Statistics
 
+function read_teaching_csv(path::String)
+    lines = readlines(path)
+    columns = Symbol.(split(first(lines), ","))
+    data = Dict{Symbol, Vector}()
+    raw_rows = [split(line, ",") for line in lines[2:end]]
+
+    for (index, name) in enumerate(columns)
+        values = [row[index] for row in raw_rows]
+        if name in (:country, :isocode)
+            data[name] = String.(values)
+        elseif name === :year
+            data[name] = parse.(Int, values)
+        else
+            data[name] = parse.(Float64, values)
+        end
+    end
+
+    return data
+end
+
 @testset "MetricaPanel 面板基础" begin
     # 构造简单的面板数据
     data = Dict(
@@ -72,6 +92,25 @@ using Statistics
         @test haskey(payload["result_payload"]["augment_preview"], "std_residual")
     end
 
+    @testset "面板诊断结构化载荷" begin
+        diagnostics = panel_diagnostics(panel_data, "invest ~ mvalue + capital")
+
+        @test haskey(diagnostics, "hausman")
+        @test haskey(diagnostics, "fixed_effect_f")
+        @test haskey(diagnostics, "breusch_pagan_lm")
+
+        for key in ("hausman", "fixed_effect_f", "breusch_pagan_lm")
+            diagnostic = diagnostics[key]
+            @test haskey(diagnostic, "available")
+            @test haskey(diagnostic, "method")
+            @test haskey(diagnostic, "note")
+            if diagnostic["available"]
+                @test isfinite(diagnostic["statistic"])
+                @test 0.0 <= diagnostic["pvalue"] <= 1.0
+            end
+        end
+    end
+
     @testset "FE 不平衡面板" begin
         unbalanced_data = Dict(
             :firm => [1, 1, 2, 2, 2],
@@ -87,6 +126,10 @@ using Statistics
         a = augment(result)
         y_orig = [10.0, 12.0, 15.0, 18.0, 20.0]
         @test a.columns[:fitted] + a.columns[:residual] ≈ y_orig atol=1e-10
+
+        diagnostics = panel_diagnostics(unbalanced_panel, "invest ~ mvalue")
+        @test diagnostics["breusch_pagan_lm"]["available"] == false
+        @test occursin("平衡面板", diagnostics["breusch_pagan_lm"]["note"])
     end
 
     @testset "RE 随机效应拟合" begin
@@ -155,5 +198,22 @@ using Statistics
         @test a.nobs == 3
         @test a.columns[:fitted] + a.columns[:residual] ≈
               result.fitted_values + result.residual_vector atol=1e-12
+    end
+
+    @testset "PWT 教学数据面板拟合与诊断" begin
+        root = dirname(dirname(dirname(@__DIR__)))
+        pwt_path = joinpath(root, "datasets", "teaching", "pwt_productivity_panel.csv")
+        pwt_data = read_teaching_csv(pwt_path)
+        pwt_panel = PanelData(pwt_data, :isocode, :year)
+        formula = "log_output_per_worker ~ log_capital_per_worker + hc"
+
+        result = fit_panel(pwt_panel, formula; method=:fe)
+        @test result isa PanelFitResult
+        @test glance(result).metrics[:n_ids] == 12
+        @test glance(result).metrics[:n_times] == 30
+
+        diagnostics = panel_diagnostics(pwt_panel, formula)
+        @test diagnostics["fixed_effect_f"]["available"] == true
+        @test diagnostics["breusch_pagan_lm"]["available"] == true
     end
 end

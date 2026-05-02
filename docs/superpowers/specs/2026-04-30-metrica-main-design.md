@@ -4,7 +4,7 @@
 >
 > **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现，Runtime 已迁移到 axum + 持久化 Julia 守护进程。augment 能力已贯通。里程碑 3（面板基础）已完成，包含 `MetricaPanel.jl` 包、FE/RE/FD/Between 四种面板估计器、Grunfeld 教学数据集，以及 `model_type = "panel"` 的 Runtime/App 结构化贯通。
 >
-> **下一步边界：** 里程碑 2 和 3 已完成，当前基线稳定。后续工作可考虑：引入新模型类型（IV、GLS），或扩展面板诊断（Hausman 检验），或推进里程碑 4（教学与产品化增强）。不得重开平行 mock 路线，也不得让 App 解析终端文本。
+> **下一步边界：** 里程碑 2 和 3 已完成，当前基线稳定。里程碑 4 的第一个垂直切片是面板诊断与教学数据集：Hausman、固定效应 F、Breusch-Pagan LM，以及 PWT / NLSY 教学数据入口。不得重开平行 mock 路线，也不得让 App 解析终端文本。
 
 ## 概述
 

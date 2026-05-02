@@ -166,6 +166,63 @@
 }
 ```
 
+### 面板模型诊断响应片段
+
+`model_type = "panel"` 的成功响应继续沿用同一个 `result_payload`，不新增 endpoint。面板诊断挂在 `result_payload.diagnostics` 下，当前包含 `hausman`、`fixed_effect_f`、`breusch_pagan_lm` 三个结构化诊断块。
+
+```json
+{
+  "result_payload": {
+    "glance": {
+      "model_type": "panel",
+      "method": "fe",
+      "nobs": 200,
+      "n_ids": 10,
+      "n_times": 20
+    },
+    "tidy": [
+      {
+        "term": "mvalue",
+        "estimate": 0.11,
+        "std_error": 0.01,
+        "statistic": 10.4,
+        "p_value": 0.0
+      }
+    ],
+    "augment_preview": [],
+    "diagnostics": {
+      "hausman": {
+        "available": true,
+        "statistic": 12.4,
+        "pvalue": 0.002,
+        "dof": 2,
+        "method": "Hausman FE vs RE",
+        "note": "教学版口径，比较 FE 与 RE 的共同斜率系数。"
+      },
+      "fixed_effect_f": {
+        "available": true,
+        "statistic": 18.6,
+        "pvalue": 0.0,
+        "dof": [9, 188],
+        "method": "固定效应 F 检验",
+        "note": "比较 pooled OLS 与个体固定效应模型。"
+      },
+      "breusch_pagan_lm": {
+        "available": false,
+        "statistic": null,
+        "pvalue": null,
+        "dof": null,
+        "method": "Breusch-Pagan LM 随机效应检验",
+        "note": "当前样本是不平衡面板，v1 不返回 LM 统计量。"
+      }
+    },
+    "warnings": []
+  }
+}
+```
+
+不可用诊断必须显式返回 `available = false` 与 `note`，不得用 `0`、空字符串或展示层兜底文本伪造统计量。
+
 ## 数据检查成功响应示例
 
 ```json
@@ -220,12 +277,14 @@
 
 - 本地 CSV 输入 → `fit_model` 动作 → `ols` 或 `panel` 模型类型
 - 结构化的 `glance` 与 `tidy` 响应载荷
+- 面板模型的结构化 `diagnostics` 响应载荷
 - 删行与拟合错误的警告/消息传播
 
 主设计与当前实施顺序见：
 
 - `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
 - `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md`
+- `docs/superpowers/plans/2026-05-02-milestone-4-panel-diagnostics-datasets-plan.md`
 
 当前实现路线补充约束：
 
@@ -241,6 +300,7 @@
 - 当前稳定协方差标签是 `classical`
 - `model_spec.weights` 表示 WLS 权重变量名，值必须是数据集列名；缺省或 `null` 时保持 OLS
 - `model_spec.panel_id`、`model_spec.panel_time`、`model_spec.panel_method` 仅在 `model_type = "panel"` 时使用；`panel_method` 当前支持 `fe`、`re`、`fd`、`between`，缺省由 Julia 桥接层按 `fe` 处理
+- 面板 `diagnostics` 当前包含 `hausman`、`fixed_effect_f`、`breusch_pagan_lm`；诊断不可用时返回结构化不可用说明，而不是展示层推断
 - 新增 `WLS`、`HC1`、`cluster` 等能力时，必须保持现有成功/失败响应信封不变
 
 ## 后续高级能力的协议预留

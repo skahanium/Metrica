@@ -1,0 +1,24 @@
+{
+  "name": "NLSY Public-use Teaching Panel Template",
+  "description": "NLSY 教学面板数据入口模板。实际 CSV 需由用户通过 NLS Investigator 选择变量并导出。",
+  "source": "National Longitudinal Surveys public-use data via NLS Investigator",
+  "source_url": "https://www.nlsinfo.org/content/access-data-investigator",
+  "license": "请以 NLS 官方 public-use 条款和用户导出的变量清单为准。",
+  "local_source_csv": "",
+  "recommended_variables": [
+    "person_id",
+    "survey_year",
+    "hourly_wage",
+    "education",
+    "experience",
+    "employment_status"
+  ],
+  "recommended_formulas": [
+    "log_wage ~ education + experience",
+    "log_wage ~ education"
+  ],
+  "notes": [
+    "本仓库不提交未经明确变量抽取记录的 NLSY 原始行数据。",
+    "生成真实教学子集时，应同步提交变量映射、cohort、年份范围与缺失值规则。"
+  ]
+}

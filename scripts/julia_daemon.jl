@@ -52,6 +52,7 @@ function handle_request(req::Dict{String, Any})
 
                 result = fit_panel(panel_data, formula; method=panel_method)
                 payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
+                payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
             else
                 vcov_type = params["vcov"]
                 vcov_symbol = if vcov_type == "HC1"
