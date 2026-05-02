@@ -13,7 +13,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::julia_bridge::execute_fit_model;
 use crate::julia_session::JuliaSession;
 use crate::{
-    health_summary, repo_root, Message, TaskRequest, TaskResponse, TransformRequest,
+    health_summary, repo_root, Message, TaskRequest, TaskResponse, TransformTaskRequest,
 };
 
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:47821";
@@ -77,29 +77,67 @@ async fn transform_handler(
     State(session): State<SharedSession>,
     body: String,
 ) -> impl IntoResponse {
-    let request: TransformRequest = match serde_json::from_str(&body) {
+    let request: TransformTaskRequest = match serde_json::from_str(&body) {
         Ok(r) => r,
         Err(e) => {
-            return (
+            return json_error_response(
                 StatusCode::BAD_REQUEST,
-                Json(json!({"status": "error", "message": format!("Invalid request: {}", e)})),
+                "unknown".to_string(),
+                "RUNTIME_INVALID_JSON",
+                format!("请求 JSON 解析失败: {e}"),
+                Some("请确认 /transform 请求符合 runtime-protocol。".to_string()),
             );
         }
+    };
+
+    if request.action != "transform" {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id,
+            "RUNTIME_UNSUPPORTED_ACTION",
+            format!("端点 transform 不支持动作 `{}`。", request.action),
+            Some("请将 action 设为 `transform`。".to_string()),
+        );
+    }
+
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
+    let output_path = if request.options.persist_output {
+        match ensure_transform_output_path(&working_dir, &request.task_id) {
+            Ok(path) => Some(path),
+            Err(err) => {
+                return json_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    request.task_id,
+                    "RUNTIME_TRANSFORM_OUTPUT_PATH_FAILED",
+                    err,
+                    Some("请检查项目目录是否可写。".to_string()),
+                );
+            }
+        }
+    } else {
+        None
     };
 
     let operations_json = match serde_json::to_string(&request.operations) {
         Ok(json) => json,
         Err(e) => {
-            return (
+            return json_error_response(
                 StatusCode::BAD_REQUEST,
-                Json(json!({"status": "error", "message": format!("Failed to serialize operations: {}", e)})),
+                request.task_id,
+                "RUNTIME_TRANSFORM_SERIALIZE_FAILED",
+                format!("数据操作序列化失败: {e}"),
+                Some("请检查 operations 是否为结构化数组。".to_string()),
             );
         }
     };
 
     let params = json!({
-        "dataset_path": request.dataset_path,
+        "dataset_path": dataset_path,
         "operations": operations_json,
+        "preview_rows": request.options.preview_rows,
+        "persist_output": request.options.persist_output,
+        "output_path": output_path,
     });
 
     let result = {
@@ -116,39 +154,37 @@ async fn transform_handler(
             let status = julia_response
                 .get("status")
                 .and_then(|v| v.as_str())
-                .unwrap_or("error");
+                .unwrap_or("error")
+                .to_string();
+            let messages: Vec<Message> = julia_response
+                .get("messages")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            let result_payload = julia_response.get("result_payload").cloned();
 
-            if status == "success" {
-                let result_payload = julia_response.get("result_payload").cloned();
-                (
-                    StatusCode::OK,
-                    Json(json!({
-                        "status": "success",
-                        "result_payload": result_payload,
-                    })),
-                )
-            } else {
-                let messages = julia_response
-                    .get("messages")
-                    .and_then(|v| serde_json::from_value::<Vec<Message>>(v.clone()).ok())
-                    .unwrap_or_default();
-                let error_text = messages
-                    .first()
-                    .map(|m| m.text.clone())
-                    .unwrap_or_else(|| "Unknown Julia error".to_string());
-                (
-                    StatusCode::OK,
-                    Json(json!({"status": "error", "message": error_text})),
-                )
-            }
+            let task_response = TaskResponse {
+                task_id: request.task_id,
+                status,
+                messages,
+                artifacts: None,
+                result_payload,
+            };
+
+            (StatusCode::OK, Json(task_response)).into_response()
         }
-        Ok(Err(err)) => (
+        Ok(Err(err)) => json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"status": "error", "message": format!("Julia error: {}", err)})),
+            request.task_id,
+            "RUNTIME_JULIA_EXECUTION_FAILED",
+            err,
+            Some("请检查 Julia 环境、依赖安装与数据操作参数。".to_string()),
         ),
-        Err(join_err) => (
+        Err(join_err) => json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"status": "error", "message": format!("Internal error: {}", join_err)})),
+            request.task_id,
+            "RUNTIME_INTERNAL_ERROR",
+            format!("内部运行时错误: {join_err}"),
+            Some("请重试或联系管理员。".to_string()),
         ),
     }
 }
@@ -218,6 +254,16 @@ async fn handle_model_request(
     }
     if let Some(ref panel_method) = request.model_spec.panel_method {
         params["panel_method"] = json!(panel_method);
+    }
+
+    if let Some(ref instruments) = request.model_spec.instruments {
+        params["instruments"] = json!(instruments);
+    }
+    if let Some(ref endog_columns) = request.model_spec.endog_columns {
+        params["endog_columns"] = json!(endog_columns);
+    }
+    if let Some(ref omega_spec) = request.model_spec.omega_spec {
+        params["omega_spec"] = json!(omega_spec);
     }
 
     let action = expected_action.to_string();
@@ -328,16 +374,35 @@ fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::PathBuf) -> Str
     working_dir.join(dataset_path).to_string_lossy().to_string()
 }
 
+fn ensure_transform_output_path(
+    working_dir: &std::path::Path,
+    task_id: &str,
+) -> Result<String, String> {
+    let safe_task_id = task_id
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
+        .collect::<String>();
+    let derived_dir = working_dir.join(".metrica").join("derived");
+    std::fs::create_dir_all(&derived_dir)
+        .map_err(|err| format!("创建派生数据目录失败（{}）：{err}", derived_dir.display()))?;
+    Ok(derived_dir
+        .join(format!("{safe_task_id}.csv"))
+        .to_string_lossy()
+        .to_string())
+}
+
 fn validate_fit_model_request(request: &TaskRequest) -> Option<axum::response::Response> {
     match request.model_spec.model_type.as_str() {
         "ols" => None,
         "panel" => validate_panel_request(request),
+        "iv" => validate_iv_request(request),
+        "gls" => None,
         model_type => Some(json_error_response(
             StatusCode::BAD_REQUEST,
             request.task_id.clone(),
             "RUNTIME_UNSUPPORTED_MODEL_TYPE",
-            format!("runtime 当前支持 `ols` 与 `panel`，收到 `{model_type}`。"),
-            Some("请将 model_type 设为 `ols` 或 `panel`。".to_string()),
+            format!("runtime 当前支持 `ols`、`panel`、`iv` 与 `gls`，收到 `{model_type}`。"),
+            Some("请将 model_type 设为 `ols`、`panel`、`iv` 或 `gls`。".to_string()),
         )),
     }
 }
@@ -364,6 +429,24 @@ fn validate_panel_request(request: &TaskRequest) -> Option<axum::response::Respo
         "RUNTIME_PANEL_INDEX_REQUIRED",
         format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
         Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
+    ))
+}
+
+fn validate_iv_request(request: &TaskRequest) -> Option<axum::response::Response> {
+    let missing = [
+        ("instruments", request.model_spec.instruments.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
+        ("endog_columns", request.model_spec.endog_columns.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
+    ]
+    .iter()
+    .filter_map(|(f, empty)| if *empty { Some(*f) } else { None })
+    .collect::<Vec<_>>();
+
+    if missing.is_empty() { return None; }
+
+    Some(json_error_response(
+        StatusCode::BAD_REQUEST, request.task_id.clone(), "RUNTIME_IV_FIELDS_REQUIRED",
+        format!("IV 模型缺少必要字段：{}。", missing.join(", ")),
+        Some("请提供 instruments 和 endog_columns。".to_string()),
     ))
 }
 

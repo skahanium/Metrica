@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { ModelResult, ModelSpec } from '../types/protocol';
 
 interface ModelState {
-  modelType: 'ols' | 'panel';
+  modelType: 'ols' | 'iv' | 'gls' | 'panel';
   formula: string;
   vcovType: string;
   weightsColumn: string;
@@ -10,8 +10,10 @@ interface ModelState {
   panelId: string;
   panelTime: string;
   panelMethod: 'fe' | 're' | 'fd' | 'between';
+  instruments: string;
+  endogColumns: string;
   lastResult: ModelResult | null;
-  setModelType: (t: 'ols' | 'panel') => void;
+  setModelType: (t: 'ols' | 'iv' | 'gls' | 'panel') => void;
   setFormula: (f: string) => void;
   setVcovType: (v: string) => void;
   setWeightsColumn: (w: string) => void;
@@ -19,6 +21,8 @@ interface ModelState {
   setPanelId: (id: string) => void;
   setPanelTime: (t: string) => void;
   setPanelMethod: (m: 'fe' | 're' | 'fd' | 'between') => void;
+  setInstruments: (v: string) => void;
+  setEndogColumns: (v: string) => void;
   setLastResult: (r: ModelResult | null) => void;
   buildModelSpec: () => ModelSpec;
 }
@@ -32,6 +36,8 @@ export const useModelStore = create<ModelState>((set, get) => ({
   panelId: '',
   panelTime: '',
   panelMethod: 'fe',
+  instruments: '',
+  endogColumns: '',
   lastResult: null,
   setModelType: (modelType) => set({ modelType }),
   setFormula: (formula) => set({ formula }),
@@ -41,6 +47,8 @@ export const useModelStore = create<ModelState>((set, get) => ({
   setPanelId: (panelId) => set({ panelId }),
   setPanelTime: (panelTime) => set({ panelTime }),
   setPanelMethod: (panelMethod) => set({ panelMethod }),
+  setInstruments: (instruments) => set({ instruments }),
+  setEndogColumns: (endogColumns) => set({ endogColumns }),
   setLastResult: (lastResult) => set({ lastResult }),
   buildModelSpec: () => {
     const s = get();
@@ -52,6 +60,13 @@ export const useModelStore = create<ModelState>((set, get) => ({
       spec.panel_id = s.panelId;
       spec.panel_time = s.panelTime;
       spec.panel_method = s.panelMethod;
+    } else if (s.modelType === 'iv') {
+      spec.vcov = { type: s.vcovType };
+      if (s.clusterColumn.trim()) spec.cluster_column = s.clusterColumn.trim();
+      if (s.instruments.trim()) spec.instruments = s.instruments.split(',').map((v) => v.trim()).filter(Boolean);
+      if (s.endogColumns.trim()) spec.endog_columns = s.endogColumns.split(',').map((v) => v.trim()).filter(Boolean);
+    } else if (s.modelType === 'gls') {
+      spec.vcov = { type: s.vcovType };
     } else {
       spec.vcov = { type: s.vcovType };
       if (s.weightsColumn.trim()) spec.weights = s.weightsColumn.trim();

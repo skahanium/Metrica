@@ -56,6 +56,14 @@ pub struct ModelSpec {
     pub panel_time: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panel_method: Option<String>,
+    // M6: IV/2SLS 字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instruments: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endog_columns: Option<Vec<String>>,
+    // M6: GLS 字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub omega_spec: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +80,42 @@ pub struct TaskRequest {
     pub dataset_ref: DatasetRef,
     pub model_spec: ModelSpec,
     pub options: RequestOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformOptions {
+    #[serde(default = "default_transform_preview_rows")]
+    pub preview_rows: usize,
+    #[serde(default = "default_transform_persist_output")]
+    pub persist_output: bool,
+}
+
+impl Default for TransformOptions {
+    fn default() -> Self {
+        Self {
+            preview_rows: default_transform_preview_rows(),
+            persist_output: default_transform_persist_output(),
+        }
+    }
+}
+
+fn default_transform_preview_rows() -> usize {
+    10
+}
+
+fn default_transform_persist_output() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformTaskRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    pub dataset_ref: DatasetRef,
+    pub operations: Vec<TransformOperation>,
+    #[serde(default)]
+    pub options: TransformOptions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,6 +201,9 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             panel_id: None,
             panel_time: None,
             panel_method: None,
+            instruments: None,
+            endog_columns: None,
+            omega_spec: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -186,6 +233,9 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         panel_id: Some("firm".to_string()),
         panel_time: Some("year".to_string()),
         panel_method: Some("fe".to_string()),
+        instruments: None,
+        endog_columns: None,
+        omega_spec: None,
     };
     request.options.return_augment = true;
     request
@@ -257,12 +307,6 @@ pub fn health_summary() -> HealthSummary {
 pub struct TransformOperation {
     pub op: String,
     pub args: serde_json::Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransformRequest {
-    pub dataset_path: String,
-    pub operations: Vec<TransformOperation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

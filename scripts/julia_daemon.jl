@@ -6,7 +6,7 @@
 #       --startup-file=no --color=no scripts/julia_daemon.jl
 #
 # 协议（每行一个完整 JSON 对象）：
-#   stdin:  {"id":"<请求标识>","action":"fit_model|inspect_dataset|shutdown","params":{...}}
+#   stdin:  {"id":"<请求标识>","action":"fit_model|inspect_dataset|transform|shutdown","params":{...}}
 #   stdout: {"id":"<匹配请求标识>","status":"success|error","payload":{...}}
 #   stdout: {"type":"ready"}  （启动就绪信号）
 #   stdout: {"type":"error","text":"..."}  （非请求关联错误，如 JSON 解析失败）
@@ -17,6 +17,7 @@ using CSV
 using DataFrames
 using MetricaBase
 using MetricaLinear
+using LinearAlgebra: I
 
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
@@ -41,12 +42,19 @@ function handle_request(req::Dict{String, Any})
         elseif action == "transform"
             dataset_path = params["dataset_path"]
             operations = JSON3.read(params["operations"], Vector{Dict{String, Any}})
+            preview_rows = Int(get(params, "preview_rows", 10))
+            output_path = get(params, "persist_output", true) ? get(params, "output_path", nothing) : nothing
             df = CSV.read(dataset_path, DataFrame)
-            result = MetricaData.operate_chain(df, operations)
+            result = MetricaData.operate_chain(df, operations; output_path=output_path, preview_rows=preview_rows)
             payload = Dict(
                 "status" => result["status"] == "error" ? "error" : "success",
                 "result_payload" => result,
-                "messages" => [],
+                "messages" => result["status"] == "error" ? [Dict(
+                    "level" => "error",
+                    "code" => "DATA_TRANSFORM_FAILED",
+                    "text" => get(get(result, "error", Dict{String, Any}()), "message", "数据操作失败。"),
+                    "hint" => "请检查失败步骤的参数、列名和表达式。",
+                )] : [],
             )
         elseif action == "fit_model"
             dataset_path = params["dataset_path"]
@@ -65,6 +73,27 @@ function handle_request(req::Dict{String, Any})
                 result = fit_panel(panel_data, formula; method=panel_method)
                 payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
+            elseif model_type == "iv"
+                instruments = String.(params["instruments"])
+                endog_columns = String.(params["endog_columns"])
+                vcov_type = params["vcov"]
+                vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
+                cluster_col = get(params, "cluster_column", nothing)
+                cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
+
+                result = fit(IVModel, formula, dataset_path;
+                    instruments=instruments, endog=endog_columns,
+                    vcov=vcov_symbol, cluster_column=cluster_sym)
+                payload = result_to_payload(result; include_augment=include_augment)
+
+            elseif model_type == "gls"
+                omega_fn = r -> Matrix{Float64}(I, length(r), length(r))
+                vcov_type = get(params, "vcov", "classical")
+                vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
+
+                result = fit(GLSModel, formula, dataset_path;
+                    omega_fn=omega_fn, vcov=vcov_symbol)
+                payload = result_to_payload(result; include_augment=include_augment)
             else
                 vcov_type = params["vcov"]
                 vcov_symbol = if vcov_type == "HC1"
@@ -97,7 +126,7 @@ function handle_request(req::Dict{String, Any})
                     "level" => "error",
                     "code" => "UNKNOWN_ACTION",
                     "text" => "守护进程不支持的动作：$action",
-                    "hint" => "当前仅支持 fit_model 与 inspect_dataset。",
+                    "hint" => "当前仅支持 fit_model、inspect_dataset 与 transform。",
                 )],
             )
         end

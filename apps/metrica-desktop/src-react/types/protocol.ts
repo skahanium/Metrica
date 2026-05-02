@@ -103,21 +103,25 @@ export interface ModelResult {
 
 export interface ColumnSummary {
   name: string;
-  type: string;
-  missing: number;
+  type?: string;
+  missing?: number;
+  inferred_type?: string;
+  missing_count?: number;
 }
 
 export interface DatasetSummary {
-  nrows: number;
-  ncols: number;
+  nrows?: number;
+  ncols?: number;
+  dataset_summary?: { row_count: number; column_count: number };
   columns: ColumnSummary[];
-  preview: Record<string, unknown>[];
+  preview?: Record<string, unknown>[];
+  preview_rows?: Record<string, unknown>[];
 }
 
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'panel';
+  model_type: 'ols' | 'iv' | 'gls' | 'panel';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -125,6 +129,9 @@ export interface ModelSpec {
   panel_id?: string;
   panel_time?: string;
   panel_method?: 'fe' | 're' | 'fd' | 'between';
+  instruments?: string[];
+  endog_columns?: string[];
+  omega_spec?: string;
 }
 
 export interface FitModelRequest {
@@ -156,8 +163,12 @@ export interface DataOp {
 }
 
 export interface TransformRequest {
-  dataset_path: string;
+  task_id: string;
+  action: 'transform';
+  project_context: { project_id: string; working_dir: string };
+  dataset_ref: { source: string; path: string; format: string };
   operations: DataOp[];
+  options: { preview_rows: number; persist_output: boolean };
 }
 
 export interface TransformResult {
@@ -167,8 +178,18 @@ export interface TransformResult {
     nrows: number;
     ncols: number;
     notes: string;
+    dataset_path?: string;
   };
   preview?: { columns: string[]; rows: Record<string, unknown>[] };
   warnings: Warning[];
   error?: { op_index: number; message: string };
+  operations?: TransformResult[];
+}
+
+export interface TransformTaskResponse {
+  task_id: string;
+  status: 'success' | 'error';
+  messages: Message[];
+  artifacts?: string[];
+  result_payload?: TransformResult;
 }
