@@ -360,3 +360,50 @@ end
     @test wrong_result isa ModelError
     @test wrong_result.code === :omega_dimension_mismatch
 end
+
+@testset "黄金样例与模型比较载荷" begin
+    # OLS 黄金样例：demo.csv 已知值对齐
+    ols = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+    @test coef_row(ols, :x1).estimate ≈ 2.7333333333333347
+    @test coef_row(ols, :x1).stderror ≈ 0.7180219742845957
+    @test coef_row(ols, :x2).estimate ≈ 0.8285714285714295
+    @test r2(ols) ≈ 0.993321819228555
+    @test nobs(ols) == 7
+    @test dof(ols) == 4
+
+    # AIC/BIC 载荷
+    payload = result_to_payload(ols)
+    @test haskey(payload["result_payload"], "loglikelihood")
+    @test haskey(payload["result_payload"], "aic")
+    @test haskey(payload["result_payload"], "bic")
+    @test payload["result_payload"]["aic"] isa Float64
+    @test payload["result_payload"]["bic"] isa Float64
+
+    # predict 区间覆盖率：置信区间应包含所有点预测
+    ci = predict(ols; interval=:confidence, level=0.95)
+    @test all(ci.lower .<= ci.predictions .<= ci.upper)
+
+    # 预测区间应比置信区间宽
+    pi = predict(ols; interval=:prediction, level=0.95)
+    @test all((pi.upper .- pi.lower) .>= (ci.upper .- ci.lower) .- 1e-10)
+
+    # IV 黄金样例：含工具变量数据
+    iv_csv, iv_io = mktemp()
+    close(iv_io)
+    write(iv_csv, """y,x,z
+3,1,2
+5,2,4
+7,3,6
+9,4,8
+11,5,10
+13,6,12
+15,7,14
+17,8,16
+""")
+    iv = fit(IVModel, "y ~ x", iv_csv; instruments=["z"], endog=["x"])
+    @test iv isa IVFitResult
+    # z 与 x 完全共线性情况下，IV 应给出合理估计
+    @test length(coef(iv)) == 2
+    @test all(isfinite(last(p)) for p in coef(iv))
+    rm(iv_csv; force=true)
+end
