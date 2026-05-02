@@ -12,7 +12,9 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::julia_bridge::execute_fit_model;
 use crate::julia_session::JuliaSession;
-use crate::{health_summary, repo_root, Message, TaskRequest, TaskResponse};
+use crate::{
+    health_summary, repo_root, Message, TaskRequest, TaskResponse, TransformRequest,
+};
 
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:47821";
 
@@ -33,6 +35,7 @@ pub fn build_router(session: SharedSession) -> Router {
         .route("/health", get(health_handler))
         .route("/fit_model", post(fit_model_handler))
         .route("/inspect_dataset", post(inspect_dataset_handler))
+        .route("/transform", post(transform_handler))
         .layer(cors)
         .with_state(session)
 }
@@ -49,7 +52,7 @@ async fn health_handler(State(session): State<SharedSession>) -> impl IntoRespon
         "status": if julia_healthy { "ready" } else { "degraded" },
         "julia_healthy": julia_healthy,
         "restart_count": restart_count,
-        "supported_actions": ["inspect_dataset", "fit_model"],
+        "supported_actions": ["inspect_dataset", "fit_model", "transform"],
     }))
 }
 
@@ -67,6 +70,87 @@ async fn inspect_dataset_handler(
     body: String,
 ) -> impl IntoResponse {
     handle_model_request(session, body, "inspect_dataset").await
+}
+
+/// POST /transform — 接受数据操作链，转发到 Julia MetricaData 执行。
+async fn transform_handler(
+    State(session): State<SharedSession>,
+    body: String,
+) -> impl IntoResponse {
+    let request: TransformRequest = match serde_json::from_str(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"status": "error", "message": format!("Invalid request: {}", e)})),
+            );
+        }
+    };
+
+    let operations_json = match serde_json::to_string(&request.operations) {
+        Ok(json) => json,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"status": "error", "message": format!("Failed to serialize operations: {}", e)})),
+            );
+        }
+    };
+
+    let params = json!({
+        "dataset_path": request.dataset_path,
+        "operations": operations_json,
+    });
+
+    let result = {
+        let session = session.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut s = session.lock().unwrap();
+            s.send_request("transform", params)
+        })
+        .await
+    };
+
+    match result {
+        Ok(Ok(julia_response)) => {
+            let status = julia_response
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("error");
+
+            if status == "success" {
+                let result_payload = julia_response.get("result_payload").cloned();
+                (
+                    StatusCode::OK,
+                    Json(json!({
+                        "status": "success",
+                        "result_payload": result_payload,
+                    })),
+                )
+            } else {
+                let messages = julia_response
+                    .get("messages")
+                    .and_then(|v| serde_json::from_value::<Vec<Message>>(v.clone()).ok())
+                    .unwrap_or_default();
+                let error_text = messages
+                    .first()
+                    .map(|m| m.text.clone())
+                    .unwrap_or_else(|| "Unknown Julia error".to_string());
+                (
+                    StatusCode::OK,
+                    Json(json!({"status": "error", "message": error_text})),
+                )
+            }
+        }
+        Ok(Err(err)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"status": "error", "message": format!("Julia error: {}", err)})),
+        ),
+        Err(join_err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"status": "error", "message": format!("Internal error: {}", join_err)})),
+        ),
+    }
 }
 
 /// 共享请求处理逻辑：解析 JSON → 校验 → 解析路径 → 转发 Julia → 返回响应。
