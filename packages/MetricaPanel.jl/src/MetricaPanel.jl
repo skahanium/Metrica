@@ -7,7 +7,9 @@ using MetricaBase
 using Statistics
 using StatsModels
 
-export PanelModel, PanelFitResult, fit_panel, fit_hdfde, fit_crea, panel_diagnostics, result_to_payload,
+export PanelModel, PanelFitResult, PanelIVModel, PanelIVFitResult,
+    fit_panel, fit_hdfde, fit_crea, fit_panel_iv,
+    panel_diagnostics, result_to_payload,
     compute_dk_vcov, compute_iv_dk_vcov
 
 """
@@ -155,6 +157,7 @@ include("fe.jl")
 include("hdfde.jl")
 include("dk.jl")
 include("cre.jl")
+include("panel_iv.jl")
 include("re.jl")
 include("fd.jl")
 include("between.jl")
