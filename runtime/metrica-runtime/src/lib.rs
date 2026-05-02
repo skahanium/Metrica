@@ -253,6 +253,50 @@ pub fn health_summary() -> HealthSummary {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformOperation {
+    pub op: String,
+    pub args: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformRequest {
+    pub dataset_path: String,
+    pub operations: Vec<TransformOperation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformResult {
+    pub operation: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<TransformResultDetail>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview: Option<TransformPreview>,
+    pub warnings: Vec<Message>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<TransformError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformResultDetail {
+    pub nrows: usize,
+    pub ncols: usize,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformPreview {
+    pub columns: Vec<String>,
+    pub rows: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformError {
+    pub op_index: usize,
+    pub message: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
