@@ -27,10 +27,13 @@ Metrica 的跨平台原生桌面工作台。
 - 输入本地 CSV 路径
 - 触发真实 `inspect_dataset` 请求
 - 渲染结构化列摘要与预览表
-- 输入 OLS 公式
+- 选择 `OLS / WLS` 或 `Panel` 模型类型
+- 输入 OLS 或面板公式
+- 配置面板索引列与 FE/RE/FD/Between 方法
 - 触发真实 `fit_model` 请求
 - 渲染结构化 `glance`
 - 渲染结构化 `tidy`
+- 渲染结构化 `augment_preview`
 - 渲染 warning 与 error
 
 当前明确未实现的能力：

@@ -80,6 +80,8 @@
 
 ## 请求示例
 
+### OLS / WLS 请求
+
 ```json
 {
   "task_id": "uuid",
@@ -100,6 +102,37 @@
     "vcov": {
       "type": "classical"
     }
+  },
+  "options": {
+    "drop_missing": true,
+    "return_augment": true
+  }
+}
+```
+
+### 面板模型请求
+
+面板模型继续沿用 `fit_model` 信封，通过 `model_spec.model_type = "panel"` 与结构化面板索引字段进入 Julia 面板估计器。Runtime 只校验字段存在并转发请求，不在 Rust 侧实现面板计量逻辑。
+
+```json
+{
+  "task_id": "uuid-panel",
+  "action": "fit_model",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  },
+  "dataset_ref": {
+    "source": "file",
+    "path": "/path/to/grunfeld.csv",
+    "format": "csv"
+  },
+  "model_spec": {
+    "model_type": "panel",
+    "formula": "invest ~ mvalue + capital",
+    "panel_id": "firm",
+    "panel_time": "year",
+    "panel_method": "fe"
   },
   "options": {
     "drop_missing": true,
@@ -185,28 +218,29 @@
 
 当前可执行端到端链路为：
 
-- 本地 CSV 输入 → `fit_model` 动作 → `ols` 模型类型
+- 本地 CSV 输入 → `fit_model` 动作 → `ols` 或 `panel` 模型类型
 - 结构化的 `glance` 与 `tidy` 响应载荷
 - 删行与拟合错误的警告/消息传播
 
 主设计与当前实施顺序见：
 
 - `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
-- `docs/superpowers/plans/2026-04-30-metrica-current-plan.md`
+- `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md`
 
 当前实现路线补充约束：
 
 - `fit_model` 必须通过 Runtime 调用 Julia 子进程真实执行
-- 成功响应中的 `glance` 与 `tidy` 来自真实 OLS 拟合结果
+- 成功响应中的 `glance` 与 `tidy` 来自真实 Julia 拟合结果
 - `fit_ols_demo` 或纯示例载荷不得作为当前完成标准
 
-> 注意：成功响应中的 `augment_preview` 字段在 `options.return_augment = true` 时返回逐观测增强数据（拟合值、残差、标准化残差、杠杆值、Cook's D），默认预览前 100 行。当 `return_augment = false` 时，该字段不包含在响应中。
+> 注意：成功响应中的 `augment_preview` 字段在 `options.return_augment = true` 时返回逐观测增强数据。OLS/WLS 包含拟合值、残差、标准化残差、杠杆值与 Cook's D；面板模型至少包含拟合值、残差与标准化残差。默认预览前 100 行。当 `return_augment = false` 时，该字段不包含在响应中。
 
 当前默认基线为：
 
 - `fit_model` 的默认模型类型是 `ols`
 - 当前稳定协方差标签是 `classical`
 - `model_spec.weights` 表示 WLS 权重变量名，值必须是数据集列名；缺省或 `null` 时保持 OLS
+- `model_spec.panel_id`、`model_spec.panel_time`、`model_spec.panel_method` 仅在 `model_type = "panel"` 时使用；`panel_method` 当前支持 `fe`、`re`、`fd`、`between`，缺省由 Julia 桥接层按 `fe` 处理
 - 新增 `WLS`、`HC1`、`cluster` 等能力时，必须保持现有成功/失败响应信封不变
 
 ## 后续高级能力的协议预留

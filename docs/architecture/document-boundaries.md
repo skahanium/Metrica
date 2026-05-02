@@ -60,7 +60,7 @@
 
 - 当前唯一主设计
 - Core / Runtime / App 分层边界
-- 真实 OLS 基线与里程碑 2 的关系
+- 真实 OLS 基线、里程碑 2 与里程碑 3 的关系
 - 教学友好、结构化结果、受控扩展等全局产品原则
 - 当前包含与排除范围
 
@@ -70,19 +70,19 @@
 - 桌面工作台组件级设计
 - 逐步实施任务清单
 
-### `docs/superpowers/plans/2026-04-30-metrica-current-plan.md`
+### `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md`
 
 拥有：
 
-- 当前实施顺序
-- WLS、HC1、基础诊断与 App 结构化选项的下一步任务
-- 已验证事实基线的简短记录
+- 里程碑 3 面板基础的实施顺序
+- `MetricaPanel.jl`、Runtime 面板请求与 App 结构化展示的收口任务
+- 面板基础已验证事实基线的简短记录
 
 不拥有：
 
 - 项目长期愿景
 - 子系统字段级完整 schema
-- 远期可视化或面板模型设计
+- 远期可视化、IV/GLS 或动态面板模型设计
 
 ### `docs/architecture/runtime-protocol.md`
 

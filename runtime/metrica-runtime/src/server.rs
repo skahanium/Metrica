@@ -87,40 +87,47 @@ async fn handle_model_request(
             StatusCode::BAD_REQUEST,
             request.task_id,
             "RUNTIME_UNSUPPORTED_ACTION",
-            format!(
-                "端点 {} 不支持动作 `{}`。",
-                expected_action, request.action
-            ),
+            format!("端点 {} 不支持动作 `{}`。", expected_action, request.action),
             Some("请使用正确的端点。".to_string()),
         );
     }
 
-    if request.action == "fit_model" && request.model_spec.model_type != "ols" {
-        return json_error_response(
-            StatusCode::BAD_REQUEST,
-            request.task_id,
-            "RUNTIME_UNSUPPORTED_MODEL_TYPE",
-            format!(
-                "runtime 当前仅支持 `ols`，收到 `{}`。",
-                request.model_spec.model_type
-            ),
-            Some("请将 model_type 设为 `ols`。".to_string()),
-        );
+    if request.action == "fit_model" {
+        if let Some(response) = validate_fit_model_request(&request) {
+            return response;
+        }
     }
 
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
     let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
 
+    let vcov = request
+        .model_spec
+        .vcov
+        .as_ref()
+        .map(|spec| spec.kind.as_str())
+        .unwrap_or("classical");
+
     let mut params = json!({
         "dataset_path": dataset_path,
         "formula": request.model_spec.formula,
         "model_type": request.model_spec.model_type,
-        "vcov": request.model_spec.vcov.kind,
+        "vcov": vcov,
         "weights": request.model_spec.weights,
+        "return_augment": request.options.return_augment,
     });
 
     if let Some(ref col) = request.model_spec.cluster_column {
         params["cluster_column"] = json!(col);
+    }
+    if let Some(ref panel_id) = request.model_spec.panel_id {
+        params["panel_id"] = json!(panel_id);
+    }
+    if let Some(ref panel_time) = request.model_spec.panel_time {
+        params["panel_time"] = json!(panel_time);
+    }
+    if let Some(ref panel_method) = request.model_spec.panel_method {
+        params["panel_method"] = json!(panel_method);
     }
 
     let action = expected_action.to_string();
@@ -228,10 +235,46 @@ fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::PathBuf) -> Str
     if dataset_path.is_absolute() {
         return dataset_path.to_string_lossy().to_string();
     }
-    working_dir
-        .join(dataset_path)
-        .to_string_lossy()
-        .to_string()
+    working_dir.join(dataset_path).to_string_lossy().to_string()
+}
+
+fn validate_fit_model_request(request: &TaskRequest) -> Option<axum::response::Response> {
+    match request.model_spec.model_type.as_str() {
+        "ols" => None,
+        "panel" => validate_panel_request(request),
+        model_type => Some(json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id.clone(),
+            "RUNTIME_UNSUPPORTED_MODEL_TYPE",
+            format!("runtime 当前支持 `ols` 与 `panel`，收到 `{model_type}`。"),
+            Some("请将 model_type 设为 `ols` 或 `panel`。".to_string()),
+        )),
+    }
+}
+
+fn validate_panel_request(request: &TaskRequest) -> Option<axum::response::Response> {
+    let missing_fields = [
+        ("panel_id", request.model_spec.panel_id.as_deref()),
+        ("panel_time", request.model_spec.panel_time.as_deref()),
+    ]
+    .iter()
+    .filter_map(|(field, value)| match value {
+        Some(value) if !value.trim().is_empty() => None,
+        _ => Some(*field),
+    })
+    .collect::<Vec<_>>();
+
+    if missing_fields.is_empty() {
+        return None;
+    }
+
+    Some(json_error_response(
+        StatusCode::BAD_REQUEST,
+        request.task_id.clone(),
+        "RUNTIME_PANEL_INDEX_REQUIRED",
+        format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
+        Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
+    ))
 }
 
 // === 错误响应 ==================================================================
@@ -258,12 +301,7 @@ fn json_error_response(
 
     let body = serde_json::to_string(&response).unwrap_or_default();
 
-    (
-        status,
-        [("Content-Type", "application/json")],
-        body,
-    )
-        .into_response()
+    (status, [("Content-Type", "application/json")], body).into_response()
 }
 
 // === Oneshot 回退模式（每请求 Julia 子进程） =====================================
@@ -316,12 +354,7 @@ async fn oneshot_handle(body: String) -> axum::response::Response {
                 StatusCode::OK
             };
             let body = serde_json::to_string(&response).unwrap_or_default();
-            (
-                status_code,
-                [("Content-Type", "application/json")],
-                body,
-            )
-                .into_response()
+            (status_code, [("Content-Type", "application/json")], body).into_response()
         }
         Err(err) => json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -341,7 +374,9 @@ pub async fn serve_oneshot(bind_addr: &str) -> Result<(), String> {
         .await
         .map_err(|err| format!("绑定 {bind_addr} 失败: {err}"))?;
 
-    eprintln!("metrica-runtime HTTP server listening on http://{bind_addr} (axum, oneshot fallback)");
+    eprintln!(
+        "metrica-runtime HTTP server listening on http://{bind_addr} (axum, oneshot fallback)"
+    );
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

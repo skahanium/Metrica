@@ -98,6 +98,30 @@ test("fitModel 使用 JSON POST 调用 Runtime", async () => {
   assert.equal(payload.status, "success");
 });
 
+test("fitModel 传递聚类变量到 buildFitModelRequest", async () => {
+  let capturedBody;
+
+  await fitModel({
+    endpoint: DEFAULT_RUNTIME_ENDPOINT,
+    datasetPath: "/tmp/demo.csv",
+    formula: "y ~ x1",
+    vcovType: "cluster",
+    clusterColumn: "group_id",
+    fetchImpl: async (_url, options) => {
+      capturedBody = JSON.parse(options.body);
+      return {
+        ok: true,
+        async json() {
+          return { status: "success", result_payload: { glance: {}, tidy: [] } };
+        },
+      };
+    },
+  });
+
+  assert.equal(capturedBody.model_spec.vcov.type, "cluster");
+  assert.equal(capturedBody.model_spec.cluster_column, "group_id");
+});
+
 test("fitModel 传递面板参数到 buildFitModelRequest", async () => {
   let capturedBody;
 

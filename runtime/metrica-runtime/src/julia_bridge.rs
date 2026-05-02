@@ -61,16 +61,10 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
         ));
     }
 
-    if request.action == "fit_model" && request.model_spec.model_type != "ols" {
-        return Ok(runtime_error_response(
-            request,
-            "RUNTIME_UNSUPPORTED_MODEL_TYPE",
-            format!(
-                "runtime 当前仅支持 `ols`，收到 `{}`。",
-                request.model_spec.model_type
-            ),
-            Some("请将 model_type 设为 `ols`。".to_string()),
-        ));
+    if request.action == "fit_model" {
+        if let Some(response) = validate_fit_model_request(request) {
+            return Ok(response);
+        }
     }
 
     let mut runtime_request = request.clone();
@@ -125,6 +119,43 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
         },
         result_payload: envelope.result_payload,
     })
+}
+
+fn validate_fit_model_request(request: &TaskRequest) -> Option<TaskResponse> {
+    match request.model_spec.model_type.as_str() {
+        "ols" => None,
+        "panel" => validate_panel_request(request),
+        model_type => Some(runtime_error_response(
+            request,
+            "RUNTIME_UNSUPPORTED_MODEL_TYPE",
+            format!("runtime 当前支持 `ols` 与 `panel`，收到 `{model_type}`。"),
+            Some("请将 model_type 设为 `ols` 或 `panel`。".to_string()),
+        )),
+    }
+}
+
+fn validate_panel_request(request: &TaskRequest) -> Option<TaskResponse> {
+    let missing_fields = [
+        ("panel_id", request.model_spec.panel_id.as_deref()),
+        ("panel_time", request.model_spec.panel_time.as_deref()),
+    ]
+    .iter()
+    .filter_map(|(field, value)| match value {
+        Some(value) if !value.trim().is_empty() => None,
+        _ => Some(*field),
+    })
+    .collect::<Vec<_>>();
+
+    if missing_fields.is_empty() {
+        return None;
+    }
+
+    Some(runtime_error_response(
+        request,
+        "RUNTIME_PANEL_INDEX_REQUIRED",
+        format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
+        Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
+    ))
 }
 
 fn runtime_error_response(

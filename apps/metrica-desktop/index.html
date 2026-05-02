@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Metrica OLS</title>
+  <title>Metrica Alpha</title>
   <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
     <section class="panel controls">
       <div class="panel-header">
         <span class="eyebrow">Metrica</span>
-        <h1>真实 OLS / WLS 链路</h1>
+        <h1>真实 OLS / WLS / 面板链路</h1>
         <p>
           当前页面只负责通过 Runtime 发起真实 `fit_model` 请求，并渲染结构化结果。
         </p>
@@ -34,28 +34,60 @@
       <input id="file-picker" type="file" accept=".csv,text/csv" hidden />
 
       <label class="field">
-        <span>OLS 公式</span>
-        <input id="formula-input" type="text" value="y ~ x1 + x2" />
-      </label>
-
-      <label class="field">
-        <span>协方差类型</span>
-        <select id="vcov-type">
-          <option value="classical">classical</option>
-          <option value="HC1">HC1</option>
-          <option value="cluster">cluster</option>
+        <span>模型类型</span>
+        <select id="model-type">
+          <option value="ols">OLS / WLS</option>
+          <option value="panel">Panel</option>
         </select>
       </label>
 
       <label class="field">
-        <span>WLS 权重列（可选）</span>
-        <input id="weights-column" type="text" placeholder="例如 x1" />
+        <span id="formula-label">OLS 公式</span>
+        <input id="formula-input" type="text" value="y ~ x1 + x2" />
       </label>
 
-      <label class="field">
-        <span>聚类变量（可选，用于 cluster 协方差）</span>
-        <input id="cluster-column" type="text" placeholder="例如 group_id" />
-      </label>
+      <div id="ols-options" class="field-group">
+        <label class="field">
+          <span>协方差类型</span>
+          <select id="vcov-type">
+            <option value="classical">classical</option>
+            <option value="HC1">HC1</option>
+            <option value="cluster">cluster</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>WLS 权重列（可选）</span>
+          <input id="weights-column" type="text" placeholder="例如 x1" />
+        </label>
+
+        <label class="field">
+          <span>聚类变量（可选，用于 cluster 协方差）</span>
+          <input id="cluster-column" type="text" placeholder="例如 group_id" />
+        </label>
+      </div>
+
+      <div id="panel-options" class="field-group" hidden>
+        <label class="field">
+          <span>个体标识列</span>
+          <input id="panel-id" type="text" placeholder="例如 firm" />
+        </label>
+
+        <label class="field">
+          <span>时间标识列</span>
+          <input id="panel-time" type="text" placeholder="例如 year" />
+        </label>
+
+        <label class="field">
+          <span>面板方法</span>
+          <select id="panel-method">
+            <option value="fe">FE 固定效应</option>
+            <option value="re">RE 随机效应</option>
+            <option value="fd">FD 一阶差分</option>
+            <option value="between">Between 组间估计</option>
+          </select>
+        </label>
+      </div>
 
       <button id="run-model" type="button">运行模型</button>
       <p id="status-text" class="status-text">等待运行。</p>
@@ -132,7 +164,7 @@
       <section class="table-panel">
         <div class="table-header">
           <h3>诊断结果</h3>
-          <p>展示 Runtime 返回的结构化诊断结果。</p>
+          <p>展示 Runtime 返回的结构化诊断结果；面板诊断将在后续切片实现。</p>
         </div>
         <div id="diagnostics-box">
           <article class="empty-state">
@@ -140,6 +172,14 @@
             <p>当前链路先保留结构化展示入口。</p>
           </article>
         </div>
+      </section>
+
+      <section class="table-panel">
+        <div class="table-header">
+          <h3>逐观测增强数据</h3>
+          <p>展示 Runtime 返回的结构化 <code>augment_preview</code>。</p>
+        </div>
+        <div id="augment-box"></div>
       </section>
     </section>
   </main>

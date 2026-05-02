@@ -231,11 +231,11 @@ apps/metrica-desktop/
 
 ### Phase 5：模型配置与结果展示
 
-- 实现模型配置页面（公式输入、模型类型、协方差选择）
-- 重写结果展示（glance 卡片、tidy 系数表、警告列表）
+- 实现模型配置页面（公式输入、`OLS / WLS` 与 `Panel` 模型类型、协方差选择、面板索引配置）
+- 重写结果展示（glance 卡片、tidy 系数表、警告列表、augment 预览）
 - 集成 ECharts，实现诊断图（残差图、QQ 图）
 - 实现图表-数据联动
-- 验证：端到端运行 OLS，展示结构化结果 + 诊断图
+- 验证：端到端运行 OLS 与基础面板模型，展示结构化结果；诊断图与面板诊断留给后续切片
 
 ### Phase 6：教学交互与导出
 
@@ -264,4 +264,4 @@ apps/metrica-desktop/
 
 - Runtime 载荷由 `docs/architecture/runtime-protocol.md` 负责。
 - 项目级分层与当前主链路由 `docs/superpowers/specs/2026-04-30-metrica-main-design.md` 负责。
-- 当前执行顺序由 `docs/superpowers/plans/2026-04-30-metrica-current-plan.md` 负责。
+- 当前面板收口执行顺序由 `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md` 负责。

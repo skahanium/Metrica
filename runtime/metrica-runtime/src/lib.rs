@@ -45,11 +45,18 @@ pub struct VcovSpec {
 pub struct ModelSpec {
     pub model_type: String,
     pub formula: String,
-    pub vcov: VcovSpec,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vcov: Option<VcovSpec>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weights: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cluster_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel_method: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,11 +150,14 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
         model_spec: ModelSpec {
             model_type: "ols".to_string(),
             formula: "y ~ x1 + x2".to_string(),
-            vcov: VcovSpec {
+            vcov: Some(VcovSpec {
                 kind: "classical".to_string(),
-            },
+            }),
             weights: None,
             cluster_column: None,
+            panel_id: None,
+            panel_time: None,
+            panel_method: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -162,6 +172,24 @@ pub fn sample_fit_model_request() -> TaskRequest {
 
 pub fn sample_inspect_dataset_request() -> TaskRequest {
     sample_request_base("inspect_dataset", "inspect-uuid")
+}
+
+pub fn sample_panel_fit_model_request() -> TaskRequest {
+    let mut request = sample_request_base("fit_model", "panel-uuid");
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/teaching/grunfeld.csv".to_string();
+    request.model_spec = ModelSpec {
+        model_type: "panel".to_string(),
+        formula: "invest ~ mvalue + capital".to_string(),
+        vcov: None,
+        weights: None,
+        cluster_column: None,
+        panel_id: Some("firm".to_string()),
+        panel_time: Some("year".to_string()),
+        panel_method: Some("fe".to_string()),
+    };
+    request.options.return_augment = true;
+    request
 }
 
 pub fn sample_success_response() -> TaskResponse {
@@ -235,6 +263,15 @@ mod tests {
         let request = sample_fit_model_request();
         assert_eq!(request.action, "fit_model");
         assert_eq!(request.model_spec.model_type, "ols");
+    }
+
+    #[test]
+    fn sample_panel_request_targets_panel_model() {
+        let request = sample_panel_fit_model_request();
+        assert_eq!(request.action, "fit_model");
+        assert_eq!(request.model_spec.model_type, "panel");
+        assert_eq!(request.model_spec.panel_id.as_deref(), Some("firm"));
+        assert_eq!(request.model_spec.panel_time.as_deref(), Some("year"));
     }
 
     #[test]

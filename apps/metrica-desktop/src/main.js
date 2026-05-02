@@ -4,11 +4,13 @@ import {
   fitModel,
   inspectDataset,
 } from "./runtime-client.js";
+import { applyModelControlState } from "./model-controls.js";
 import {
   renderDatasetSummary,
   renderDiagnostics,
   renderError,
   renderGlance,
+  renderAugmentPreview,
   renderMessagesMarkup,
   renderPreviewRows,
   renderSummaryText,
@@ -22,10 +24,17 @@ const datasetInput = document.getElementById("dataset-path");
 const chooseFileButton = document.getElementById("choose-file");
 const inspectButton = document.getElementById("inspect-dataset");
 const filePicker = document.getElementById("file-picker");
+const modelTypeInput = document.getElementById("model-type");
+const formulaLabel = document.getElementById("formula-label");
 const formulaInput = document.getElementById("formula-input");
+const olsOptions = document.getElementById("ols-options");
 const vcovTypeInput = document.getElementById("vcov-type");
 const weightsColumnInput = document.getElementById("weights-column");
 const clusterColumnInput = document.getElementById("cluster-column");
+const panelOptions = document.getElementById("panel-options");
+const panelIdInput = document.getElementById("panel-id");
+const panelTimeInput = document.getElementById("panel-time");
+const panelMethodInput = document.getElementById("panel-method");
 const runButton = document.getElementById("run-model");
 const statusText = document.getElementById("status-text");
 const errorBox = document.getElementById("error-box");
@@ -37,6 +46,7 @@ const glanceBox = document.getElementById("glance-box");
 const summaryBox = document.getElementById("summary-box");
 const vcovLabelBox = document.getElementById("vcov-label-box");
 const diagnosticsBox = document.getElementById("diagnostics-box");
+const augmentBox = document.getElementById("augment-box");
 const tidyTableBody = document.querySelector("#tidy-table tbody");
 
 runtimeBaseInput.value = DEFAULT_RUNTIME_BASE;
@@ -56,6 +66,7 @@ function resetResultArea() {
   summaryBox.innerHTML = renderSummaryText(null);
   vcovLabelBox.innerHTML = "";
   diagnosticsBox.innerHTML = renderDiagnostics(null);
+  augmentBox.innerHTML = renderAugmentPreview(null);
   tidyTableBody.innerHTML = `
     <tr>
       <td colspan="5" class="empty-row">等待 Runtime 返回结构化 tidy。</td>
@@ -99,6 +110,19 @@ function showVcovLabel(vcovLabel) {
 
 function showDiagnostics(diagnostics) {
   diagnosticsBox.innerHTML = renderDiagnostics(diagnostics);
+}
+
+function showAugmentPreview(augmentPreview) {
+  augmentBox.innerHTML = renderAugmentPreview(augmentPreview);
+}
+
+function syncModelControls() {
+  applyModelControlState({
+    modelType: modelTypeInput.value,
+    olsOptions,
+    panelOptions,
+    formulaLabel,
+  });
 }
 
 function showInspection(payload) {
@@ -149,9 +173,13 @@ async function inspectCurrentDataset() {
 async function runModel() {
   const datasetPath = datasetInput.value.trim();
   const formula = formulaInput.value.trim();
+  const modelType = modelTypeInput.value;
   const vcovType = vcovTypeInput.value;
   const weightsColumn = weightsColumnInput.value.trim();
   const clusterColumn = (clusterColumnInput?.value || "").trim();
+  const panelId = panelIdInput.value.trim();
+  const panelTime = panelTimeInput.value.trim();
+  const panelMethod = panelMethodInput.value;
 
   if (!runtimeBaseInput.value.trim() || !datasetPath || !formula) {
     showError({
@@ -159,6 +187,17 @@ async function runModel() {
       code: "APP_INVALID_INPUT",
       text: "Runtime 端点、CSV 路径和公式都不能为空。",
       hint: "请补全输入后重试。",
+    });
+    statusText.textContent = "输入待修正。";
+    return;
+  }
+
+  if (modelType === "panel" && (!panelId || !panelTime)) {
+    showError({
+      title: "面板索引不完整",
+      code: "APP_INVALID_PANEL_INPUT",
+      text: "运行面板模型需要填写个体标识列和时间标识列。",
+      hint: "例如 Grunfeld 数据集可使用 firm 和 year。",
     });
     statusText.textContent = "输入待修正。";
     return;
@@ -173,9 +212,13 @@ async function runModel() {
       endpoint: runtimeEndpoint("/fit_model"),
       datasetPath,
       formula,
+      modelType,
       vcovType,
       weightsColumn,
       clusterColumn,
+      panelId,
+      panelTime,
+      panelMethod,
     });
 
     statusText.textContent =
@@ -193,6 +236,7 @@ async function runModel() {
     showSummary(payload.summary_text || "");
     showVcovLabel(payload.vcov_label || "");
     showDiagnostics(payload.diagnostics);
+    showAugmentPreview(payload.augment_preview);
     showTidy(payload.tidy || []);
   } catch (message) {
     statusText.textContent = "运行失败。";
@@ -232,4 +276,6 @@ filePicker.addEventListener("change", () => {
 
 inspectButton.addEventListener("click", inspectCurrentDataset);
 resetResultArea();
+syncModelControls();
+modelTypeInput.addEventListener("change", syncModelControls);
 runButton.addEventListener("click", runModel);

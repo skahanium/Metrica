@@ -77,6 +77,14 @@ body {
   margin-top: 18px;
 }
 
+.field-group[hidden] {
+  display: none;
+}
+
+.field-group {
+  margin-top: 4px;
+}
+
 .field span {
   font-size: 0.92rem;
 }

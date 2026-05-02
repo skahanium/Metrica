@@ -2,7 +2,7 @@
 
 use metrica_runtime::{
     build_http_response, execute_fit_model, sample_fit_model_request,
-    sample_inspect_dataset_request, HttpResponse,
+    sample_inspect_dataset_request, sample_panel_fit_model_request, HttpResponse,
 };
 
 fn response_header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
@@ -40,12 +40,15 @@ fn fit_model_accepts_paths_relative_to_project_context() {
 #[test]
 fn fit_model_forwards_hc1_vcov_to_julia() {
     let mut request = sample_fit_model_request();
-    request.model_spec.vcov.kind = "HC1".to_string();
+    request.model_spec.vcov.as_mut().expect("vcov").kind = "HC1".to_string();
     let response = execute_fit_model(&request).expect("runtime response");
 
     assert_eq!(response.status, "success");
     let payload = response.result_payload.expect("payload");
-    assert_eq!(payload.get("vcov_label").and_then(|value| value.as_str()), Some("HC1"));
+    assert_eq!(
+        payload.get("vcov_label").and_then(|value| value.as_str()),
+        Some("HC1")
+    );
 }
 
 #[test]
@@ -57,7 +60,63 @@ fn fit_model_forwards_weights_to_julia() {
     assert_eq!(response.status, "success");
     let payload = response.result_payload.expect("payload");
     let glance = payload.get("glance").expect("glance");
-    assert_eq!(glance.get("model").and_then(|value| value.as_str()), Some("wls"));
+    assert_eq!(
+        glance.get("model").and_then(|value| value.as_str()),
+        Some("wls")
+    );
+}
+
+#[test]
+fn fit_model_forwards_panel_request_to_julia() {
+    let request = sample_panel_fit_model_request();
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let glance = payload.get("glance").expect("glance");
+    assert_eq!(
+        glance.get("model").and_then(|value| value.as_str()),
+        Some("fe")
+    );
+
+    let metrics = glance.get("metrics").expect("metrics");
+    assert_eq!(
+        metrics.get("n_ids").and_then(|value| value.as_i64()),
+        Some(20)
+    );
+    assert_eq!(
+        metrics.get("n_times").and_then(|value| value.as_i64()),
+        Some(20)
+    );
+
+    let tidy = payload
+        .get("tidy")
+        .and_then(|value| value.as_array())
+        .expect("tidy");
+    assert!(!tidy.is_empty());
+
+    let augment = payload.get("augment_preview").expect("augment_preview");
+    assert!(augment
+        .get("fitted")
+        .and_then(|value| value.as_array())
+        .is_some());
+    assert!(augment
+        .get("residual")
+        .and_then(|value| value.as_array())
+        .is_some());
+}
+
+#[test]
+fn fit_model_requires_panel_index_fields() {
+    let mut request = sample_panel_fit_model_request();
+    request.model_spec.panel_id = None;
+    request.model_spec.panel_time = Some("".to_string());
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "error");
+    assert_eq!(response.messages[0].code, "RUNTIME_PANEL_INDEX_REQUIRED");
+    assert!(response.messages[0].text.contains("panel_id"));
+    assert!(response.messages[0].text.contains("panel_time"));
 }
 
 #[test]
@@ -70,7 +129,10 @@ fn fit_model_returns_structured_diagnostics() {
     let diagnostics = payload.get("diagnostics").expect("diagnostics");
 
     // VIF
-    assert!(diagnostics.get("vif").and_then(|value| value.as_array()).is_some());
+    assert!(diagnostics
+        .get("vif")
+        .and_then(|value| value.as_array())
+        .is_some());
 
     // Breusch-Pagan
     let bp = diagnostics.get("breusch_pagan").expect("breusch_pagan");

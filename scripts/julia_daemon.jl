@@ -13,10 +13,15 @@
 # ==============================================================================
 
 using JSON3
+using MetricaBase
 using MetricaLinear
 
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))
 using .MetricaTests
+
+# 加载面板模块
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
+using .MetricaPanel
 
 # 加载共享诊断函数
 include(joinpath(ENV["METRICA_REPO_ROOT"], "scripts", "diagnostics_common.jl"))
@@ -33,28 +38,44 @@ function handle_request(req::Dict{String, Any})
         elseif action == "fit_model"
             dataset_path = params["dataset_path"]
             formula = params["formula"]
-            vcov_type = params["vcov"]
-            vcov_symbol = if vcov_type == "HC1"
-                :HC1
-            elseif vcov_type == "cluster"
-                :cluster
+            model_type = get(params, "model_type", "ols")
+            include_augment = get(params, "return_augment", true)
+
+            if model_type == "panel"
+                panel_id = Symbol(params["panel_id"])
+                panel_time = Symbol(params["panel_time"])
+                panel_method = Symbol(get(params, "panel_method", "fe"))
+
+                using CSV, DataFrames
+                df = CSV.read(dataset_path, DataFrame)
+                panel_data = MetricaBase.PanelData(df, panel_id, panel_time)
+
+                result = fit_panel(panel_data, formula; method=panel_method)
+                payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
             else
-                :classical
-            end
-            weights = get(params, "weights", nothing)
-            weights_sym = isnothing(weights) || isempty(weights) ? nothing : Symbol(weights)
-            cluster_col = get(params, "cluster_column", nothing)
-            cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
+                vcov_type = params["vcov"]
+                vcov_symbol = if vcov_type == "HC1"
+                    :HC1
+                elseif vcov_type == "cluster"
+                    :cluster
+                else
+                    :classical
+                end
+                weights = get(params, "weights", nothing)
+                weights_sym = isnothing(weights) || isempty(weights) ? nothing : Symbol(weights)
+                cluster_col = get(params, "cluster_column", nothing)
+                cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
 
-            result = fit_ols_file(dataset_path, formula;
-                vcov=vcov_symbol,
-                weights=weights_sym,
-                cluster=cluster_sym,
-            )
+                result = fit_ols_file(dataset_path, formula;
+                    vcov=vcov_symbol,
+                    weights=weights_sym,
+                    cluster=cluster_sym,
+                )
 
-            payload = result_to_payload(result)
-            if result isa OLSFitResult
-                payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
+                payload = result_to_payload(result; include_augment=include_augment)
+                if result isa OLSFitResult
+                    payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
+                end
             end
         else
             payload = Dict(

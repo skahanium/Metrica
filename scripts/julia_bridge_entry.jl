@@ -6,6 +6,7 @@
 # ==============================================================================
 
 using JSON3
+using MetricaBase
 using MetricaLinear
 
 include(joinpath(String(ARGS[2]), "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))

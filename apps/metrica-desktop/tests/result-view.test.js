@@ -44,6 +44,26 @@ test("renderGlance 输出关键指标卡片", () => {
   assert.match(html, /0\.9900/);
 });
 
+test("renderGlance 支持面板模型指标", () => {
+  const html = renderGlance({
+    model: "fe",
+    nobs: 400,
+    dof: 377,
+    metrics: {
+      r2: 0.76,
+      adj_r2: 0.74,
+      n_ids: 20,
+      n_times: 20,
+    },
+  });
+
+  assert.match(html, /模型/);
+  assert.match(html, /fe/);
+  assert.match(html, /个体数/);
+  assert.match(html, /20\.0000/);
+  assert.match(html, /时期数/);
+});
+
 test("renderTidyRows 输出系数行", () => {
   const html = renderTidyRows([
     {

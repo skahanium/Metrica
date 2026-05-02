@@ -2,7 +2,7 @@
 
 > **状态：当前主设计。** 本文件是当前 `Core -> Runtime -> App` 主链路的唯一设计锚点。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
 >
-> **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现，Runtime 已迁移到 axum + 持久化 Julia 守护进程。augment 能力已贯通。里程碑 3（面板基础）已完成，包含 `MetricaPanel.jl` 包、FE/RE/FD/Between 四种面板估计器、Grunfeld 教学数据集。
+> **当前事实基线：** 真实 OLS 全链路已作为里程碑 2 的稳定基线保留。仓库中已经具备 `fit_ols_file`、`glance`、`tidy`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染，以及包层 WLS、HC1、输出层和基础诊断接口。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现，Runtime 已迁移到 axum + 持久化 Julia 守护进程。augment 能力已贯通。里程碑 3（面板基础）已完成，包含 `MetricaPanel.jl` 包、FE/RE/FD/Between 四种面板估计器、Grunfeld 教学数据集，以及 `model_type = "panel"` 的 Runtime/App 结构化贯通。
 >
 > **下一步边界：** 里程碑 2 和 3 已完成，当前基线稳定。后续工作可考虑：引入新模型类型（IV、GLS），或扩展面板诊断（Hausman 检验），或推进里程碑 4（教学与产品化增强）。不得重开平行 mock 路线，也不得让 App 解析终端文本。
 
@@ -10,13 +10,13 @@
 
 本设计文档定义 Metrica 当前阶段最核心的产品与架构目标：
 
-**以 “本地 CSV 导入 + 真实数据检查 + 真实 OLS/WLS 拟合 + 结构化结果 + 桌面渲染 + 教学友好警告” 作为当前稳定主链路。**
+**以 “本地 CSV 导入 + 真实数据检查 + 真实 OLS/WLS/面板拟合 + 结构化结果 + 桌面渲染 + 教学友好警告” 作为当前稳定主链路。**
 
 这不是一个演示级 mock 切片，也不是占位式联调；它是后续所有模型能力、输出能力、桌面能力与教学能力的基石。
 
 本文档将当前真实实现路线固定为：
 
-- 真实 `OLS`
+- 真实 `OLS` 与基础面板模型
 - `StatsModels.jl` 风格公式语义
 - 混合依赖策略：CSV/表/公式使用成熟生态，Metrica 自主掌握 OLS 结果语义
 - `Runtime -> Julia` 通过子进程 CLI 执行真实桥接
@@ -34,7 +34,7 @@
 当前阶段性落点：
 
 - 已完成的最小可用边界：`fit_ols_file`、`glance`、`tidy`、结构化 warning / error、结构化 payload、Runtime 真实调用 Julia、桌面端结构化渲染
-- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现，`augment` 能力已贯通（拟合值、残差、标准化残差、杠杆值、Cook's D），面板基础已实现（`MetricaPanel.jl` 包、FE/RE/FD/Between 四种估计器、Grunfeld 数据集）
+- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现，`augment` 能力已贯通（拟合值、残差、标准化残差、杠杆值、Cook's D），面板基础已实现并贯通（`MetricaPanel.jl` 包、FE/RE/FD/Between 四种估计器、Grunfeld 数据集、Runtime `panel` 请求、App 结构化渲染）
 - 明确排除的短期捷径：前端直接调用本地 Julia 脚本、前端消费示例 JSON、Runtime 返回样例载荷冒充真实链路
 - 延后处理的高级能力：受控自定义动作 / 分析模板；当前只要求为其保留稳定接口铺垫，不落地完整模板系统
 
@@ -42,7 +42,7 @@
 
 本设计明确不包含以下内容：
 
-- 面板模型、IV、GLS
+- IV、GLS 等尚未进入当前稳定链路的新模型族
 - 多模型对比工作流
 - 完整 `augment` 大表渲染
 - 完整诊断图系统
