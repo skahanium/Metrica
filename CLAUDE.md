@@ -14,14 +14,16 @@
 
 ## 当前阶段
 
-里程碑 1/2/3 已全部完成。当前状态：
+里程碑 1/2/3/5 已全部完成。当前状态：
 - 里程碑 1：Base Alpha ✅
 - 里程碑 2：教学向 OLS ✅
 - 里程碑 3：面板基础 ✅
+- 里程碑 5：地基升级与数据能力 ✅
 
 总体蓝图：`Metrica.jl-计量经济学框架-完善版.md`
 主设计文档：`docs/superpowers/specs/2026-04-30-metrica-main-design.md`
 
+Core 层 Julia 包：MetricaBase.jl / MetricaData.jl / MetricaDiagnostics.jl / MetricaLinear.jl / MetricaPanel.jl / MetricaOutput.jl
 App 层技术栈：Tauri 2 + React 19 + TypeScript 5 + Zustand + Ant Design + AG Grid + ECharts
 Runtime 层技术栈：Rust + axum + tokio + 持久化 Julia 进程（stdin/stdout JSON lines）
 详细架构：`docs/architecture/app-shell.md`、`docs/architecture/runtime-protocol.md`
