@@ -10,21 +10,22 @@ using StatsModels
 using MetricaBase
 using MetricaOutput
 
-export OLSModel, OLSFitResult, PHASE_1_MODELS, fit_ols_file, inspect_dataset, result_to_payload
+export OLSModel, OLSFitResult, IVModel, IVFitResult, GLSModel, GLSFitResult,
+    PHASE_1_MODELS, fit, fit_ols_file, inspect_dataset, result_to_payload
 
-const PHASE_1_MODELS = (:OLS,)
+const PHASE_1_MODELS = (:OLS, :IV, :GLS)
 
 """
 第一条参考线性模型的规格对象。
 """
-struct OLSModel <: MetricaBase.AbstractEconModel
+struct OLSModel <: MetricaBase.AbstractLinearModel
     formula::String
 end
 
 """
 第一条真实 OLS 链路的结构化拟合结果。
 """
-struct OLSFitResult <: MetricaBase.AbstractFittedModel
+struct OLSFitResult <: MetricaBase.AbstractLinearFitResult
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
@@ -33,6 +34,8 @@ struct OLSFitResult <: MetricaBase.AbstractFittedModel
     fitted_values::Vector{Float64}
     residual_vector::Vector{Float64}
     coefficient_names::Vector{Symbol}
+    vcov_matrix::Matrix{Float64}
+    stderror_values::Vector{Float64}
 end
 
 MetricaBase.glance(result::OLSFitResult) = result.glance_table
