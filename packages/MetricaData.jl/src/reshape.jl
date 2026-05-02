@@ -36,7 +36,15 @@ end
 长 → 宽转换。
 """
 function reshape_wide(df::DataFrame, id_cols::Vector{Symbol}, time_col::Symbol, value_cols::Vector{Symbol})
-    result = unstack(df, id_cols, time_col, value_cols[1])
+    value_col = value_cols[1]
+    result = unstack(df, id_cols, time_col, value_col)
+    rename_map = Pair{Symbol, Symbol}[]
+    for col in names(result)
+        col_sym = Symbol(col)
+        col_sym in id_cols && continue
+        push!(rename_map, col_sym => Symbol("$(value_col)_$(col)"))
+    end
+    rename!(result, rename_map...)
     notes = "reshape wide: $(nrow(df)) → $(nrow(result)) 行"
     return OpResult("reshape_wide", result, notes = notes)
 end

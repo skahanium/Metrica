@@ -13,6 +13,8 @@
 # ==============================================================================
 
 using JSON3
+using CSV
+using DataFrames
 using MetricaBase
 using MetricaLinear
 
@@ -23,6 +25,10 @@ using .MetricaDiagnostics
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
 using .MetricaPanel
 
+# 加载数据操作模块
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaData.jl", "src", "MetricaData.jl"))
+using .MetricaData
+
 function handle_request(req::Dict{String, Any})
     id = req["id"]
     action = req["action"]
@@ -32,6 +38,16 @@ function handle_request(req::Dict{String, Any})
     try
         if action == "inspect_dataset"
             payload = inspect_dataset(params["dataset_path"])
+        elseif action == "transform"
+            dataset_path = params["dataset_path"]
+            operations = JSON3.read(params["operations"], Vector{Dict{String, Any}})
+            df = CSV.read(dataset_path, DataFrame)
+            result = MetricaData.operate_chain(df, operations)
+            payload = Dict(
+                "status" => result["status"] == "error" ? "error" : "success",
+                "result_payload" => result,
+                "messages" => [],
+            )
         elseif action == "fit_model"
             dataset_path = params["dataset_path"]
             formula = params["formula"]
@@ -43,7 +59,6 @@ function handle_request(req::Dict{String, Any})
                 panel_time = Symbol(params["panel_time"])
                 panel_method = Symbol(get(params, "panel_method", "fe"))
 
-                using CSV, DataFrames
                 df = CSV.read(dataset_path, DataFrame)
                 panel_data = MetricaBase.PanelData(df, panel_id, panel_time)
 

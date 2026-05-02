@@ -10,7 +10,7 @@ end
 
 @testset "replace" begin
     df = DataFrame(x = [1, 2, 3], flag = ["a", "b", "a"])
-    result = replace(df, "flag", "x > 1", "\"c\"")
+    result = MetricaData.replace(df, "flag", "x > 1", "\"c\"")
     @test result.df.flag == ["a", "c", "c"]
 end
 

@@ -1,6 +1,6 @@
 # 里程碑 4 实施计划：面板诊断与教学数据集
 
-> **状态：当前实施依据。** 本计划定义里程碑 4 的第一个垂直切片：在已贯通的面板模型链路上增加结构化诊断，并补充可追踪的教学数据集入口。
+> **状态：已完成。** 本计划定义里程碑 4 的第一个垂直切片：在已贯通的面板模型链路上增加结构化诊断，并补充可追踪的教学数据集入口。当前实施依据已转入里程碑 5；里程碑 4 仅保留为验收记录与后续切片参考。
 
 **目标：** 实现 Hausman、固定效应 F、Breusch-Pagan LM 三类面板诊断，并新增 Penn World Table 教学面板子集与 NLSY 导入模板。
 
@@ -26,6 +26,15 @@
 3. PWT 教学子集可用于 FE 面板拟合与诊断
 4. App 可渲染可用诊断和不可用诊断
 5. `cargo test`、`npm test`、`MetricaPanel.jl` 测试通过
+
+## 已验证命令
+
+- `julia --project=packages/MetricaPanel.jl -e 'using Pkg; Pkg.test()'`
+- `cd runtime/metrica-runtime && cargo test fit_model_forwards_panel_request_to_julia`
+- `cd apps/metrica-desktop && npm test`
+- `cd runtime/metrica-runtime && cargo test`
+
+以上命令作为里程碑 4 回归门禁；若后续里程碑引入失败，应先区分是否影响面板诊断链路，再决定是否回退 M4 完成状态。
 
 ## 后续切片
 

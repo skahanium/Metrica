@@ -7,14 +7,15 @@ using Statistics
 按条件筛选行。`condition` 为字符串表达式。
 """
 function filter(df::DataFrame, condition::String)
+    parsed_condition = Meta.parse(condition)
     mask = [begin
         row = NamedTuple{tuple(Symbol.(names(df))...)}(Tuple(r))
-        eval(Meta.parse(condition))
+        _eval_row_expr(parsed_condition, row)
     end for r in eachrow(df)]
     df2 = df[mask, :]
     n_kept = nrow(df2)
     n_total = nrow(df)
-    return OpResult("filter", df2, notes = "筛选条件: $condition，保留 $n_kept / $n_total 行")
+    return OpResult("filter", df2, notes = "筛选条件: $(condition)，保留 $(n_kept) / $(n_total) 行")
 end
 
 """

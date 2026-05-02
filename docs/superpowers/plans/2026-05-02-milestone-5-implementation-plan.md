@@ -1,5 +1,7 @@
 # 里程碑 5 实施计划
 
+> **状态：实施中。** 当前第一优先级是恢复绿色基线：`MetricaData.jl`、Runtime `/transform` 与 React App 的门禁测试必须保持通过，然后再继续扩展数据管理面板或后续模型能力。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 加固 Metrica 地基：前端升级到 React 19 + TypeScript 5 技术栈，新增 MetricaData.jl 数据管理包。

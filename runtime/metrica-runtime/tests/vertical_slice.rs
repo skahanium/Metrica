@@ -1,9 +1,12 @@
 //! Alpha 垂直切片：真实 Julia 桥与最小 HTTP 传输测试。
 
 use metrica_runtime::{
-    execute_fit_model, sample_fit_model_request, sample_inspect_dataset_request,
-    sample_panel_fit_model_request,
+    execute_fit_model, repo_root,
+    server::build_router,
+    sample_fit_model_request, sample_inspect_dataset_request, sample_panel_fit_model_request,
+    JuliaSession,
 };
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn fit_model_returns_real_payload_shape() {
@@ -194,9 +197,22 @@ fn inspect_dataset_accepts_paths_relative_to_project_context() {
     assert!(payload.get("preview_rows").is_some());
 }
 
-#[test]
-fn transform_filter_operation_returns_ok() {
-    let client = reqwest::blocking::Client::new();
+#[tokio::test(flavor = "multi_thread")]
+async fn transform_filter_operation_returns_ok() {
+    let root = repo_root();
+    let julia_project = root.join("packages").join("MetricaLinear.jl");
+    let session = JuliaSession::start(&root.to_string_lossy(), &julia_project.to_string_lossy())
+        .expect("Julia session should start");
+    let app = build_router(Arc::new(Mutex::new(session)));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind test runtime");
+    let addr = listener.local_addr().expect("test runtime address");
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve test runtime");
+    });
+
+    let client = reqwest::Client::new();
 
     let body = serde_json::json!({
         "dataset_path": concat!(env!("CARGO_MANIFEST_DIR"), "/../../datasets/teaching/pwt_productivity_panel.csv"),
@@ -208,15 +224,16 @@ fn transform_filter_operation_returns_ok() {
     .to_string();
 
     let resp = client
-        .post("http://127.0.0.1:47821/transform")
+        .post(format!("http://{addr}/transform"))
         .header("Content-Type", "application/json")
         .body(body)
         .send()
+        .await
         .expect("POST /transform should succeed");
 
     assert_eq!(resp.status(), 200);
-    let json: serde_json::Value = resp.json().expect("response should be JSON");
+    let json: serde_json::Value = resp.json().await.expect("response should be JSON");
     assert_eq!(json["status"], "success");
-    assert!(json["result_payload"]["nrows"].as_u64().unwrap() > 0);
+    assert!(json["result_payload"]["result"]["nrows"].as_u64().unwrap() > 0);
+    server.abort();
 }
-

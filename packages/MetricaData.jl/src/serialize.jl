@@ -1,4 +1,4 @@
-using DataFrames, JSON, CSV
+using DataFrames, CSV
 
 """
 将 OpResult 序列化为 Dict（Runtime 可直接序列化为 JSON）。
@@ -86,7 +86,7 @@ function operate_chain(df::DataFrame, operations::Vector{Dict{String, Any}})
         push!(results, result_to_dict(result))
         current_df = result.df
     end
-    final = last(results)
+    final = copy(last(results))
     final["operations"] = results
     return final
 end
