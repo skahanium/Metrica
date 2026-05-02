@@ -356,9 +356,7 @@ end
 # === 主入口 ====================================================================
 
 """
-使用给定模型规格与数据拟合模型。
-
-返回 `AbstractFittedModel` 的子类型实例；若拟合失败则返回 `ModelError`。
+已弃用：请使用 `fit(OLSModel, formula, data; kwargs...)` 代替。
 """
 function fit_ols_file(
     path::AbstractString,
@@ -367,6 +365,7 @@ function fit_ols_file(
     vcov::Symbol=:classical,
     cluster::Union{Nothing, Symbol}=nothing,
 )
+    @warn "fit_ols_file 已弃用，请使用 fit(OLSModel, formula, data; kwargs...) 代替。" maxlog=1
     dataset = load_dataset(path)
     dataset isa MetricaBase.ModelError && return dataset
 
@@ -430,5 +429,77 @@ function fit_ols_file(
         coefficient_names,
         vcov_matrix,
         stderror,
+    )
+end
+
+"""
+    fit(OLSModel, formula, data; weights, vcov, cluster_column)
+
+使用统一接口拟合 OLS/WLS 模型。`data` 可为 DataFrame 或 CSV 路径。
+"""
+function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
+                         weights::Union{Nothing,Symbol,String}=nothing,
+                         vcov::Symbol=:classical,
+                         cluster_column::Union{Nothing,Symbol,String}=nothing)
+    weights_sym = isnothing(weights) ? nothing : Symbol(weights)
+    cluster_sym = isnothing(cluster_column) ? nothing : Symbol(cluster_column)
+
+    dataset = if data isa AbstractString
+        loaded = load_dataset(data)
+        loaded isa MetricaBase.ModelError && return loaded
+        loaded
+    else
+        data
+    end
+
+    model_formula = parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+
+    model_columns = collect_term_symbols(model_formula)
+
+    err = validate_model_columns(dataset, model_columns, weights_sym, cluster_sym)
+    err isa MetricaBase.ModelError && return err
+
+    prepared = prepare_model_data(dataset, model_formula, model_columns, weights_sym, cluster_sym)
+    prepared isa MetricaBase.ModelError && return prepared
+
+    (_, model_frame, _, X, y, weight_values, cluster_values, n_total, n_effective) = prepared
+    nobs = length(y)
+    ncoef = size(X, 2)
+
+    err = validate_design(X, ncoef, nobs)
+    err isa MetricaBase.ModelError && return err
+
+    dof = nobs - ncoef
+    X_eff, y_eff, model_label = apply_weights(X, y, weight_values)
+    coefficients, fitted, residuals, effective_residuals = compute_ols_estimates(X, y, X_eff, y_eff)
+
+    vcov_result = compute_vcov(X_eff, effective_residuals, nobs, dof, vcov, cluster_values)
+    vcov_result isa MetricaBase.ModelError && return vcov_result
+    vcov_matrix, stderror = vcov_result
+
+    r2, adj_r2, rss, tss, sigma = compute_glance_stats(y, effective_residuals, weight_values, dof, nobs)
+    coefficient_names = Symbol.(coefnames(model_frame))
+
+    warnings = MetricaBase.ModelWarning[]
+    dropped_rows = n_total - n_effective
+    dropped_rows > 0 && push!(warnings, build_rows_dropped_warning(dropped_rows))
+
+    glance_table = MetricaBase.ModelGlance(
+        model_label,
+        nobs,
+        dof,
+        Dict{Symbol, MetricaBase.MetricValue}(
+            :r2 => r2, :adj_r2 => adj_r2, :rss => rss, :tss => tss, :sigma => sigma,
+        ),
+        warnings,
+    )
+
+    tidy_table = assemble_tidy_table(coefficients, stderror, coefficient_names, dof, vcov)
+
+    return OLSFitResult(
+        String(formula), glance_table, tidy_table,
+        Matrix{Float64}(X), copy(y), fitted, residuals,
+        coefficient_names, vcov_matrix, stderror,
     )
 end
