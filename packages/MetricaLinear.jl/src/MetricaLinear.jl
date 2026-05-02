@@ -83,6 +83,41 @@ function MetricaBase.augment(result::OLSFitResult)
     )
 end
 
+MetricaBase.coef(result::OLSFitResult) = result.coefficient_names .=> result.fitted_values[1:length(result.coefficient_names)]
+MetricaBase.vcov(result::OLSFitResult) = result.vcov_matrix
+MetricaBase.stderror(result::OLSFitResult) = result.stderror_values
+MetricaBase.nobs(result::OLSFitResult) = length(result.response_vector)
+MetricaBase.dof(result::OLSFitResult) = length(result.response_vector) - length(result.coefficient_names)
+MetricaBase.r2(result::OLSFitResult) = result.glance_table.metrics[:r2]
+MetricaBase.fitted(result::OLSFitResult) = result.fitted_values
+MetricaBase.residuals(result::OLSFitResult) = result.residual_vector
+
+function MetricaBase.predict(result::OLSFitResult;
+                             newdata::Union{Nothing,Matrix{Float64}}=nothing,
+                             interval::Symbol=:none, level::Float64=0.95)
+    X = isnothing(newdata) ? result.design_matrix : newdata
+    predictions = X * result.fitted_values[1:length(result.coefficient_names)]
+
+    interval === :none && return predictions
+
+    n = length(result.response_vector)
+    k = length(result.coefficient_names)
+    dof_val = n - k
+    t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
+    sigma = result.glance_table.metrics[:sigma]
+    XtX_inv = inv(result.design_matrix' * result.design_matrix)
+
+    if interval === :confidence
+        se_pred = [sqrt(sigma^2 * dot(X[i, :], XtX_inv * X[i, :])) for i in 1:size(X, 1)]
+    else
+        se_pred = [sqrt(sigma^2 * (1 + dot(X[i, :], XtX_inv * X[i, :]))) for i in 1:size(X, 1)]
+    end
+
+    lower = predictions .- t_crit .* se_pred
+    upper = predictions .+ t_crit .* se_pred
+    return (predictions=predictions, lower=lower, upper=upper)
+end
+
 include("io.jl")
 include("ols.jl")
 include("serialize.jl")

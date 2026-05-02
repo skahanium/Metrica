@@ -394,7 +394,7 @@ function fit_ols_file(
 
     vcov_result = compute_vcov(X_eff, effective_residuals, nobs, dof, vcov, cluster_values)
     vcov_result isa MetricaBase.ModelError && return vcov_result
-    _, stderror = vcov_result
+    vcov_matrix, stderror = vcov_result
 
     r2, adj_r2, rss, tss, sigma = compute_glance_stats(y, effective_residuals, weight_values, dof, nobs)
     coefficient_names = Symbol.(coefnames(model_frame))
@@ -428,5 +428,7 @@ function fit_ols_file(
         fitted,
         residuals,
         coefficient_names,
+        vcov_matrix,
+        stderror,
     )
 end
