@@ -128,8 +128,9 @@ end
         @test a.columns[:fitted] + a.columns[:residual] ≈ y_orig atol=1e-10
 
         diagnostics = panel_diagnostics(unbalanced_panel, "invest ~ mvalue")
-        @test diagnostics["breusch_pagan_lm"]["available"] == false
-        @test occursin("平衡面板", diagnostics["breusch_pagan_lm"]["note"])
+        # M7: BP LM 现在支持不平衡面板
+        @test diagnostics["breusch_pagan_lm"]["available"] == true
+        @test occursin("不平衡面板", diagnostics["breusch_pagan_lm"]["note"])
     end
 
     @testset "RE 随机效应拟合" begin

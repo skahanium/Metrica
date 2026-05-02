@@ -128,7 +128,7 @@ export interface ModelSpec {
   cluster_column?: string;
   panel_id?: string;
   panel_time?: string;
-  panel_method?: 'fe' | 're' | 'fd' | 'between';
+  panel_method?: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv';
   instruments?: string[];
   endog_columns?: string[];
   omega_spec?: string;

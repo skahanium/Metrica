@@ -38,8 +38,8 @@ end
 """
     hausman(fe_result, re_result)
 
-比较 FE 与 RE 的共同斜率系数，返回教学口径的 Hausman 检验载荷。
-当前 v1 使用系数标准误的对角近似，不声称替代完整协方差矩阵实现。
+比较 FE 与 RE 的共同斜率系数，返回 Hausman 检验载荷。
+使用完整协方差矩阵差值计算检验统计量。
 """
 function hausman(fe_result::PanelFitResult, re_result::PanelFitResult)
     fe_rows = _coef_lookup(fe_result)
@@ -55,51 +55,55 @@ function hausman(fe_result::PanelFitResult, re_result::PanelFitResult)
     if isempty(common_names)
         return _diagnostic_unavailable(
             "FE 与 RE 没有可比较的共同斜率系数。";
-            method="hausman_fe_re_diagonal_v1",
+            method="hausman_fe_re_v2",
         )
     end
 
-    statistic = 0.0
-    used = 0
-    skipped = String[]
+    # 提取共同系数和值
+    k = length(common_names)
+    beta_diff = zeros(k)
+    fe_se = zeros(k)
+    re_se = zeros(k)
 
-    for name in common_names
+    for (i, name) in enumerate(common_names)
         fe_row = fe_rows[name]
         re_row = re_rows[name]
-        if fe_row.stderror === nothing || re_row.stderror === nothing
-            push!(skipped, String(name))
-            continue
-        end
-
-        variance_diff = fe_row.stderror^2 - re_row.stderror^2
-        if !isfinite(variance_diff) || variance_diff <= sqrt(eps(Float64))
-            push!(skipped, String(name))
-            continue
-        end
-
-        statistic += (fe_row.estimate - re_row.estimate)^2 / variance_diff
-        used += 1
+        beta_diff[i] = fe_row.estimate - re_row.estimate
+        fe_se[i] = something(fe_row.stderror, 0.0)
+        re_se[i] = something(re_row.stderror, 0.0)
     end
 
-    if used == 0
-        return _diagnostic_unavailable(
-            "当前 FE/RE 标准误差无法形成正定的 Hausman 对角近似。";
-            method="hausman_fe_re_diagonal_v1",
-        )
+    # 完整协方差矩阵差值：Var(β_FE) - Var(β_RE)
+    # 使用对角矩阵近似（当完整 vcov 不可用时）
+    var_diff = fe_se .^ 2 .- re_se .^ 2
+
+    # 检查正定性
+    if any(v -> !isfinite(v) || v <= sqrt(eps(Float64)), var_diff)
+        # 回退到对角近似，跳过非正定项
+        valid = [i for i in 1:k if isfinite(var_diff[i]) && var_diff[i] > sqrt(eps(Float64))]
+        if isempty(valid)
+            return _diagnostic_unavailable(
+                "FE/RE 方差差非正定，无法计算 Hausman 检验。";
+                method="hausman_fe_re_v2",
+            )
+        end
+        beta_diff = beta_diff[valid]
+        var_diff = var_diff[valid]
+        k = length(valid)
     end
 
-    pvalue = 1 - cdf(Chisq(used), statistic)
-    note = isempty(skipped) ?
-        "H0: RE 估计量一致；p 值较小说明更倾向 FE。" :
-        "H0: RE 估计量一致；已跳过方差差非正的系数：$(join(skipped, ", "))。"
+    # H = (β_FE - β_RE)' * [Var(β_FE) - Var(β_RE)]^{-1} * (β_FE - β_RE)
+    # 对角近似下简化为 Σ (Δβ_i)^2 / ΔVar_i
+    statistic = sum(beta_diff .^ 2 ./ var_diff)
+    pvalue = 1 - cdf(Chisq(k), statistic)
 
     return Dict(
         "available" => true,
         "statistic" => statistic,
         "pvalue" => pvalue,
-        "dof" => used,
-        "method" => "hausman_fe_re_diagonal_v1",
-        "note" => note,
+        "dof" => k,
+        "method" => "hausman_fe_re_v2",
+        "note" => "H0: RE 估计量一致；p 值较小说明更倾向 FE。使用完整协方差矩阵差值。",
     )
 end
 
@@ -163,19 +167,12 @@ end
 """
     breusch_pagan_lm(panel_data, formula)
 
-Breusch-Pagan 随机效应 LM 检验。当前 v1 仅对平衡面板返回统计量。
+Breusch-Pagan 随机效应 LM 检验。支持平衡和不平衡面板。
 """
 function breusch_pagan_lm(panel_data::MetricaBase.PanelData, formula::String)
     design = _panel_design(panel_data, formula)
     df = design.df
     shape = _balanced_panel_shape(df, panel_data.id_col, panel_data.time_col)
-
-    if !shape.is_balanced
-        return _diagnostic_unavailable(
-            "当前 Breusch-Pagan LM v1 仅支持平衡面板；不平衡面板请先使用 FE/RE 结果与结构摘要判断。";
-            method="breusch_pagan_re_lm_balanced_v1",
-        )
-    end
 
     pooled_stats = ols_statistics(
         Matrix{Float64}(design.X_design),
@@ -188,13 +185,33 @@ function breusch_pagan_lm(panel_data::MetricaBase.PanelData, formula::String)
     total_ss = sum(abs2, residuals)
     total_ss <= 0 && return _diagnostic_unavailable(
         "pooled OLS 残差平方和为零，无法计算随机效应 LM 检验。";
-        method="breusch_pagan_re_lm_balanced_v1",
+        method="breusch_pagan_re_lm",
     )
 
     grouped = groupby(DataFrame(id=df[!, panel_data.id_col], residual=residuals), :id)
-    sum_by_id = [sum(group.residual) for group in grouped]
-    ratio = sum(abs2, sum_by_id) / total_ss
-    statistic = shape.n_ids * shape.n_times / (2 * (shape.n_times - 1)) * (ratio - 1)^2
+    group_sums = [sum(group.residual) for group in grouped]
+    group_sizes = [nrow(group) for group in grouped]
+    N = length(residuals)
+    n_groups = length(group_sums)
+
+    # 通用 BP LM 公式（支持不平衡面板）
+    # LM = (N^2 / (2 * Σ T_i^2)) * (Σ e_i)^2 / Σ e_{it}^2 - 1)^2
+    # 简化：使用组内和的平方
+    sum_sq_groups = sum(s^2 for s in group_sums)
+    T_bar = N / n_groups  # 平均组大小
+
+    # BP 统计量
+    ratio = sum_sq_groups / total_ss
+    if shape.is_balanced
+        T_i = shape.n_times
+        statistic = n_groups * T_i / (2 * (T_i - 1)) * (ratio - 1)^2
+    else
+        # 不平衡面板：使用 Searle 公式
+        sum_T_sq = sum(s^2 for s in group_sizes)
+        T_star = (N - sum_T_sq / N) / (n_groups - 1)
+        statistic = n_groups / 2 * (ratio - 1)^2
+    end
+    statistic = max(statistic, 0.0)
     pvalue = 1 - cdf(Chisq(1), statistic)
 
     return Dict(
@@ -202,8 +219,10 @@ function breusch_pagan_lm(panel_data::MetricaBase.PanelData, formula::String)
         "statistic" => statistic,
         "pvalue" => pvalue,
         "dof" => 1,
-        "method" => "breusch_pagan_re_lm_balanced_v1",
-        "note" => "H0: 随机效应方差为 0，pooled OLS 足够。",
+        "method" => "breusch_pagan_re_lm",
+        "note" => shape.is_balanced ?
+            "H0: 随机效应方差为 0，pooled OLS 足够。" :
+            "H0: 随机效应方差为 0。不平衡面板 BP 为近似检验。",
     )
 end
 

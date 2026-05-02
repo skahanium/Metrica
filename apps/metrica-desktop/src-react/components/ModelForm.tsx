@@ -73,13 +73,26 @@ export function ModelForm() {
               <Input value={panelTime} onChange={(e) => setPanelTime(e.target.value)} style={{ width: 100 }} placeholder="year" />
             </Form.Item>
             <Form.Item label="方法">
-              <Select value={panelMethod} onChange={(v) => setPanelMethod(v)} style={{ width: 120 }}>
+              <Select value={panelMethod} onChange={(v) => setPanelMethod(v)} style={{ width: 140 }}>
                 <Select.Option value="fe">FE 固定效应</Select.Option>
                 <Select.Option value="re">RE 随机效应</Select.Option>
                 <Select.Option value="fd">FD 一阶差分</Select.Option>
                 <Select.Option value="between">Between</Select.Option>
+                <Select.Option value="hdfde">HDFE 高维固定效应</Select.Option>
+                <Select.Option value="cre">CRE/Mundlak</Select.Option>
+                <Select.Option value="panel_iv">Panel IV</Select.Option>
               </Select>
             </Form.Item>
+            {panelMethod === 'panel_iv' && (
+              <>
+                <Form.Item label="工具变量">
+                  <Input value={instruments} onChange={(e) => setInstruments(e.target.value)} style={{ width: 160 }} placeholder="z1, z2" />
+                </Form.Item>
+                <Form.Item label="内生变量">
+                  <Input value={endogColumns} onChange={(e) => setEndogColumns(e.target.value)} style={{ width: 160 }} placeholder="x1" />
+                </Form.Item>
+              </>
+            )}
           </>
         ) : modelType === 'iv' ? (
           <>

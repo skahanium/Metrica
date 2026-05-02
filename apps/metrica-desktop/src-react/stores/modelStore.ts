@@ -9,7 +9,7 @@ interface ModelState {
   clusterColumn: string;
   panelId: string;
   panelTime: string;
-  panelMethod: 'fe' | 're' | 'fd' | 'between';
+  panelMethod: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv';
   instruments: string;
   endogColumns: string;
   lastResult: ModelResult | null;
@@ -20,7 +20,7 @@ interface ModelState {
   setClusterColumn: (c: string) => void;
   setPanelId: (id: string) => void;
   setPanelTime: (t: string) => void;
-  setPanelMethod: (m: 'fe' | 're' | 'fd' | 'between') => void;
+  setPanelMethod: (m: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv') => void;
   setInstruments: (v: string) => void;
   setEndogColumns: (v: string) => void;
   setLastResult: (r: ModelResult | null) => void;
@@ -60,6 +60,10 @@ export const useModelStore = create<ModelState>((set, get) => ({
       spec.panel_id = s.panelId;
       spec.panel_time = s.panelTime;
       spec.panel_method = s.panelMethod;
+      if (s.panelMethod === 'panel_iv') {
+        if (s.instruments.trim()) spec.instruments = s.instruments.split(',').map((v) => v.trim()).filter(Boolean);
+        if (s.endogColumns.trim()) spec.endog_columns = s.endogColumns.split(',').map((v) => v.trim()).filter(Boolean);
+      }
     } else if (s.modelType === 'iv') {
       spec.vcov = { type: s.vcovType };
       if (s.clusterColumn.trim()) spec.cluster_column = s.clusterColumn.trim();

@@ -70,7 +70,19 @@ function handle_request(req::Dict{String, Any})
                 df = CSV.read(dataset_path, DataFrame)
                 panel_data = MetricaBase.PanelData(df, panel_id, panel_time)
 
-                result = fit_panel(panel_data, formula; method=panel_method)
+                if panel_method == :hdfde
+                    fe_spec = Symbol.(get(params, "fe_spec", ["firm"]))
+                    result = fit_panel(panel_data, formula; method=:hdfde, fe_spec=fe_spec)
+                elseif panel_method == :cre
+                    result = fit_panel(panel_data, formula; method=:cre)
+                elseif panel_method == :panel_iv
+                    instruments = String.(params["instruments"])
+                    endog_columns = String.(params["endog_columns"])
+                    result = fit_panel_iv(panel_data, formula; instruments=instruments, endog=endog_columns)
+                else
+                    # 原有 FE/RE/FD/Between 分支
+                    result = fit_panel(panel_data, formula; method=panel_method)
+                end
                 payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
             elseif model_type == "iv"
