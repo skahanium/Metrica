@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-状态：待启动
+状态：已完成
 设计规格：`docs/superpowers/specs/2026-05-03-milestone-6-linear-models-design.md`
 
 **Goal:** 将 MetricaLinear.jl 从教学口径 OLS/WLS 升级为研究口径线性模型族，补全 IV/2SLS、GLS、统一 fit 接口、predict 和协议方法。
