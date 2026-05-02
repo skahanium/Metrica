@@ -7,7 +7,7 @@ using MetricaBase
 using Statistics
 using StatsModels
 
-export PanelModel, PanelFitResult, fit_panel, fit_hdfde, panel_diagnostics, result_to_payload,
+export PanelModel, PanelFitResult, fit_panel, fit_hdfde, fit_crea, panel_diagnostics, result_to_payload,
     compute_dk_vcov, compute_iv_dk_vcov
 
 """
@@ -144,6 +144,8 @@ function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::S
         return fit_fd(panel_data, formula)
     elseif method === :between
         return fit_between(panel_data, formula)
+    elseif method === :cre
+        return fit_crea(panel_data, formula)
     else
         error("面板估计方法 :$method 尚未实现")
     end
@@ -152,6 +154,7 @@ end
 include("fe.jl")
 include("hdfde.jl")
 include("dk.jl")
+include("cre.jl")
 include("re.jl")
 include("fd.jl")
 include("between.jl")
