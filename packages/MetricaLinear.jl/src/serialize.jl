@@ -69,6 +69,9 @@ function result_to_payload(result::OLSFitResult; include_augment::Bool=true)
             ],
             "warnings" => warnings,
             "summary_text" => summary_text,
+            "loglikelihood" => _compute_loglikelihood(result),
+            "aic" => _compute_aic(result),
+            "bic" => _compute_bic(result),
         ),
     )
 
@@ -83,6 +86,26 @@ function result_to_payload(result::OLSFitResult; include_augment::Bool=true)
     end
 
     return payload
+end
+
+function _compute_loglikelihood(result)
+    n = length(result.response_vector)
+    rss = sum(abs2, result.residual_vector)
+    sigma2 = rss / n
+    return -n / 2 * (log(2π) + log(sigma2) + 1)
+end
+
+function _compute_aic(result)
+    k = length(result.coefficient_names)
+    ll = _compute_loglikelihood(result)
+    return 2 * k - 2 * ll
+end
+
+function _compute_bic(result)
+    n = length(result.response_vector)
+    k = length(result.coefficient_names)
+    ll = _compute_loglikelihood(result)
+    return k * log(n) - 2 * ll
 end
 
 result_to_payload(err::MetricaBase.ModelError) = error_to_payload(err)
