@@ -7,7 +7,7 @@ using MetricaBase
 using Statistics
 using StatsModels
 
-export PanelModel, PanelFitResult, fit_panel, panel_diagnostics, result_to_payload
+export PanelModel, PanelFitResult, fit_panel, fit_hdfde, panel_diagnostics, result_to_payload
 
 """
 面板模型规格对象。
@@ -131,9 +131,12 @@ end
 
 返回 `PanelFitResult`。
 """
-function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::Symbol=:fe)
+function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::Symbol=:fe, fe_spec::Vector{Symbol}=Symbol[])
     if method === :fe
         return fit_fe(panel_data, formula)
+    elseif method === :hdfde
+        isempty(fe_spec) && error("HDFE 方法需要指定 fe_spec 参数，如 fe_spec=[:firm, :year]")
+        return fit_hdfde(panel_data, formula; fe_spec=fe_spec)
     elseif method === :re
         return fit_re(panel_data, formula)
     elseif method === :fd
@@ -146,6 +149,7 @@ function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::S
 end
 
 include("fe.jl")
+include("hdfde.jl")
 include("re.jl")
 include("fd.jl")
 include("between.jl")
