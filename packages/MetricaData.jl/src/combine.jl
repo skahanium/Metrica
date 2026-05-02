@@ -61,17 +61,3 @@ function collapse(df::DataFrame, by::Vector{Symbol}, stats::Vector{String}, valu
     end
     return OpResult("collapse", df2, notes = "分组: $(join(String.(by), ", "))，统计: $(join(stats, ", "))")
 end
-
-"""
-    operate(df, expr)
-
-通用列运算。`expr` 为字符串表达式。
-"""
-function operate(df::DataFrame, expr::String) end
-
-"""
-    operate_chain(df, ops)
-
-链式操作。`ops` 为操作字典列表。
-"""
-function operate_chain(df::DataFrame, ops::Vector{Dict{String, Any}}) end

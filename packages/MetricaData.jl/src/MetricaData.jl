@@ -11,6 +11,6 @@ include("serialize.jl")
 export generate, replace, rename, drop, keep
 export filter, sort
 export merge, reshape_long, reshape_wide, collapse
-export operate, operate_chain
+export result_to_dict, operate, operate_chain
 
 end # module MetricaData
