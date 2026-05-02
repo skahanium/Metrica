@@ -1,8 +1,8 @@
 [deps]
 MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
-MetricaTests = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
+MetricaDiagnostics = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [sources]
 MetricaLinear = {path = "../../MetricaLinear.jl"}
-MetricaTests = {path = ".."}
+MetricaDiagnostics = {path = ".."}

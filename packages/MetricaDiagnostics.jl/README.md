@@ -1,6 +1,6 @@
-# MetricaTests.jl
+# MetricaDiagnostics.jl
 
-Metrica 的诊断检验与测试层。
+Metrica 的诊断检验层。
 
 ## 职责
 

@@ -9,15 +9,12 @@ using JSON3
 using MetricaBase
 using MetricaLinear
 
-include(joinpath(String(ARGS[2]), "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))
-using .MetricaTests
+include(joinpath(String(ARGS[2]), "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
+using .MetricaDiagnostics
 
 # 加载面板模块
 include(joinpath(String(ARGS[2]), "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
 using .MetricaPanel
-
-# 加载共享诊断函数
-include(joinpath(String(ARGS[2]), "scripts", "diagnostics_common.jl"))
 
 request = JSON3.read(ARGS[1])
 action = String(request.action)

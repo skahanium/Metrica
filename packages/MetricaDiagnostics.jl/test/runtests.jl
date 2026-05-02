@@ -1,6 +1,6 @@
 using Test
 using MetricaLinear
-using MetricaTests
+using MetricaDiagnostics
 
 const DEMO_CSV = joinpath(
     dirname(dirname(dirname(@__DIR__))),

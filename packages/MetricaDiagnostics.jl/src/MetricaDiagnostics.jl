@@ -1,11 +1,11 @@
-module MetricaTests
+module MetricaDiagnostics
 
 using Distributions
 using LinearAlgebra
 using Statistics
 using MetricaLinear
 
-export vif, breusch_pagan, white_test, durbin_watson, breusch_godfrey, reset_test, jarque_bera
+export vif, breusch_pagan, white_test, durbin_watson, breusch_godfrey, reset_test, jarque_bera, diagnostics_to_dict
 
 function is_intercept_name(name::Symbol)
     normalized = lowercase(String(name))
@@ -265,5 +265,7 @@ function jarque_bera(fit::MetricaLinear.OLSFitResult)
 
     return (statistic=statistic, pvalue=pvalue, skewness=S, kurtosis=K)
 end
+
+include("diagnostics_common.jl")
 
 end

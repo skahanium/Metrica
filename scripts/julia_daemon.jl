@@ -16,15 +16,12 @@ using JSON3
 using MetricaBase
 using MetricaLinear
 
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTests.jl", "src", "MetricaTests.jl"))
-using .MetricaTests
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
+using .MetricaDiagnostics
 
 # 加载面板模块
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
 using .MetricaPanel
-
-# 加载共享诊断函数
-include(joinpath(ENV["METRICA_REPO_ROOT"], "scripts", "diagnostics_common.jl"))
 
 function handle_request(req::Dict{String, Any})
     id = req["id"]

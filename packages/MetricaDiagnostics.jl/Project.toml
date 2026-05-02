@@ -1,4 +1,4 @@
-name = "MetricaTests"
+name = "MetricaDiagnostics"
 uuid = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
 version = "0.1.0"
 authors = ["Metrica Contributors"]
