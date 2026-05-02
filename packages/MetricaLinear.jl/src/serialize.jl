@@ -97,6 +97,7 @@ end
 
 _compute_k(result::OLSFitResult) = length(result.coefficient_names)
 _compute_k(result::IVFitResult) = length(result.coef_names)
+_compute_k(result::GLSFitResult) = length(result.coef_names)
 
 function _compute_aic(result)
     k = _compute_k(result)
@@ -129,6 +130,35 @@ function result_to_payload(result::IVFitResult; include_augment::Bool=true)
             "vcov_label" => tidy_table.vcov_label,
             "tidy" => [Dict("name" => String(r.name), "estimate" => r.estimate, "stderror" => r.stderror, "statistic" => r.statistic, "pvalue" => r.pvalue) for r in tidy_table.rows],
             "first_stage_stats" => Dict(String(k) => v for (k, v) in result.first_stage_stats),
+            "warnings" => warnings, "summary_text" => summary_text,
+            "loglikelihood" => _compute_loglikelihood(result), "aic" => _compute_aic(result), "bic" => _compute_bic(result),
+        ),
+    )
+
+    if include_augment
+        at = MetricaBase.augment(result)
+        max_preview = min(100, at.nobs)
+        payload["result_payload"]["augment_preview"] = Dict(String(k) => v[1:max_preview] for (k, v) in at.columns)
+    end
+
+    return payload
+end
+
+function result_to_payload(result::GLSFitResult; include_augment::Bool=true)
+    glance_table = MetricaBase.glance(result)
+    tidy_table = MetricaBase.tidy(result)
+    warnings = [warning_to_dict(w) for w in glance_table.warnings]
+
+    summary_text = try MetricaOutput.summary_card(glance_table) catch e "" end
+
+    payload = Dict(
+        "status" => "success",
+        "messages" => [Dict("level" => severity_to_string(w.severity), "code" => String(w.code), "text" => w.detail, "hint" => w.hint) for w in glance_table.warnings],
+        "result_payload" => Dict(
+            "glance" => Dict("model" => String(glance_table.model), "nobs" => glance_table.nobs, "dof" => glance_table.dof,
+                "metrics" => Dict(String(k) => v for (k, v) in glance_table.metrics), "warnings" => warnings),
+            "vcov_label" => tidy_table.vcov_label,
+            "tidy" => [Dict("name" => String(r.name), "estimate" => r.estimate, "stderror" => r.stderror, "statistic" => r.statistic, "pvalue" => r.pvalue) for r in tidy_table.rows],
             "warnings" => warnings, "summary_text" => summary_text,
             "loglikelihood" => _compute_loglikelihood(result), "aic" => _compute_aic(result), "bic" => _compute_bic(result),
         ),

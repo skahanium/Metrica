@@ -122,6 +122,7 @@ end
 include("io.jl")
 include("ols.jl")
 include("iv.jl")
+include("gls.jl")
 include("serialize.jl")
 
 end

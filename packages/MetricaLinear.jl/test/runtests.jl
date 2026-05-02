@@ -1,4 +1,5 @@
 using Test
+using LinearAlgebra: I
 using MetricaBase: fit, coef, vcov, stderror, nobs, dof, r2, fitted, residuals, predict,
     glance, tidy, augment, ModelError, ModelWarning, AugmentTable, AbstractLinearModel, AbstractLinearFitResult
 using MetricaLinear
@@ -320,4 +321,42 @@ end
     @test bad_endog.code === :endog_not_in_formula
 
     rm(iv_csv; force=true)
+end
+
+@testset "GLS 链路" begin
+    identity_omega = r -> Matrix{Float64}(I, length(r), length(r))
+    gls_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=identity_omega)
+
+    @test gls_result isa GLSFitResult
+    @test gls_result isa AbstractLinearFitResult
+    @test glance(gls_result).model === :gls
+    @test glance(gls_result).nobs == 7
+
+    ols_result = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+    for (g, o) in zip(tidy(gls_result).rows, tidy(ols_result).rows)
+        @test g.estimate ≈ o.estimate atol=1e-10
+    end
+
+    @test haskey(glance(gls_result).metrics, :r2)
+    @test augment(gls_result) isa AugmentTable
+
+    p = predict(gls_result)
+    @test length(p) == 7
+
+    ci = predict(gls_result; interval=:confidence, level=0.95)
+    @test ci isa NamedTuple
+    @test all(ci.lower .<= ci.predictions .<= ci.upper)
+
+    payload = result_to_payload(gls_result)
+    @test payload["status"] == "success"
+
+    bad_omega = r -> -Matrix{Float64}(I, length(r), length(r))
+    bad_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=bad_omega)
+    @test bad_result isa ModelError
+    @test bad_result.code === :omega_not_positive_definite
+
+    wrong_dim_omega = r -> Matrix{Float64}(I, 3, 3)
+    wrong_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=wrong_dim_omega)
+    @test wrong_result isa ModelError
+    @test wrong_result.code === :omega_dimension_mismatch
 end
