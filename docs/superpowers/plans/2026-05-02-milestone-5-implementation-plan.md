@@ -1,12 +1,21 @@
 # 里程碑 5 实施计划
 
-> **状态：实施中。** 当前第一优先级是恢复绿色基线：`MetricaData.jl`、Runtime `/transform` 与 React App 的门禁测试必须保持通过，然后再继续扩展数据管理面板或后续模型能力。
+> **状态：已完成。** M5 所有 Task 已完成并提交（最新提交 `3ad6f9b Stabilize M4 and M5 green baselines`）。门禁测试全部通过，地基已稳定。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 加固 Metrica 地基：前端升级到 React 19 + TypeScript 5 技术栈，新增 MetricaData.jl 数据管理包。
 
 **Architecture:** 双轨并行。Track A 在 `src-react/` 中构建 React/TypeScript 前端，与旧 `src/` 并存，完成后切换入口。Track B 在 Julia Core 层新增 `MetricaData.jl` 包，通过 Runtime `/transform` 端点暴露。两条轨道独立开发、独立测试、独立提交。
+
+**当前收口切片（2026-05-02）：**
+
+- `/transform` 统一为 Task 风格请求：`task_id`、`action: "transform"`、`project_context`、`dataset_ref`、`operations`、`options`
+- `options.persist_output` 在 M5 默认启用，派生 CSV 写入 `<working_dir>/.metrica/derived/<task_id>.csv`
+- Runtime 返回 `TaskResponse` 风格结果，`result_payload.result.dataset_path` 指向派生 CSV
+- `MetricaData.operate_chain` 负责事务式执行、结构化错误与成功写出 CSV；任一步失败时不写派生文件
+- React App 通过 `transformStore`、`datasetStore.activePath`、数据操作面板、操作历史与预览表形成“数据处理 → 模型拟合”闭环
+- M5 不迁移当前 wry/tao 桌面壳到完整 Tauri 2 插件架构；完整插件化文件对话框进入 M9 产品化或后续桌面增强
 
 **Tech Stack:** React 19, TypeScript 5, Vite, Zustand, Ant Design, AG Grid, ECharts, Julia 1.12, DataFrames.jl, Rust/axum
 
@@ -26,12 +35,16 @@ apps/metrica-desktop/
     stores/
       appStore.ts               # { activeTab, isLoading, error }
       modelStore.ts             # { modelType, formula, options, lastResult }
-      datasetStore.ts           # { filePath, summary, preview }
+      datasetStore.ts           # { sourcePath, activePath, summary, isDerived }
+      transformStore.ts         # { operations, history, lastTransformResult, isTransforming }
     components/
       App.tsx                   # 根组件，ConfigProvider + Layout
       Header.tsx                # 菜单栏、运行按钮、状态指示
       Sidebar.tsx               # 数据源面板、变量浏览器
       DataSourcePanel.tsx       # 文件选择、数据检查
+      DataOperationsPanel.tsx   # 数据操作链配置与运行
+      OperationHistory.tsx      # 操作历史、失败位置、行列变化
+      DataPreviewTable.tsx      # inspect 或 transform preview
       ModelForm.tsx             # 模型类型/公式/选项表单
       GlanceTable.tsx           # AG Grid 渲染 glance 指标
       TidyTable.tsx             # AG Grid 渲染系数表
