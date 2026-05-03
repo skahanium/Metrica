@@ -21,9 +21,7 @@ function fit_crea(panel_data::MetricaBase.PanelData, formula::String)
     n_ids = length(unique_ids)
 
     # 解析公式
-    parts = split(formula, "~")
-    response_name = strip(parts[1])
-    predictor_names = [strip(x) for x in split(parts[2], "+")]
+    response_name, predictor_names = MetricaBase.parse_metrica_formula(formula)
 
     y = Float64.(data[!, Symbol(response_name)])
     X_names = [Symbol(name) for name in predictor_names]

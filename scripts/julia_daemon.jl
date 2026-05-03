@@ -17,6 +17,7 @@ using CSV
 using DataFrames
 using MetricaBase
 using MetricaLinear
+using MetricaOutput
 using LinearAlgebra: I
 
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
@@ -131,6 +132,28 @@ function handle_request(req::Dict{String, Any})
                     payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
                 end
             end
+        elseif action == "export_report"
+            format = get(params, "format", "markdown")
+            run_record = get(params, "run_record", Dict{String, Any}())
+            result = get(params, "result", Dict{String, Any}())
+
+            content = if format == "markdown"
+                MetricaOutput.markdown_run_report(run_record, result)
+            elseif format == "csv_tidy"
+                MetricaOutput.csv_tidy(result)
+            elseif format == "csv_glance"
+                MetricaOutput.csv_glance(result)
+            elseif format == "csv_diagnostics"
+                MetricaOutput.csv_diagnostics(result)
+            else
+                ""
+            end
+
+            payload = Dict(
+                "status" => "success",
+                "content" => content,
+                "format" => format,
+            )
         else
             payload = Dict(
                 "status" => "error",
@@ -138,7 +161,7 @@ function handle_request(req::Dict{String, Any})
                     "level" => "error",
                     "code" => "UNKNOWN_ACTION",
                     "text" => "守护进程不支持的动作：$action",
-                    "hint" => "当前仅支持 fit_model、inspect_dataset 与 transform。",
+                    "hint" => "当前支持 fit_model、inspect_dataset、transform 与 export_report。",
                 )],
             )
         end

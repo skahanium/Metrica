@@ -2,6 +2,7 @@ import { Form, Select, Input, Card, Tag, Typography } from 'antd';
 import { useModelStore } from '../stores/modelStore';
 import { useAppStore } from '../stores/appStore';
 import { useDatasetStore } from '../stores/datasetStore';
+import { useProjectStore } from '../stores/projectStore';
 import { fitModel } from '../services/runtimeClient';
 
 export function ModelForm() {
@@ -14,13 +15,16 @@ export function ModelForm() {
     instruments, setInstruments, endogColumns, setEndogColumns,
   } = useModelStore();
   const { setLoading, setError } = useAppStore();
-  const { activePath, isDerived } = useDatasetStore();
+  const activePath = useDatasetStore((s) => s.activePath);
+  const isDerived = useDatasetStore((s) => s.sourcePath !== s.activePath);
+  const { appendRunRecord, setDirty } = useProjectStore();
 
   const handleRun = async () => {
     if (!activePath) { setError('请先选择数据集'); return; }
     setLoading(true);
     setError(null);
     try {
+      const { projectId } = useProjectStore.getState();
       const res = await fitModel({
         datasetPath: activePath,
         formula,
@@ -33,11 +37,16 @@ export function ModelForm() {
         panelMethod,
         instruments,
         endogColumns,
+        projectId,
       });
       if (res.status === 'error') {
         setError(res.messages.map((m) => m.text).join('; '));
       } else if (res.result_payload) {
         setLastResult(res.result_payload);
+        if (res.run_record) {
+          appendRunRecord(res.run_record);
+        }
+        setDirty(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');

@@ -8,7 +8,7 @@ export function DataPreviewTable() {
   const lastTransformResult = useTransformStore((s) => s.lastTransformResult);
 
   const preview = lastTransformResult?.preview;
-  const fallbackRows = summary?.preview ?? summary?.preview_rows ?? [];
+  const fallbackRows = summary?.preview ?? [];
   const rows = preview?.rows ?? fallbackRows;
   const columns = preview?.columns ?? (rows[0] ? Object.keys(rows[0]) : []);
 

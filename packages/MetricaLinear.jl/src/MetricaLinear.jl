@@ -11,7 +11,7 @@ using MetricaBase
 using MetricaOutput
 
 export OLSModel, OLSFitResult, IVModel, IVFitResult, GLSModel, GLSFitResult,
-    PHASE_1_MODELS, fit, fit_ols_file, inspect_dataset, result_to_payload
+    PHASE_1_MODELS, fit, inspect_dataset, result_to_payload
 
 const PHASE_1_MODELS = (:OLS, :IV, :GLS)
 

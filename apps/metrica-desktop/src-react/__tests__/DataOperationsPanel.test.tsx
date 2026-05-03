@@ -11,7 +11,7 @@ describe('DataOperationsPanel', () => {
       sourcePath: '/tmp/source.csv',
       activePath: '/tmp/source.csv',
       summary: null,
-      isDerived: false,
+      isDerived: () => false,
     });
     useTransformStore.setState({
       operations: [],
@@ -62,7 +62,7 @@ describe('DataOperationsPanel', () => {
     await waitFor(() => {
       expect(useDatasetStore.getState().activePath).toBe('/tmp/.metrica/derived/transform-ok.csv');
     });
-    expect(useDatasetStore.getState().isDerived).toBe(true);
+    expect(useDatasetStore.getState().isDerived()).toBe(true);
     expect(useTransformStore.getState().history.length).toBe(1);
   });
 });

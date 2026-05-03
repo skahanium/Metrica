@@ -11,6 +11,142 @@ pub use julia_session::JuliaSession;
 pub use server::{build_router, serve as serve_axum};
 
 /// 解析仓库根目录。
+
+/// 模型请求的校验错误，由共享校验函数返回。
+/// 调用方（server / julia_bridge）负责将其转换为各自协议的响应格式。
+#[derive(Debug, Clone)]
+pub struct ValidationError {
+    pub code: &'static str,
+    pub message: String,
+    pub hint: Option<String>,
+}
+
+// === 共享路径解析 =============================================================
+
+/// 将相对工作目录解析为绝对路径。
+pub fn resolve_working_dir(raw_working_dir: &str) -> std::path::PathBuf {
+    let working_dir = std::path::PathBuf::from(raw_working_dir);
+    if working_dir.is_absolute() {
+        return working_dir;
+    }
+    repo_root().join(working_dir)
+}
+
+/// 将数据集相对路径解析为绝对路径字符串。
+pub fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::PathBuf) -> String {
+    let dataset_path = std::path::PathBuf::from(raw_path);
+    if dataset_path.is_absolute() {
+        return dataset_path.to_string_lossy().to_string();
+    }
+    working_dir.join(dataset_path).to_string_lossy().to_string()
+}
+
+// === 共享模型校验 =============================================================
+
+/// 根据 model_type 分发到具体校验器。
+pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
+    match spec.model_type.as_str() {
+        "ols" => None,
+        "panel" => validate_panel_spec(spec),
+        "iv" => validate_iv_spec(spec),
+        "gls" => None,
+        model_type => Some(ValidationError {
+            code: "RUNTIME_UNSUPPORTED_MODEL_TYPE",
+            message: format!("runtime 当前支持 `ols`、`panel`、`iv` 与 `gls`，收到 `{model_type}`。"),
+            hint: Some("请将 model_type 设为 `ols`、`panel`、`iv` 或 `gls`。".to_string()),
+        }),
+    }
+}
+
+/// 校验面板模型必须提供 panel_id 与 panel_time。
+pub fn validate_panel_spec(spec: &ModelSpec) -> Option<ValidationError> {
+    let missing_fields = [
+        ("panel_id", spec.panel_id.as_deref()),
+        ("panel_time", spec.panel_time.as_deref()),
+    ]
+    .iter()
+    .filter_map(|(field, value)| match value {
+        Some(value) if !value.trim().is_empty() => None,
+        _ => Some(*field),
+    })
+    .collect::<Vec<_>>();
+
+    if missing_fields.is_empty() {
+        return None;
+    }
+
+    Some(ValidationError {
+        code: "RUNTIME_PANEL_INDEX_REQUIRED",
+        message: format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
+        hint: Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
+    })
+}
+
+/// 校验 IV 模型必须提供 instruments 与 endog_columns。
+pub fn validate_iv_spec(spec: &ModelSpec) -> Option<ValidationError> {
+    let missing = [
+        ("instruments", spec.instruments.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
+        ("endog_columns", spec.endog_columns.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
+    ]
+    .iter()
+    .filter_map(|(f, empty)| if *empty { Some(*f) } else { None })
+    .collect::<Vec<_>>();
+
+    if missing.is_empty() {
+        return None;
+    }
+
+    Some(ValidationError {
+        code: "RUNTIME_IV_FIELDS_REQUIRED",
+        message: format!("IV 模型缺少必要字段：{}。", missing.join(", ")),
+        hint: Some("请提供 instruments 和 endog_columns。".to_string()),
+    })
+}
+
+// === 标准化常量 ===============================================================
+
+/// 支持的 action 类型常量，避免字符串字面量散落各处。
+pub mod actions {
+    pub const FIT_MODEL: &str = "fit_model";
+    pub const INSPECT_DATASET: &str = "inspect_dataset";
+    pub const TRANSFORM: &str = "transform";
+    pub const EXPORT_REPORT: &str = "export_report";
+    pub const SAVE_PROJECT: &str = "save_project";
+    pub const LOAD_PROJECT: &str = "load_project";
+    pub const LIST_RUNS: &str = "list_runs";
+    pub const RERUN_TASK: &str = "rerun_task";
+}
+
+// === Julia 响应解析 ===========================================================
+
+/// Julia 返回的标准化响应信封，避免各处重复解析 `"status"`、`"messages"` 等 key。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JuliaResponse {
+    pub status: String,
+    #[serde(default)]
+    pub messages: Vec<Message>,
+    #[serde(default)]
+    pub result_payload: Option<serde_json::Value>,
+}
+
+impl JuliaResponse {
+    /// 从 Julia 返回的 JSON 字符串解析响应信封。
+    pub fn from_json(raw: &str) -> Result<Self, String> {
+        serde_json::from_str::<JuliaResponse>(raw)
+            .map_err(|e| format!("解析 Julia 响应失败: {e}"))
+    }
+
+    /// 从响应中提取 content 字段（用于导出场景）。
+    pub fn content(&self) -> &str {
+        self.result_payload
+            .as_ref()
+            .and_then(|v| v.get("content"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+    }
+}
+
+/// 解析仓库根目录。
 ///
 /// 基于 `CARGO_MANIFEST_DIR`（`runtime/metrica-runtime`）向上两级到仓库根。
 pub fn repo_root() -> std::path::PathBuf {
@@ -135,7 +271,109 @@ pub struct TaskResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub artifacts: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_record: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub result_payload: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataLineage {
+    pub source_dataset: String,
+    pub active_dataset: String,
+    pub operations: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row_count_before: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row_count_after: Option<usize>,
+    #[serde(default)]
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectManifest {
+    pub project_id: String,
+    pub version: u32,
+    pub created_at: String,
+    pub updated_at: String,
+    pub source_dataset: String,
+    pub active_dataset: String,
+    pub saved_model_specs: Vec<ModelSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_run_id: Option<String>,
+    #[serde(default)]
+    pub ui_state: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_lineage: Option<DataLineage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunRecord {
+    pub run_id: String,
+    pub action: String,
+    pub started_at: String,
+    pub finished_at: String,
+    pub status: String,
+    pub dataset_ref: DatasetRef,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_spec: Option<ModelSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operations: Option<Vec<TransformOperation>>,
+    #[serde(default)]
+    pub warnings: Vec<Value>,
+    #[serde(default)]
+    pub messages: Vec<Message>,
+    #[serde(default)]
+    pub artifacts: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_summary: Option<Value>,
+    pub request_payload: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveProjectRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    pub manifest: ProjectManifest,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadProjectRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListRunsRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    #[serde(default)]
+    pub offset: Option<usize>,
+    #[serde(default)]
+    pub action_filter: Option<String>,
+    #[serde(default)]
+    pub status_filter: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerunTaskRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    pub run_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportReportRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    pub run_id: String,
+    pub format: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -252,6 +490,7 @@ pub fn sample_success_response() -> TaskResponse {
             hint: Some("拟合前请检查缺失列。".to_string()),
         }],
         artifacts: Some(vec![]),
+        run_record: None,
         result_payload: Some(json!({
             "glance": {
                 "model": "ols",
@@ -291,6 +530,7 @@ pub fn sample_error_response() -> TaskResponse {
             hint: Some("请检查是否存在某一预测变量是其他变量的线性组合。".to_string()),
         }],
         artifacts: None,
+        run_record: None,
         result_payload: None,
     }
 }
@@ -299,7 +539,7 @@ pub fn health_summary() -> HealthSummary {
     HealthSummary {
         service: "metrica-runtime".to_string(),
         status: "ready".to_string(),
-        supported_actions: vec!["inspect_dataset", "fit_model", "transform"],
+        supported_actions: vec!["inspect_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task"],
     }
 }
 

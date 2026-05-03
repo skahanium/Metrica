@@ -22,7 +22,7 @@
 ## 历史映射
 
 - 对应旧 `M6-M7`
-- 当前活跃文档：`2026-05-03-milestone-6-linear-models-design.md`、`2026-05-03-milestone-7-panel-models-design.md`
+- 当前阶段边界以本文件与总蓝图为准，不再保留已完成里程碑的独立设计文档
 
 ## 阶段验收
 

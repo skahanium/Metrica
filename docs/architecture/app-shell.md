@@ -264,4 +264,4 @@ apps/metrica-desktop/
 
 - Runtime 载荷由 `docs/architecture/runtime-protocol.md` 负责。
 - 项目级分层与当前主链路由 `docs/superpowers/specs/2026-04-30-metrica-main-design.md` 负责。
-- 当前面板收口执行顺序由 `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md` 负责。
+- 阶段级能力边界由 `docs/roadmap/` 下的 `S1-S7` 文档负责。

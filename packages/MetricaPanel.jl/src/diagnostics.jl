@@ -1,12 +1,8 @@
 # === 面板诊断 ===============================================================
 
 function _parse_panel_formula(formula::String)
-    parts = split(formula, "~")
-    length(parts) == 2 || error("面板公式必须包含一个 `~`。")
-
-    response_name = Symbol(strip(parts[1]))
-    predictor_names = Symbol.(strip.(split(parts[2], "+")))
-    return response_name, predictor_names
+    response_name, predictor_names = MetricaBase.parse_metrica_formula(formula)
+    return Symbol(response_name), Symbol.(predictor_names)
 end
 
 function _panel_design(panel_data::MetricaBase.PanelData, formula::String)

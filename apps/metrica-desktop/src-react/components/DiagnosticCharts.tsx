@@ -1,9 +1,15 @@
+import { useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Card, Empty } from 'antd';
 import { useModelStore } from '../stores/modelStore';
+import { ChartExportButton } from './ChartExportButton';
 
 export function DiagnosticCharts() {
   const lastResult = useModelStore((s) => s.lastResult);
+  const histogramRef = useRef<any>(null);
+  const qqRef = useRef<any>(null);
+  const scatterRef = useRef<any>(null);
+
   if (!lastResult?.augment_preview?.length) return <Empty description="无增强数据，无法生成诊断图表。请在运行时开启 return_augment。" />;
 
   const residuals = lastResult.augment_preview.map((r) => r.residual);
@@ -54,9 +60,18 @@ export function DiagnosticCharts() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16, marginTop: 16 }}>
-      <Card size="small"><ReactECharts option={histogramOption} style={{ height: 300 }} /></Card>
-      <Card size="small"><ReactECharts option={qqOption} style={{ height: 300 }} /></Card>
-      <Card size="small"><ReactECharts option={scatterOption} style={{ height: 300 }} /></Card>
+      <Card size="small" style={{ position: 'relative' }}>
+        <ChartExportButton chartRef={histogramRef} filename="residual_histogram" />
+        <ReactECharts ref={histogramRef} option={histogramOption} opts={{ renderer: 'svg' }} style={{ height: 300 }} />
+      </Card>
+      <Card size="small" style={{ position: 'relative' }}>
+        <ChartExportButton chartRef={qqRef} filename="residual_qq" />
+        <ReactECharts ref={qqRef} option={qqOption} opts={{ renderer: 'svg' }} style={{ height: 300 }} />
+      </Card>
+      <Card size="small" style={{ position: 'relative' }}>
+        <ChartExportButton chartRef={scatterRef} filename="residual_vs_fitted" />
+        <ReactECharts ref={scatterRef} option={scatterOption} opts={{ renderer: 'svg' }} style={{ height: 300 }} />
+      </Card>
     </div>
   );
 }

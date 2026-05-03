@@ -1,4 +1,5 @@
-import { ConfigProvider, Layout, Tabs, theme } from 'antd';
+import { useEffect } from 'react';
+import { ConfigProvider, Layout, Tabs, theme, Alert } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -13,14 +14,26 @@ import { WarningPanel } from './WarningPanel';
 import { DataOperationsPanel } from './DataOperationsPanel';
 import { OperationHistory } from './OperationHistory';
 import { DataPreviewTable } from './DataPreviewTable';
-import { useAppStore } from '../stores/appStore';
+import { ProjectPanel } from './ProjectPanel';
+import { ExportPanel } from './ExportPanel';
+import { ModelComparison } from './ModelComparison';
+import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
 
 const { Content, Sider } = Layout;
 
 export function App() {
-  const { activeTab, setActiveTab, error } = useAppStore();
+  const {
+    activeTab, setActiveTab, error,
+    juliaHealthy, restartCount,
+    startHealthPolling, stopHealthPolling,
+  } = useAppStore();
   const lastResult = useModelStore((s) => s.lastResult);
+
+  useEffect(() => {
+    startHealthPolling();
+    return () => stopHealthPolling();
+  }, [startHealthPolling, stopHealthPolling]);
 
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>
@@ -32,17 +45,43 @@ export function App() {
           </Sider>
           <Content style={{ padding: 24, background: '#fff' }}>
             <ModelForm />
+
+            {/* 操作错误 */}
             {error && <ErrorPanel messages={[{ code: 'ERROR', text: error }]} />}
+
+            {/* Julia 健康降级横幅 */}
+            {!juliaHealthy && restartCount < MAX_RESTARTS && (
+              <Alert
+                type="warning"
+                message={`Julia 计算引擎不可用（已自动重启 ${restartCount} 次）。运行时正在尝试自动恢复，请稍候重试。`}
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+            {!juliaHealthy && restartCount >= MAX_RESTARTS && (
+              <Alert
+                type="error"
+                message={`Julia 计算引擎已崩溃 ${MAX_RESTARTS} 次，已达最大重启次数。请检查 Julia 环境后刷新页面。`}
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            {/* 模型警告 */}
             {lastResult?.warnings && <WarningPanel warnings={lastResult.warnings} />}
+
             <Tabs
               activeKey={activeTab}
               onChange={setActiveTab}
               items={[
                 { key: 'data', label: '数据处理', children: <><DataOperationsPanel /><OperationHistory /><DataPreviewTable /></> },
+                { key: 'project', label: '项目', children: <ProjectPanel /> },
                 { key: 'glance', label: '模型概览', children: <GlanceTable /> },
                 { key: 'tidy', label: '系数表', children: <TidyTable /> },
                 { key: 'diagnostics', label: '诊断', children: <><DiagnosticCards /><DiagnosticCharts /></> },
                 { key: 'augment', label: '拟合值', children: <AugmentPreview /> },
+                { key: 'comparison', label: '模型对比', children: <ModelComparison /> },
+                { key: 'export', label: '导出', children: <ExportPanel /> },
               ]}
             />
           </Content>

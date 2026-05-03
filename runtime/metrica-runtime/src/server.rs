@@ -8,12 +8,17 @@ use axum::{
     Router,
 };
 use serde_json::json;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 use crate::julia_bridge::execute_fit_model;
 use crate::julia_session::JuliaSession;
 use crate::{
-    health_summary, repo_root, Message, TaskRequest, TaskResponse, TransformTaskRequest,
+    health_summary, ExportReportRequest, JuliaResponse, ListRunsRequest, LoadProjectRequest, Message,
+    ProjectManifest, RerunTaskRequest, RunRecord, SaveProjectRequest, TaskRequest, TaskResponse,
+    TransformTaskRequest, ValidationError,
+    validate_model_request,
+    resolve_working_dir, resolve_dataset_path,
+    actions,
 };
 
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:47821";
@@ -24,10 +29,15 @@ pub fn default_bind_addr() -> &'static str {
 
 pub type SharedSession = Arc<Mutex<JuliaSession>>;
 
+/// 安全获取 Julia Session 锁，处理毒化情况。
+fn lock_session(session: &SharedSession) -> Result<std::sync::MutexGuard<'_, JuliaSession>, String> {
+    session.lock().map_err(|_| "Julia 会话锁已毒化，请重启运行时。".to_string())
+}
+
 /// 构建含所有路由和 CORS 中间件的 axum Router。
 pub fn build_router(session: SharedSession) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin("http://localhost:1420".parse::<axum::http::HeaderValue>().unwrap())
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE]);
 
@@ -36,6 +46,11 @@ pub fn build_router(session: SharedSession) -> Router {
         .route("/fit_model", post(fit_model_handler))
         .route("/inspect_dataset", post(inspect_dataset_handler))
         .route("/transform", post(transform_handler))
+        .route("/save_project", post(save_project_handler))
+        .route("/load_project", post(load_project_handler))
+        .route("/list_runs", post(list_runs_handler))
+        .route("/rerun_task", post(rerun_task_handler))
+        .route("/export_report", post(export_report_handler))
         .layer(cors)
         .with_state(session)
 }
@@ -52,7 +67,7 @@ async fn health_handler(State(session): State<SharedSession>) -> impl IntoRespon
         "status": if julia_healthy { "ready" } else { "degraded" },
         "julia_healthy": julia_healthy,
         "restart_count": restart_count,
-        "supported_actions": ["inspect_dataset", "fit_model", "transform"],
+        "supported_actions": ["inspect_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task", "export_report"],
     }))
 }
 
@@ -61,7 +76,7 @@ async fn fit_model_handler(
     State(session): State<SharedSession>,
     body: String,
 ) -> impl IntoResponse {
-    handle_model_request(session, body, "fit_model").await
+    handle_model_request(session, body, actions::FIT_MODEL).await
 }
 
 /// POST /inspect_dataset — 解析 TaskRequest，解析路径，转发到 Julia 守护进程。
@@ -69,7 +84,30 @@ async fn inspect_dataset_handler(
     State(session): State<SharedSession>,
     body: String,
 ) -> impl IntoResponse {
-    handle_model_request(session, body, "inspect_dataset").await
+    handle_model_request(session, body, actions::INSPECT_DATASET).await
+}
+
+// === Transform 辅助函数 =======================================================
+
+/// 解析变换请求的输出路径（若启用 persist_output）。
+fn resolve_transform_output_path(
+    working_dir: &std::path::Path,
+    task_id: &str,
+    persist_output: bool,
+) -> Result<Option<String>, axum::response::Response> {
+    if !persist_output {
+        return Ok(None);
+    }
+    match ensure_transform_output_path(working_dir, task_id) {
+        Ok(path) => Ok(Some(path)),
+        Err(err) => Err(json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            task_id.to_string(),
+            "RUNTIME_TRANSFORM_OUTPUT_PATH_FAILED",
+            err,
+            Some("请检查项目目录是否可写。".to_string()),
+        )),
+    }
 }
 
 /// POST /transform — 接受数据操作链，转发到 Julia MetricaData 执行。
@@ -77,24 +115,21 @@ async fn transform_handler(
     State(session): State<SharedSession>,
     body: String,
 ) -> impl IntoResponse {
+    let started_at = current_timestamp_string();
     let request: TransformTaskRequest = match serde_json::from_str(&body) {
         Ok(r) => r,
         Err(e) => {
             return json_error_response(
-                StatusCode::BAD_REQUEST,
-                "unknown".to_string(),
-                "RUNTIME_INVALID_JSON",
+                StatusCode::BAD_REQUEST, "unknown".to_string(), "RUNTIME_INVALID_JSON",
                 format!("请求 JSON 解析失败: {e}"),
                 Some("请确认 /transform 请求符合 runtime-protocol。".to_string()),
             );
         }
     };
 
-    if request.action != "transform" {
+    if request.action != actions::TRANSFORM {
         return json_error_response(
-            StatusCode::BAD_REQUEST,
-            request.task_id,
-            "RUNTIME_UNSUPPORTED_ACTION",
+            StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_UNSUPPORTED_ACTION",
             format!("端点 transform 不支持动作 `{}`。", request.action),
             Some("请将 action 设为 `transform`。".to_string()),
         );
@@ -102,30 +137,16 @@ async fn transform_handler(
 
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
     let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
-    let output_path = if request.options.persist_output {
-        match ensure_transform_output_path(&working_dir, &request.task_id) {
-            Ok(path) => Some(path),
-            Err(err) => {
-                return json_error_response(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    request.task_id,
-                    "RUNTIME_TRANSFORM_OUTPUT_PATH_FAILED",
-                    err,
-                    Some("请检查项目目录是否可写。".to_string()),
-                );
-            }
-        }
-    } else {
-        None
+    let output_path = match resolve_transform_output_path(&working_dir, &request.task_id, request.options.persist_output) {
+        Ok(p) => p,
+        Err(response) => return response,
     };
 
     let operations_json = match serde_json::to_string(&request.operations) {
         Ok(json) => json,
         Err(e) => {
             return json_error_response(
-                StatusCode::BAD_REQUEST,
-                request.task_id,
-                "RUNTIME_TRANSFORM_SERIALIZE_FAILED",
+                StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_TRANSFORM_SERIALIZE_FAILED",
                 format!("数据操作序列化失败: {e}"),
                 Some("请检查 operations 是否为结构化数组。".to_string()),
             );
@@ -133,60 +154,90 @@ async fn transform_handler(
     };
 
     let params = json!({
-        "dataset_path": dataset_path,
+        "dataset_path": dataset_path.clone(),
         "operations": operations_json,
         "preview_rows": request.options.preview_rows,
         "persist_output": request.options.persist_output,
-        "output_path": output_path,
+        "output_path": output_path.clone(),
     });
 
     let result = {
         let session = session.clone();
         tokio::task::spawn_blocking(move || {
             let mut s = session.lock().unwrap();
-            s.send_request("transform", params)
-        })
-        .await
+            s.send_request(actions::TRANSFORM, params)
+        }).await
     };
 
     match result {
         Ok(Ok(julia_response)) => {
-            let status = julia_response
-                .get("status")
-                .and_then(|v| v.as_str())
-                .unwrap_or("error")
-                .to_string();
-            let messages: Vec<Message> = julia_response
-                .get("messages")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
+            let status = julia_response.get("status").and_then(|v| v.as_str()).unwrap_or("error").to_string();
+            let messages: Vec<Message> = julia_response.get("messages").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
             let result_payload = julia_response.get("result_payload").cloned();
+            let artifacts = output_path.as_ref().map(|path| vec![path.clone()]).unwrap_or_default();
+            let run_record = build_transform_run_record(&request, &dataset_path, &status, &messages, &artifacts, result_payload.as_ref(), &started_at);
+            let _ = persist_run_record(&working_dir, &run_record);
 
             let task_response = TaskResponse {
-                task_id: request.task_id,
-                status,
-                messages,
-                artifacts: None,
+                task_id: request.task_id, status, messages,
+                artifacts: if artifacts.is_empty() { None } else { Some(artifacts.clone()) },
+                run_record: serde_json::to_value(&run_record).ok(),
                 result_payload,
             };
-
             (StatusCode::OK, Json(task_response)).into_response()
         }
         Ok(Err(err)) => json_error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            request.task_id,
-            "RUNTIME_JULIA_EXECUTION_FAILED",
-            err,
+            StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_JULIA_EXECUTION_FAILED", err,
             Some("请检查 Julia 环境、依赖安装与数据操作参数。".to_string()),
         ),
         Err(join_err) => json_error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            request.task_id,
-            "RUNTIME_INTERNAL_ERROR",
+            StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_INTERNAL_ERROR",
             format!("内部运行时错误: {join_err}"),
             Some("请重试或联系管理员。".to_string()),
         ),
     }
+}
+
+// === 模型请求辅助函数 ==========================================================
+
+/// 从 TaskRequest 构建发送给 Julia 的 params JSON。
+fn build_model_params(request: &TaskRequest) -> serde_json::Value {
+    let vcov = request.model_spec.vcov.as_ref()
+        .map(|spec| spec.kind.as_str())
+        .unwrap_or("classical");
+
+    let mut params = json!({
+        "dataset_path": "",
+        "formula": request.model_spec.formula,
+        "model_type": request.model_spec.model_type,
+        "vcov": vcov,
+        "weights": request.model_spec.weights,
+        "return_augment": request.options.return_augment,
+    });
+
+    if let Some(ref col) = request.model_spec.cluster_column { params["cluster_column"] = json!(col); }
+    if let Some(ref panel_id) = request.model_spec.panel_id { params["panel_id"] = json!(panel_id); }
+    if let Some(ref panel_time) = request.model_spec.panel_time { params["panel_time"] = json!(panel_time); }
+    if let Some(ref panel_method) = request.model_spec.panel_method { params["panel_method"] = json!(panel_method); }
+    if let Some(ref instruments) = request.model_spec.instruments { params["instruments"] = json!(instruments); }
+    if let Some(ref endog_columns) = request.model_spec.endog_columns { params["endog_columns"] = json!(endog_columns); }
+    if let Some(ref omega_spec) = request.model_spec.omega_spec { params["omega_spec"] = json!(omega_spec); }
+
+    params
+}
+
+/// 向 Julia 派发模型请求并提取响应。
+async fn dispatch_model_to_julia(
+    session: &SharedSession,
+    action: &str,
+    params: serde_json::Value,
+) -> Result<std::result::Result<serde_json::Value, String>, tokio::task::JoinError> {
+    let s = session.clone();
+    let act = action.to_string();
+    tokio::task::spawn_blocking(move || {
+        let mut s = s.lock().unwrap();
+        s.send_request(&act, params)
+    }).await
 }
 
 /// 共享请求处理逻辑：解析 JSON → 校验 → 解析路径 → 转发 Julia → 返回响应。
@@ -195,13 +246,12 @@ async fn handle_model_request(
     body: String,
     expected_action: &str,
 ) -> axum::response::Response {
+    let started_at = current_timestamp_string();
     let request: TaskRequest = match serde_json::from_str(&body) {
         Ok(req) => req,
         Err(err) => {
             return json_error_response(
-                StatusCode::BAD_REQUEST,
-                "unknown".to_string(),
-                "RUNTIME_INVALID_JSON",
+                StatusCode::BAD_REQUEST, "unknown".to_string(), "RUNTIME_INVALID_JSON",
                 format!("请求 JSON 解析失败: {err}"),
                 Some("请确认请求体符合 runtime-protocol。".to_string()),
             );
@@ -210,15 +260,13 @@ async fn handle_model_request(
 
     if request.action != expected_action {
         return json_error_response(
-            StatusCode::BAD_REQUEST,
-            request.task_id,
-            "RUNTIME_UNSUPPORTED_ACTION",
+            StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_UNSUPPORTED_ACTION",
             format!("端点 {} 不支持动作 `{}`。", expected_action, request.action),
             Some("请使用正确的端点。".to_string()),
         );
     }
 
-    if request.action == "fit_model" {
+    if request.action == actions::FIT_MODEL {
         if let Some(response) = validate_fit_model_request(&request) {
             return response;
         }
@@ -227,110 +275,360 @@ async fn handle_model_request(
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
     let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
 
-    let vcov = request
-        .model_spec
-        .vcov
-        .as_ref()
-        .map(|spec| spec.kind.as_str())
-        .unwrap_or("classical");
+    let mut params = build_model_params(&request);
+    params["dataset_path"] = json!(dataset_path.clone());
 
-    let mut params = json!({
-        "dataset_path": dataset_path,
-        "formula": request.model_spec.formula,
-        "model_type": request.model_spec.model_type,
-        "vcov": vcov,
-        "weights": request.model_spec.weights,
-        "return_augment": request.options.return_augment,
-    });
-
-    if let Some(ref col) = request.model_spec.cluster_column {
-        params["cluster_column"] = json!(col);
-    }
-    if let Some(ref panel_id) = request.model_spec.panel_id {
-        params["panel_id"] = json!(panel_id);
-    }
-    if let Some(ref panel_time) = request.model_spec.panel_time {
-        params["panel_time"] = json!(panel_time);
-    }
-    if let Some(ref panel_method) = request.model_spec.panel_method {
-        params["panel_method"] = json!(panel_method);
-    }
-
-    if let Some(ref instruments) = request.model_spec.instruments {
-        params["instruments"] = json!(instruments);
-    }
-    if let Some(ref endog_columns) = request.model_spec.endog_columns {
-        params["endog_columns"] = json!(endog_columns);
-    }
-    if let Some(ref omega_spec) = request.model_spec.omega_spec {
-        params["omega_spec"] = json!(omega_spec);
-    }
-
-    let action = expected_action.to_string();
-    let result = {
-        let session = session.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut s = session.lock().unwrap();
-            s.send_request(&action, params)
-        })
-        .await
-    };
+    let result = dispatch_model_to_julia(&session, expected_action, params).await;
 
     match result {
         Ok(Ok(julia_response)) => {
-            let status = julia_response
-                .get("status")
-                .and_then(|v| v.as_str())
-                .unwrap_or("error")
-                .to_string();
-
-            let messages: Vec<Message> = julia_response
-                .get("messages")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-
+            let status = julia_response.get("status").and_then(|v| v.as_str()).unwrap_or("error").to_string();
+            let messages: Vec<Message> = julia_response.get("messages").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
             let result_payload = julia_response.get("result_payload").cloned();
 
+            let run_record = build_model_run_record(&request, &dataset_path, &status, &messages, &[], result_payload.as_ref(), &started_at);
+            let _ = persist_run_record(&working_dir, &run_record);
+
             let task_response = TaskResponse {
-                task_id: request.task_id,
-                status: status.clone(),
-                messages,
-                artifacts: if status == "success" {
-                    Some(vec![])
-                } else {
-                    None
-                },
+                task_id: request.task_id, status: status.clone(), messages,
+                artifacts: if status == "success" { Some(vec![]) } else { None },
+                run_record: serde_json::to_value(&run_record).ok(),
                 result_payload,
             };
 
-            let status_code = if status == "success" {
-                StatusCode::OK
-            } else {
-                StatusCode::OK // 模型级错误仍返回 200，由 status 字段区分
-            };
-
-            (
-                status_code,
-                [("Content-Type", "application/json")],
-                serde_json::to_string(&task_response).unwrap_or_default(),
-            )
-                .into_response()
+            let status_code = if status == "success" { StatusCode::OK } else { StatusCode::OK };
+            (status_code, [("Content-Type", "application/json")], serde_json::to_string(&task_response).unwrap_or_default()).into_response()
         }
         Ok(Err(err)) => json_error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            request.task_id,
-            "RUNTIME_JULIA_EXECUTION_FAILED",
-            err,
+            StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_JULIA_EXECUTION_FAILED", err,
             Some("请检查 Julia 环境、依赖安装与请求参数。".to_string()),
         ),
         Err(join_err) => json_error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            request.task_id,
-            "RUNTIME_INTERNAL_ERROR",
+            StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_INTERNAL_ERROR",
             format!("内部运行时错误: {join_err}"),
             Some("请重试或联系管理员。".to_string()),
         ),
     }
+}
+
+async fn save_project_handler(body: String) -> impl IntoResponse {
+    let request: SaveProjectRequest = match serde_json::from_str(&body) {
+        Ok(r) => r,
+        Err(err) => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                "unknown".to_string(),
+                "RUNTIME_INVALID_JSON",
+                format!("请求 JSON 解析失败: {err}"),
+                Some("请确认 /save_project 请求符合协议。".to_string()),
+            );
+        }
+    };
+
+    // 校验 manifest 关键字段
+    if request.manifest.project_id.trim().is_empty() {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id,
+            "RUNTIME_MANIFEST_INVALID",
+            "project_id 不能为空。".to_string(),
+            Some("请提供有效的 project_id。".to_string()),
+        );
+    }
+    if request.manifest.source_dataset.trim().is_empty() {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id,
+            "RUNTIME_MANIFEST_INVALID",
+            "source_dataset 不能为空。".to_string(),
+            Some("请提供源数据集路径。".to_string()),
+        );
+    }
+    if request.manifest.version < 1 {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id,
+            "RUNTIME_MANIFEST_INVALID",
+            "version 必须 >= 1。".to_string(),
+            Some("请设置有效的版本号。".to_string()),
+        );
+    }
+
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let project_path = project_manifest_path(&working_dir);
+    if let Err(err) = ensure_metrica_dir(&working_dir) {
+        return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_PROJECT_DIR_FAILED", err, None);
+    }
+    if let Err(err) = write_json_file(&project_path, &request.manifest) {
+        return json_error_response(StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_SAVE_PROJECT_FAILED", err, None);
+    }
+
+    let response = TaskResponse {
+        task_id: request.task_id,
+        status: "success".to_string(),
+        messages: vec![],
+        artifacts: Some(vec![project_path.to_string_lossy().to_string()]),
+        run_record: None,
+        result_payload: Some(json!({
+            "project_path": project_path.to_string_lossy().to_string(),
+            "manifest": request.manifest,
+        })),
+    };
+
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+async fn load_project_handler(body: String) -> impl IntoResponse {
+    let request: LoadProjectRequest = match serde_json::from_str(&body) {
+        Ok(r) => r,
+        Err(err) => {
+            return json_error_response(StatusCode::BAD_REQUEST, "unknown".to_string(), "RUNTIME_INVALID_JSON", format!("请求 JSON 解析失败: {err}"), None);
+        }
+    };
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let project_path = project_manifest_path(&working_dir);
+    let manifest: ProjectManifest = match read_json_file(&project_path) {
+        Ok(v) => v,
+        Err(err) => {
+            return json_error_response(StatusCode::NOT_FOUND, request.task_id, "RUNTIME_PROJECT_NOT_FOUND", err, Some("请先保存项目。".to_string()));
+        }
+    };
+
+    let response = TaskResponse {
+        task_id: request.task_id,
+        status: "success".to_string(),
+        messages: vec![],
+        artifacts: Some(vec![project_path.to_string_lossy().to_string()]),
+        run_record: None,
+        result_payload: Some(json!({
+            "project_path": project_path.to_string_lossy().to_string(),
+            "manifest": manifest,
+        })),
+    };
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+async fn list_runs_handler(body: String) -> impl IntoResponse {
+    let request: ListRunsRequest = match serde_json::from_str(&body) {
+        Ok(r) => r,
+        Err(err) => {
+            return json_error_response(StatusCode::BAD_REQUEST, "unknown".to_string(), "RUNTIME_INVALID_JSON", format!("请求 JSON 解析失败: {err}"), None);
+        }
+    };
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let mut runs = list_run_records(&working_dir).unwrap_or_default();
+
+    // 按 action 过滤
+    if let Some(ref action) = request.action_filter {
+        runs.retain(|r| r.action == *action);
+    }
+    // 按 status 过滤
+    if let Some(ref status) = request.status_filter {
+        runs.retain(|r| r.status == *status);
+    }
+
+    let total = runs.len();
+    let offset = request.offset.unwrap_or(0);
+    let limit = request.limit.unwrap_or(total);
+    let runs = runs.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
+
+    let response = TaskResponse {
+        task_id: request.task_id,
+        status: "success".to_string(),
+        messages: vec![],
+        artifacts: None,
+        run_record: None,
+        result_payload: Some(json!({ "runs": runs, "total": total })),
+    };
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+async fn rerun_task_handler(
+    State(session): State<SharedSession>,
+    body: String,
+) -> impl IntoResponse {
+    let request: RerunTaskRequest = match serde_json::from_str(&body) {
+        Ok(r) => r,
+        Err(err) => {
+            return json_error_response(StatusCode::BAD_REQUEST, "unknown".to_string(), "RUNTIME_INVALID_JSON", format!("请求 JSON 解析失败: {err}"), None);
+        }
+    };
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let run_path = runs_dir(&working_dir).join(format!("{}.json", request.run_id));
+    let run_record: RunRecord = match read_json_file(&run_path) {
+        Ok(v) => v,
+        Err(err) => {
+            return json_error_response(StatusCode::NOT_FOUND, request.task_id, "RUNTIME_RUN_NOT_FOUND", err, Some("请确认 run_id 是否存在。".to_string()));
+        }
+    };
+
+    let dataset_path = resolve_dataset_path(&run_record.dataset_ref.path, &working_dir);
+    if !std::path::Path::new(&dataset_path).exists() {
+        return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_DATASET_MISSING", format!("重跑所需数据集不存在：{dataset_path}"), Some("请恢复数据文件后再重跑。".to_string()));
+    }
+
+    let new_run_id = format!("rerun-{}", current_timestamp_string());
+
+    let action = run_record.action.clone();
+    let payload = run_record.request_payload.clone();
+    let response = if action == actions::TRANSFORM {
+        let original_request: TransformTaskRequest = match serde_json::from_value(payload) {
+            Ok(v) => v,
+            Err(err) => {
+                return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_REQUEST_INVALID", format!("历史请求载荷无法解析：{err}"), None);
+            }
+        };
+        let body = match serde_json::to_string(&TransformTaskRequest { task_id: new_run_id, ..original_request }) {
+            Ok(v) => v,
+            Err(err) => {
+                return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_REQUEST_INVALID", format!("历史请求重建失败：{err}"), None);
+            }
+        };
+        transform_handler(State(session), body).await.into_response()
+    } else {
+        let original_request: TaskRequest = match serde_json::from_value(payload) {
+            Ok(v) => v,
+            Err(err) => {
+                return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_REQUEST_INVALID", format!("历史请求载荷无法解析：{err}"), None);
+            }
+        };
+        let body = match serde_json::to_string(&TaskRequest { task_id: new_run_id, ..original_request }) {
+            Ok(v) => v,
+            Err(err) => {
+                return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_REQUEST_INVALID", format!("历史请求重建失败：{err}"), None);
+            }
+        };
+        handle_model_request(session, body, &action).await
+    };
+    response
+}
+
+/// 向 Julia 发送导出请求并提取 content 字段。
+async fn dispatch_export_to_julia(
+    session: &SharedSession,
+    task_id: &str,
+    params: serde_json::Value,
+) -> Result<String, axum::response::Response> {
+    let s = session.clone();
+    let tid = task_id.to_string();
+    let julia_result = tokio::task::spawn_blocking(move || {
+        let mut s = s.lock().unwrap();
+        s.send_request(actions::EXPORT_REPORT, params)
+    })
+    .await;
+
+    match julia_result {
+        Ok(Ok(resp)) => {
+            let jr: JuliaResponse = serde_json::from_value(resp).unwrap_or(JuliaResponse {
+                status: "error".to_string(),
+                messages: vec![],
+                result_payload: None,
+            });
+            Ok(jr.content().to_string())
+        }
+        Ok(Err(err)) => Err(json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            tid,
+            "RUNTIME_EXPORT_FAILED",
+            format!("Julia 导出失败: {err}"),
+            None,
+        )),
+        Err(_) => Err(json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            tid,
+            "RUNTIME_INTERNAL_ERROR",
+            "内部运行时错误".to_string(),
+            None,
+        )),
+    }
+}
+
+async fn export_report_handler(
+    State(session): State<SharedSession>,
+    body: String,
+) -> impl IntoResponse {
+    let request: ExportReportRequest = match serde_json::from_str(&body) {
+        Ok(r) => r,
+        Err(err) => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                "unknown".to_string(),
+                "RUNTIME_INVALID_JSON",
+                format!("请求 JSON 解析失败: {err}"),
+                None,
+            );
+        }
+    };
+
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let run_path = runs_dir(&working_dir).join(format!("{}.json", request.run_id));
+    let run_record: RunRecord = match read_json_file(&run_path) {
+        Ok(v) => v,
+        Err(err) => {
+            return json_error_response(
+                StatusCode::NOT_FOUND,
+                request.task_id,
+                "RUNTIME_RUN_NOT_FOUND",
+                err,
+                Some("请确认 run_id 是否存在。".to_string()),
+            );
+        }
+    };
+
+    let result_summary = match run_record.result_summary {
+        Some(ref v) => v.clone(),
+        None => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                request.task_id,
+                "RUNTIME_NO_RESULT_SUMMARY",
+                "该运行记录没有结果摘要，无法导出报告。".to_string(),
+                Some("请确保运行成功后再导出。".to_string()),
+            );
+        }
+    };
+
+    // 构建导出参数
+    let params = match request.format.as_str() {
+        "markdown" => {
+            let run_record_dict = serde_json::to_value(&run_record)
+                .and_then(|v| serde_json::from_value::<serde_json::Value>(v))
+                .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+            json!({ "run_record": run_record_dict, "result": result_summary })
+        }
+        "csv_tidy" | "csv_glance" | "csv_diagnostics" => {
+            json!({ "format": request.format, "result": result_summary })
+        }
+        _ => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                request.task_id,
+                "RUNTIME_UNSUPPORTED_FORMAT",
+                format!("不支持的导出格式: {}", request.format),
+                Some("支持的格式: markdown, csv_tidy, csv_glance, csv_diagnostics".to_string()),
+            );
+        }
+    };
+
+    let content = match dispatch_export_to_julia(&session, &request.task_id, params).await {
+        Ok(c) => c,
+        Err(response) => return response,
+    };
+
+    let response = TaskResponse {
+        task_id: request.task_id,
+        status: "success".to_string(),
+        messages: vec![],
+        artifacts: None,
+        run_record: None,
+        result_payload: Some(json!({
+            "content": content,
+            "format": request.format,
+            "run_id": request.run_id,
+        })),
+    };
+
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 /// 启动 axum 服务器，带优雅关闭信号。
@@ -356,23 +654,9 @@ async fn shutdown_signal() {
     tokio::signal::ctrl_c().await.ok();
 }
 
-// === 路径解析（复用现有逻辑） ===================================================
+// === 路径解析 ================================================================
 
-fn resolve_working_dir(raw_working_dir: &str) -> std::path::PathBuf {
-    let working_dir = std::path::PathBuf::from(raw_working_dir);
-    if working_dir.is_absolute() {
-        return working_dir;
-    }
-    repo_root().join(working_dir)
-}
-
-fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::PathBuf) -> String {
-    let dataset_path = std::path::PathBuf::from(raw_path);
-    if dataset_path.is_absolute() {
-        return dataset_path.to_string_lossy().to_string();
-    }
-    working_dir.join(dataset_path).to_string_lossy().to_string()
-}
+// resolve_working_dir 与 resolve_dataset_path 已由 lib.rs 提供（通过 crate import 引用）
 
 fn ensure_transform_output_path(
     working_dir: &std::path::Path,
@@ -391,63 +675,176 @@ fn ensure_transform_output_path(
         .to_string())
 }
 
-fn validate_fit_model_request(request: &TaskRequest) -> Option<axum::response::Response> {
-    match request.model_spec.model_type.as_str() {
-        "ols" => None,
-        "panel" => validate_panel_request(request),
-        "iv" => validate_iv_request(request),
-        "gls" => None,
-        model_type => Some(json_error_response(
-            StatusCode::BAD_REQUEST,
-            request.task_id.clone(),
-            "RUNTIME_UNSUPPORTED_MODEL_TYPE",
-            format!("runtime 当前支持 `ols`、`panel`、`iv` 与 `gls`，收到 `{model_type}`。"),
-            Some("请将 model_type 设为 `ols`、`panel`、`iv` 或 `gls`。".to_string()),
-        )),
+fn current_timestamp_string() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis().to_string())
+        .unwrap_or_else(|_| "0".to_string())
+}
+
+fn metrica_dir(working_dir: &std::path::Path) -> std::path::PathBuf {
+    working_dir.join(".metrica")
+}
+
+fn runs_dir(working_dir: &std::path::Path) -> std::path::PathBuf {
+    metrica_dir(working_dir).join("runs")
+}
+
+fn project_manifest_path(working_dir: &std::path::Path) -> std::path::PathBuf {
+    metrica_dir(working_dir).join("project.json")
+}
+
+fn ensure_metrica_dir(working_dir: &std::path::Path) -> Result<(), String> {
+    std::fs::create_dir_all(runs_dir(working_dir))
+        .map_err(|err| format!("创建 .metrica 目录失败（{}）：{err}", metrica_dir(working_dir).display()))
+}
+
+fn write_json_file<T: serde::Serialize>(path: &std::path::Path, value: &T) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("创建目录失败（{}）：{err}", parent.display()))?;
+    }
+    let body = serde_json::to_string_pretty(value)
+        .map_err(|err| format!("JSON 序列化失败：{err}"))?;
+    std::fs::write(path, body).map_err(|err| format!("写入文件失败（{}）：{err}", path.display()))
+}
+
+fn read_json_file<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, String> {
+    let body = std::fs::read_to_string(path)
+        .map_err(|err| format!("读取文件失败（{}）：{err}", path.display()))?;
+    serde_json::from_str(&body).map_err(|err| format!("JSON 解析失败（{}）：{err}", path.display()))
+}
+
+fn list_run_records(working_dir: &std::path::Path) -> Result<Vec<RunRecord>, String> {
+    let dir = runs_dir(working_dir);
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut runs = vec![];
+    let entries = std::fs::read_dir(&dir)
+        .map_err(|err| format!("读取运行记录目录失败（{}）：{err}", dir.display()))?;
+    for entry in entries {
+        let path = match entry {
+            Ok(v) => v.path(),
+            Err(_) => continue,
+        };
+        if path.extension().and_then(|v| v.to_str()) != Some("json") {
+            continue;
+        }
+        if let Ok(run) = read_json_file::<RunRecord>(&path) {
+            runs.push(run);
+        }
+    }
+    runs.sort_by(|a, b| b.finished_at.cmp(&a.finished_at));
+    Ok(runs)
+}
+
+fn summarize_model_payload(action: &str, payload: &serde_json::Value) -> serde_json::Value {
+    if action == actions::FIT_MODEL {
+        return json!({
+            "glance": payload.get("glance").cloned().unwrap_or(serde_json::Value::Null),
+            "tidy": payload.get("tidy").cloned().unwrap_or(serde_json::Value::Null),
+            "diagnostics": payload.get("diagnostics").cloned().unwrap_or(serde_json::Value::Null),
+            "warnings": payload.get("warnings").cloned().unwrap_or(serde_json::Value::Array(vec![])),
+            "vcov_label": payload.get("vcov_label").cloned().unwrap_or(serde_json::Value::Null),
+        });
+    }
+    payload.clone()
+}
+
+fn build_model_run_record(
+    request: &TaskRequest,
+    dataset_path: &str,
+    status: &str,
+    messages: &[Message],
+    artifacts: &[String],
+    result_payload: Option<&serde_json::Value>,
+    started_at: &str,
+) -> RunRecord {
+    let warnings = result_payload
+        .and_then(|payload| payload.get("warnings"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    RunRecord {
+        run_id: request.task_id.clone(),
+        action: request.action.clone(),
+        started_at: started_at.to_string(),
+        finished_at: current_timestamp_string(),
+        status: status.to_string(),
+        dataset_ref: crate::DatasetRef {
+            source: request.dataset_ref.source.clone(),
+            path: dataset_path.to_string(),
+            format: request.dataset_ref.format.clone(),
+        },
+        model_spec: Some(request.model_spec.clone()),
+        operations: None,
+        warnings,
+        messages: messages.to_vec(),
+        artifacts: artifacts.to_vec(),
+        result_summary: result_payload.map(|payload| summarize_model_payload(&request.action, payload)),
+        request_payload: serde_json::to_value(request).unwrap_or(serde_json::Value::Null),
     }
 }
 
-fn validate_panel_request(request: &TaskRequest) -> Option<axum::response::Response> {
-    let missing_fields = [
-        ("panel_id", request.model_spec.panel_id.as_deref()),
-        ("panel_time", request.model_spec.panel_time.as_deref()),
-    ]
-    .iter()
-    .filter_map(|(field, value)| match value {
-        Some(value) if !value.trim().is_empty() => None,
-        _ => Some(*field),
-    })
-    .collect::<Vec<_>>();
-
-    if missing_fields.is_empty() {
-        return None;
+fn build_transform_run_record(
+    request: &TransformTaskRequest,
+    dataset_path: &str,
+    status: &str,
+    messages: &[Message],
+    artifacts: &[String],
+    result_payload: Option<&serde_json::Value>,
+    started_at: &str,
+) -> RunRecord {
+    let notes = result_payload
+        .and_then(|payload| payload.get("warnings"))
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    RunRecord {
+        run_id: request.task_id.clone(),
+        action: request.action.clone(),
+        started_at: started_at.to_string(),
+        finished_at: current_timestamp_string(),
+        status: status.to_string(),
+        dataset_ref: crate::DatasetRef {
+            source: request.dataset_ref.source.clone(),
+            path: dataset_path.to_string(),
+            format: request.dataset_ref.format.clone(),
+        },
+        model_spec: None,
+        operations: Some(request.operations.clone()),
+        warnings: notes,
+        messages: messages.to_vec(),
+        artifacts: artifacts.to_vec(),
+        result_summary: result_payload.cloned(),
+        request_payload: serde_json::to_value(request).unwrap_or(serde_json::Value::Null),
     }
+}
 
-    Some(json_error_response(
+fn persist_run_record(working_dir: &std::path::Path, run_record: &RunRecord) -> Result<(), String> {
+    ensure_metrica_dir(working_dir)?;
+    let path = runs_dir(working_dir).join(format!("{}.json", run_record.run_id));
+    write_json_file(&path, run_record)
+}
+
+// === 模型校验（委托给 lib.rs 共享实现） ========================================
+
+fn validation_error_to_response(err: &ValidationError, task_id: &str) -> axum::response::Response {
+    json_error_response(
         StatusCode::BAD_REQUEST,
-        request.task_id.clone(),
-        "RUNTIME_PANEL_INDEX_REQUIRED",
-        format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
-        Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
-    ))
+        task_id.to_string(),
+        err.code,
+        err.message.clone(),
+        err.hint.clone(),
+    )
 }
 
-fn validate_iv_request(request: &TaskRequest) -> Option<axum::response::Response> {
-    let missing = [
-        ("instruments", request.model_spec.instruments.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
-        ("endog_columns", request.model_spec.endog_columns.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
-    ]
-    .iter()
-    .filter_map(|(f, empty)| if *empty { Some(*f) } else { None })
-    .collect::<Vec<_>>();
-
-    if missing.is_empty() { return None; }
-
-    Some(json_error_response(
-        StatusCode::BAD_REQUEST, request.task_id.clone(), "RUNTIME_IV_FIELDS_REQUIRED",
-        format!("IV 模型缺少必要字段：{}。", missing.join(", ")),
-        Some("请提供 instruments 和 endog_columns。".to_string()),
-    ))
+fn validate_fit_model_request(request: &TaskRequest) -> Option<axum::response::Response> {
+    validate_model_request(&request.model_spec)
+        .map(|err| validation_error_to_response(&err, &request.task_id))
 }
 
 // === 错误响应 ==================================================================
@@ -469,6 +866,7 @@ fn json_error_response(
             hint,
         }],
         artifacts: None,
+        run_record: None,
         result_payload: None,
     };
 
@@ -480,9 +878,13 @@ fn json_error_response(
 // === Oneshot 回退模式（每请求 Julia 子进程） =====================================
 
 /// 构建使用每请求 Julia 子进程的 axum Router（`--oneshot` 回退模式）。
+///
+/// S3 项目系统端点（save_project / load_project / list_runs）为纯文件 I/O，
+/// 不依赖 Julia 会话，因此在 oneshot 模式下同样可用。
+/// rerun_task 需要持久化 Julia 会话，在 oneshot 模式下不可用。
 pub fn build_oneshot_router() -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin("http://localhost:1420".parse::<axum::http::HeaderValue>().unwrap())
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE]);
 
@@ -490,6 +892,9 @@ pub fn build_oneshot_router() -> Router {
         .route("/health", get(oneshot_health_handler))
         .route("/fit_model", post(oneshot_fit_model_handler))
         .route("/inspect_dataset", post(oneshot_inspect_handler))
+        .route("/save_project", post(save_project_handler))
+        .route("/load_project", post(load_project_handler))
+        .route("/list_runs", post(list_runs_handler))
         .layer(cors)
 }
 

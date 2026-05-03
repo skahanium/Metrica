@@ -8,6 +8,7 @@
 using JSON3
 using MetricaBase
 using MetricaLinear
+using MetricaOutput
 
 include(joinpath(String(ARGS[2]), "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
@@ -21,6 +22,28 @@ action = String(request.action)
 dataset_path = String(request.dataset_ref.path)
 payload = if action == "inspect_dataset"
     inspect_dataset(dataset_path)
+elseif action == "export_report"
+    format = String(get(request, :format, "markdown"))
+    run_record = get(request, :run_record, Dict{String, Any}())
+    result = get(request, :result, Dict{String, Any}())
+
+    content = if format == "markdown"
+        MetricaOutput.markdown_run_report(run_record, result)
+    elseif format == "csv_tidy"
+        MetricaOutput.csv_tidy(result)
+    elseif format == "csv_glance"
+        MetricaOutput.csv_glance(result)
+    elseif format == "csv_diagnostics"
+        MetricaOutput.csv_diagnostics(result)
+    else
+        ""
+    end
+
+    Dict(
+        "status" => "success",
+        "content" => content,
+        "format" => format,
+    )
 else
     formula = String(request.model_spec.formula)
     model_type = String(request.model_spec.model_type)

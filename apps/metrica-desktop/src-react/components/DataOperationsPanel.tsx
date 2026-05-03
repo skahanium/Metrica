@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Button, Card, Form, Input, Select, Space, Typography, List, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import type { DataOp, DataOpKind } from '../types/protocol';
-import { transformDataset } from '../services/runtimeClient';
+import { transformTask, inferWorkingDir } from '../services/runtimeClient';
 import { useDatasetStore } from '../stores/datasetStore';
+import { useProjectStore } from '../stores/projectStore';
 import { useTransformStore } from '../stores/transformStore';
 import { useAppStore } from '../stores/appStore';
 
@@ -41,6 +42,7 @@ export function DataOperationsPanel() {
   const [form] = Form.useForm();
   const [kind, setKind] = useState<DataOpKind>('filter');
   const { activePath, setActivePath } = useDatasetStore();
+  const { appendRunRecord, setDirty } = useProjectStore();
   const { operations, addOperation, removeOperation, clearOperations, appendHistory, setLastTransformResult, isTransforming, setTransforming } = useTransformStore();
   const { setError } = useAppStore();
 
@@ -57,13 +59,28 @@ export function DataOperationsPanel() {
     setTransforming(true);
     setError(null);
     try {
-      const result = await transformDataset({ datasetPath: activePath, operations, previewRows: 10, persistOutput: true });
+      const workingDir = inferWorkingDir(activePath);
+      const task = await transformTask({ datasetPath: activePath, operations, workingDir, previewRows: 10, persistOutput: true });
+      const result = task.result_payload;
+      if (!result) {
+        throw new Error(task.messages?.map((m) => m.text).join('; ') || '数据操作失败');
+      }
       setLastTransformResult(result);
       if (result.status === 'error') {
         setError(result.error?.message ?? '数据操作失败');
       } else {
         appendHistory(result.operations ?? [result]);
-        if (result.result?.dataset_path) setActivePath(result.result.dataset_path, true);
+        // 记录谱系操作
+        const { appendLineageOperations, updateLineageRowCounts } = useProjectStore.getState();
+        appendLineageOperations(operations);
+        if (result.result) {
+          updateLineageRowCounts(0, result.result.nrows);
+        }
+        if (result.result?.dataset_path) setActivePath(result.result.dataset_path);
+        if (task.run_record) {
+          appendRunRecord(task.run_record);
+        }
+        setDirty(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '数据操作失败');

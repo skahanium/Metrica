@@ -260,6 +260,103 @@ async fn transform_filter_operation_returns_ok() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn save_and_load_project_roundtrip() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+    let save_body = serde_json::json!({
+        "task_id": "save-project",
+        "action": "save_project",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir },
+        "manifest": {
+            "project_id": "alpha-demo",
+            "version": 1,
+            "created_at": "1",
+            "updated_at": "2",
+            "source_dataset": "/tmp/demo.csv",
+            "active_dataset": "/tmp/demo.csv",
+            "saved_model_specs": [{ "model_type": "ols", "formula": "y ~ x1" }],
+            "last_run_id": null,
+            "ui_state": {},
+            "data_lineage": null
+        }
+    })
+    .to_string();
+
+    let save_resp = client
+        .post(format!("http://{addr}/save_project"))
+        .header("Content-Type", "application/json")
+        .body(save_body)
+        .send()
+        .await
+        .expect("POST /save_project");
+    assert_eq!(save_resp.status(), 200);
+
+    let load_body = serde_json::json!({
+        "task_id": "load-project",
+        "action": "load_project",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir }
+    })
+    .to_string();
+
+    let load_resp = client
+        .post(format!("http://{addr}/load_project"))
+        .header("Content-Type", "application/json")
+        .body(load_body)
+        .send()
+        .await
+        .expect("POST /load_project");
+    assert_eq!(load_resp.status(), 200);
+    let json: serde_json::Value = load_resp.json().await.expect("JSON");
+    assert_eq!(json["status"], "success");
+    assert_eq!(json["result_payload"]["manifest"]["project_id"], "alpha-demo");
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fit_model_generates_run_record_and_list_runs_returns_it() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+
+    let fit_resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    assert_eq!(fit_resp.status(), 200);
+    let fit_json: serde_json::Value = fit_resp.json().await.expect("fit JSON");
+    assert_eq!(fit_json["status"], "success");
+    assert!(fit_json["run_record"]["run_id"].as_str().is_some());
+
+    let list_body = serde_json::json!({
+        "task_id": "list-runs",
+        "action": "list_runs",
+        "project_context": {
+            "project_id": "alpha-demo",
+            "working_dir": "apps/metrica-desktop"
+        }
+    })
+    .to_string();
+
+    let list_resp = client
+        .post(format!("http://{addr}/list_runs"))
+        .header("Content-Type", "application/json")
+        .body(list_body)
+        .send()
+        .await
+        .expect("POST /list_runs");
+    assert_eq!(list_resp.status(), 200);
+    let list_json: serde_json::Value = list_resp.json().await.expect("list JSON");
+    assert_eq!(list_json["status"], "success");
+    assert!(list_json["result_payload"]["runs"].as_array().unwrap().iter().any(|item| item["action"] == "fit_model"));
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn transform_failure_does_not_write_output() {
     let (addr, server) = spawn_test_runtime().await;
     let client = reqwest::Client::new();
@@ -302,5 +399,321 @@ async fn transform_failure_does_not_write_output() {
     assert_eq!(json["status"], "error");
     assert_eq!(json["result_payload"]["error"]["op_index"], 1);
     assert!(!derived_path.is_file());
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn save_project_rejects_empty_project_id() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+
+    let body = serde_json::json!({
+        "task_id": "save-invalid",
+        "action": "save_project",
+        "project_context": { "project_id": "alpha-demo", "working_dir": concat!(env!("CARGO_MANIFEST_DIR"), "/../..") },
+        "manifest": {
+            "project_id": "",
+            "version": 1,
+            "created_at": "1",
+            "updated_at": "2",
+            "source_dataset": "/tmp/demo.csv",
+            "active_dataset": "/tmp/demo.csv",
+            "saved_model_specs": [],
+            "last_run_id": null,
+            "ui_state": {},
+            "data_lineage": null
+        }
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/save_project"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /save_project");
+
+    assert_eq!(resp.status(), 400);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["messages"][0]["code"], "RUNTIME_MANIFEST_INVALID");
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn save_project_rejects_empty_source_dataset() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+
+    let body = serde_json::json!({
+        "task_id": "save-invalid-src",
+        "action": "save_project",
+        "project_context": { "project_id": "alpha-demo", "working_dir": concat!(env!("CARGO_MANIFEST_DIR"), "/../..") },
+        "manifest": {
+            "project_id": "alpha-demo",
+            "version": 1,
+            "created_at": "1",
+            "updated_at": "2",
+            "source_dataset": "",
+            "active_dataset": "/tmp/demo.csv",
+            "saved_model_specs": [],
+            "last_run_id": null,
+            "ui_state": {},
+            "data_lineage": null
+        }
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/save_project"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /save_project");
+
+    assert_eq!(resp.status(), 400);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["messages"][0]["code"], "RUNTIME_MANIFEST_INVALID");
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn list_runs_supports_pagination_and_filtering() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+    // 先执行一次 fit_model 生成 run record
+    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let fit_resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(fit_body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    assert_eq!(fit_resp.status(), 200);
+
+    // 测试 limit
+    let list_body = serde_json::json!({
+        "task_id": "list-limit",
+        "action": "list_runs",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir },
+        "limit": 1
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/list_runs"))
+        .header("Content-Type", "application/json")
+        .body(list_body)
+        .send()
+        .await
+        .expect("POST /list_runs");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    let runs = json["result_payload"]["runs"].as_array().unwrap();
+    assert!(runs.len() <= 1);
+
+    // 测试 action_filter
+    let filter_body = serde_json::json!({
+        "task_id": "list-filter",
+        "action": "list_runs",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir },
+        "action_filter": "fit_model"
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/list_runs"))
+        .header("Content-Type", "application/json")
+        .body(filter_body)
+        .send()
+        .await
+        .expect("POST /list_runs");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    let runs = json["result_payload"]["runs"].as_array().unwrap();
+    assert!(runs.iter().all(|r| r["action"] == "fit_model"));
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn rerun_task_returns_error_for_missing_dataset() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+    // 先执行一次 fit_model 生成 run record
+    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let fit_resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(fit_body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    let fit_json: serde_json::Value = fit_resp.json().await.expect("JSON");
+    let run_id = fit_json["run_record"]["run_id"].as_str().expect("run_id");
+
+    // 覆盖 run record 的 dataset_ref 路径为不存在的文件
+    let runs_dir = repo_root().join(".metrica").join("runs");
+    let run_path = runs_dir.join(format!("{run_id}.json"));
+    if run_path.exists() {
+        let mut run: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&run_path).unwrap(),
+        )
+        .unwrap();
+        run["dataset_ref"]["path"] = serde_json::json!("/nonexistent/missing.csv");
+        std::fs::write(&run_path, serde_json::to_string_pretty(&run).unwrap()).unwrap();
+    }
+
+    // 尝试重跑
+    let rerun_body = serde_json::json!({
+        "task_id": "rerun-missing",
+        "action": "rerun_task",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir },
+        "run_id": run_id
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/rerun_task"))
+        .header("Content-Type", "application/json")
+        .body(rerun_body)
+        .send()
+        .await
+        .expect("POST /rerun_task");
+
+    assert_eq!(resp.status(), 400);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["messages"][0]["code"], "RUNTIME_RERUN_DATASET_MISSING");
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_report_markdown_returns_content() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+    // 先执行一次 fit_model 生成 run record
+    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let fit_resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(fit_body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    let fit_json: serde_json::Value = fit_resp.json().await.expect("JSON");
+    assert_eq!(fit_json["status"], "success");
+    let run_id = fit_json["run_record"]["run_id"].as_str().expect("run_id");
+
+    // 导出 Markdown 报告
+    let export_body = serde_json::json!({
+        "task_id": "export-md",
+        "action": "export_report",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir },
+        "run_id": run_id,
+        "format": "markdown"
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/export_report"))
+        .header("Content-Type", "application/json")
+        .body(export_body)
+        .send()
+        .await
+        .expect("POST /export_report");
+
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["status"], "success");
+    assert_eq!(json["result_payload"]["format"], "markdown");
+    let content = json["result_payload"]["content"].as_str().expect("content");
+    assert!(content.contains("# Metrica 单次运行报告"));
+    assert!(content.contains("y ~ x1 + x2"));
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_report_csv_tidy_returns_csv() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+    // 先执行一次 fit_model 生成 run record
+    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let fit_resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(fit_body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    let fit_json: serde_json::Value = fit_resp.json().await.expect("JSON");
+    assert_eq!(fit_json["status"], "success");
+    let run_id = fit_json["run_record"]["run_id"].as_str().expect("run_id");
+
+    // 导出 CSV 系数表
+    let export_body = serde_json::json!({
+        "task_id": "export-csv",
+        "action": "export_report",
+        "project_context": { "project_id": "alpha-demo", "working_dir": working_dir },
+        "run_id": run_id,
+        "format": "csv_tidy"
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/export_report"))
+        .header("Content-Type", "application/json")
+        .body(export_body)
+        .send()
+        .await
+        .expect("POST /export_report");
+
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["status"], "success");
+    assert_eq!(json["result_payload"]["format"], "csv_tidy");
+    let content = json["result_payload"]["content"].as_str().expect("content");
+    assert!(content.contains("term,estimate,std_error,statistic,p_value"));
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn export_report_rejects_missing_run() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+
+    let body = serde_json::json!({
+        "task_id": "export-missing",
+        "action": "export_report",
+        "project_context": { "project_id": "alpha-demo", "working_dir": concat!(env!("CARGO_MANIFEST_DIR"), "/../..") },
+        "run_id": "nonexistent-run-id",
+        "format": "markdown"
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/export_report"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /export_report");
+
+    assert_eq!(resp.status(), 404);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["messages"][0]["code"], "RUNTIME_RUN_NOT_FOUND");
+
     server.abort();
 }

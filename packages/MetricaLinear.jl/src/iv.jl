@@ -16,7 +16,7 @@ struct IVFitResult <: MetricaBase.AbstractLinearFitResult
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
-    coef_names::Vector{Symbol}
+    coefficient_names::Vector{Symbol}
     coef_values::Vector{Float64}
     vcov_matrix::Matrix{Float64}
     stderror_values::Vector{Float64}
@@ -30,11 +30,11 @@ end
 
 MetricaBase.glance(result::IVFitResult) = result.glance_table
 MetricaBase.tidy(result::IVFitResult) = result.tidy_table
-MetricaBase.coef(result::IVFitResult) = result.coef_names .=> result.coef_values
+MetricaBase.coef(result::IVFitResult) = result.coefficient_names .=> result.coef_values
 MetricaBase.vcov(result::IVFitResult) = result.vcov_matrix
 MetricaBase.stderror(result::IVFitResult) = result.stderror_values
 MetricaBase.nobs(result::IVFitResult) = length(result.response_vector)
-MetricaBase.dof(result::IVFitResult) = length(result.response_vector) - length(result.coef_names)
+MetricaBase.dof(result::IVFitResult) = length(result.response_vector) - length(result.coefficient_names)
 MetricaBase.r2(result::IVFitResult) = result.glance_table.metrics[:r2]
 MetricaBase.fitted(result::IVFitResult) = result.fitted_values
 MetricaBase.residuals(result::IVFitResult) = result.residual_vector
@@ -81,7 +81,7 @@ function MetricaBase.predict(result::IVFitResult;
     interval === :none && return predictions
 
     n = length(result.response_vector)
-    k = length(result.coef_names)
+    k = length(result.coefficient_names)
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
@@ -200,7 +200,7 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
     fitted = X_second * coefficients
     residuals = y - fitted
 
-    coef_names_sym = Symbol.(vcat(["(Intercept)"], string.(exog_only), string.(endog_syms)))
+    coefficient_names_sym = Symbol.(vcat(["(Intercept)"], string.(exog_only), string.(endog_syms)))
 
     ncoef = length(coefficients)
     dof_val = nobs - ncoef
@@ -227,12 +227,12 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
     pvalues = 2 .* (1 .- cdf.(TDist(dof_val), abs.(statistics)))
     vcov_label = vcov === :HC1 ? "HC1" : vcov === :cluster ? "cluster" : "classical"
     tidy_table = MetricaBase.TidyTable([
-        MetricaBase.CoefRow(coef_names_sym[i], coefficients[i], stderror[i], statistics[i], pvalues[i])
+        MetricaBase.CoefRow(coefficient_names_sym[i], coefficients[i], stderror[i], statistics[i], pvalues[i])
         for i in eachindex(coefficients)
     ], vcov_label)
 
     return IVFitResult(String(formula), glance_table, tidy_table,
-        coef_names_sym, coefficients, vcov_mat, stderror,
+        coefficient_names_sym, coefficients, vcov_mat, stderror,
         X_second, copy(y), fitted, residuals,
         first_stage_stats, weak_warnings)
 end

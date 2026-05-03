@@ -1,5 +1,7 @@
 module MetricaBase
 
+using Dates
+
 # === 导出列表 ================================================================
 
 export AbstractEconModel,
@@ -20,6 +22,9 @@ export AbstractEconModel,
     TidyTable,
     AugmentTable,
     PanelData,
+    ProjectManifest,
+    RunRecord,
+    DataLineage,
     fit,
     coef,
     vcov,
@@ -33,7 +38,8 @@ export AbstractEconModel,
     dof,
     r2,
     fitted,
-    residuals
+    residuals,
+    parse_metrica_formula
 
 # === 严重程度枚举 ============================================================
 
@@ -205,6 +211,58 @@ struct PanelData{T}
     time_col::Symbol
 end
 
+"""
+项目文件的最小结构化载荷。
+
+由桌面端与 Runtime 共享，用于保存当前项目上下文。该类型只承载
+项目状态，不承载完整模型大载荷。
+"""
+struct ProjectManifest
+    project_id::String
+    version::Int
+    created_at::DateTime
+    updated_at::DateTime
+    source_dataset::String
+    active_dataset::String
+    saved_model_specs::Vector{Dict{Symbol, Any}}
+    last_run_id::Union{Nothing, String}
+    ui_state::Dict{Symbol, Any}
+    data_lineage::Union{Nothing, Dict{Symbol, Any}}
+end
+
+"""
+一次 inspect / transform / fit 的结构化运行记录。
+
+运行记录用于项目重开、历史查看与重跑，不要求保存完整拟合大表，
+但必须足以恢复原始请求和关键结果摘要。
+"""
+struct RunRecord
+    run_id::String
+    action::String
+    started_at::DateTime
+    finished_at::DateTime
+    status::String
+    dataset_ref::Dict{Symbol, Any}
+    model_spec::Union{Nothing, Dict{Symbol, Any}}
+    operations::Union{Nothing, Vector{Dict{Symbol, Any}}}
+    warnings::Vector{Dict{Symbol, Any}}
+    messages::Vector{Dict{Symbol, Any}}
+    artifacts::Vector{String}
+    result_summary::Union{Nothing, Dict{Symbol, Any}}
+end
+
+"""
+数据从源文件到当前活动数据集的最小谱系摘要。
+"""
+struct DataLineage
+    source_dataset::String
+    active_dataset::String
+    operations::Vector{Dict{Symbol, Any}}
+    row_count_before::Union{Nothing, Int}
+    row_count_after::Union{Nothing, Int}
+    notes::Vector{String}
+end
+
 # === 公共 API 函数（接口桩）==================================================
 
 """
@@ -283,5 +341,43 @@ function fitted end
 返回残差向量。
 """
 function residuals end
+
+# === 工具函数 ================================================================
+
+"""
+    parse_metrica_formula(formula)
+
+将计量经济学公式字符串解析为因变量和自变量列表。
+
+返回 `(response_name::String, predictor_names::Vector{String})`。
+若格式无效则返回 `ModelError`。
+
+# 示例
+```julia
+parse_metrica_formula("y ~ x1 + x2")  # → ("y", ["x1", "x2"])
+```
+"""
+function parse_metrica_formula(formula::AbstractString)
+    parts = split(formula, "~")
+    if length(parts) != 2
+        return ModelError(
+            :formula_parse_failed,
+            "公式解析失败",
+            "公式必须包含一个 `~`。",
+            "请使用如 y ~ x1 + x2 的公式格式。",
+        )
+    end
+    response_name = strip(parts[1])
+    predictor_names = [strip(x) for x in split(parts[2], "+")]
+    if isempty(response_name)
+        return ModelError(
+            :formula_parse_failed,
+            "公式解析失败",
+            "公式缺少因变量。",
+            "请使用如 y ~ x1 + x2 的公式格式。",
+        )
+    end
+    return response_name, predictor_names
+end
 
 end

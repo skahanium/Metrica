@@ -65,6 +65,23 @@ function MetricaBase.augment(result::PanelFitResult)
     return MetricaBase.AugmentTable(cols, nobs)
 end
 
+MetricaBase.coef(result::PanelFitResult) = [r.estimate for r in result.tidy_table.rows]
+MetricaBase.stderror(result::PanelFitResult) = [r.stderror for r in result.tidy_table.rows]
+MetricaBase.nobs(result::PanelFitResult) = result.glance_table.nobs
+MetricaBase.dof(result::PanelFitResult) = result.glance_table.dof
+MetricaBase.r2(result::PanelFitResult) = get(result.glance_table.metrics, :r2, NaN)
+MetricaBase.fitted(result::PanelFitResult) = result.fitted_values
+MetricaBase.residuals(result::PanelFitResult) = result.residual_vector
+
+function MetricaBase.vcov(result::PanelFitResult)
+    return MetricaBase.ModelError(
+        :vcov_not_available,
+        "Panel 模型未直接存储方差-协方差矩阵。",
+        "PanelFitResult 未存储完整 vcov 矩阵。",
+        "请使用 stderror() 获取标准误，或参考 Driscoll-Kraay 模块。",
+    )
+end
+
 # === 共享 OLS 统计量计算 ======================================================
 
 """
@@ -134,23 +151,23 @@ end
 
 返回 `PanelFitResult`。
 """
+const _PANEL_ESTIMATORS = Dict{Symbol, Function}(
+    :fe => fit_fe,
+    :re => fit_re,
+    :fd => fit_fd,
+    :between => fit_between,
+    :cre => fit_crea,
+)
+
 function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::Symbol=:fe, fe_spec::Vector{Symbol}=Symbol[])
-    if method === :fe
-        return fit_fe(panel_data, formula)
-    elseif method === :hdfde
+    if method === :hdfde
         isempty(fe_spec) && error("HDFE 方法需要指定 fe_spec 参数，如 fe_spec=[:firm, :year]")
         return fit_hdfde(panel_data, formula; fe_spec=fe_spec)
-    elseif method === :re
-        return fit_re(panel_data, formula)
-    elseif method === :fd
-        return fit_fd(panel_data, formula)
-    elseif method === :between
-        return fit_between(panel_data, formula)
-    elseif method === :cre
-        return fit_crea(panel_data, formula)
-    else
+    end
+    estimator = get(_PANEL_ESTIMATORS, method) do
         error("面板估计方法 :$method 尚未实现")
     end
+    return estimator(panel_data, formula)
 end
 
 include("fe.jl")

@@ -1,10 +1,11 @@
-use std::path::PathBuf;
 use std::process::Command;
 
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::{Message, TaskRequest, TaskResponse};
+use crate::{Message, TaskRequest, TaskResponse, ValidationError,
+    validate_model_request,
+    resolve_working_dir, resolve_dataset_path};
 
 /// 解析 Julia 项目路径。
 ///
@@ -22,23 +23,11 @@ fn julia_project_path() -> String {
         .to_string()
 }
 
-fn resolve_working_dir(raw_working_dir: &str) -> PathBuf {
-    let working_dir = PathBuf::from(raw_working_dir);
-    if working_dir.is_absolute() {
-        return working_dir;
-    }
+// resolve_working_dir 已由 lib.rs 提供（通过 crate import 引用）
 
-    crate::repo_root().join(working_dir)
-}
-
-fn resolve_dataset_path(request: &TaskRequest) -> String {
-    let dataset_path = PathBuf::from(&request.dataset_ref.path);
-    if dataset_path.is_absolute() {
-        return dataset_path.to_string_lossy().to_string();
-    }
-
+fn resolve_dataset_path_for_request(request: &TaskRequest) -> String {
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
-    working_dir.join(dataset_path).to_string_lossy().to_string()
+    resolve_dataset_path(&request.dataset_ref.path, &working_dir)
 }
 
 const JULIA_SCRIPT: &str = include_str!("../../../scripts/julia_bridge_entry.jl");
@@ -72,7 +61,7 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
         resolve_working_dir(&request.project_context.working_dir)
             .to_string_lossy()
             .to_string();
-    runtime_request.dataset_ref.path = resolve_dataset_path(request);
+    runtime_request.dataset_ref.path = resolve_dataset_path_for_request(request);
 
     let project_path = julia_project_path();
     let output = Command::new("julia")
@@ -117,45 +106,23 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
         } else {
             None
         },
+        run_record: None,
         result_payload: envelope.result_payload,
     })
 }
 
-fn validate_fit_model_request(request: &TaskRequest) -> Option<TaskResponse> {
-    match request.model_spec.model_type.as_str() {
-        "ols" => None,
-        "panel" => validate_panel_request(request),
-        model_type => Some(runtime_error_response(
-            request,
-            "RUNTIME_UNSUPPORTED_MODEL_TYPE",
-            format!("runtime 当前支持 `ols` 与 `panel`，收到 `{model_type}`。"),
-            Some("请将 model_type 设为 `ols` 或 `panel`。".to_string()),
-        )),
-    }
+fn validation_error_to_task_response(err: &ValidationError, request: &TaskRequest) -> TaskResponse {
+    runtime_error_response(
+        request,
+        err.code,
+        err.message.clone(),
+        err.hint.clone(),
+    )
 }
 
-fn validate_panel_request(request: &TaskRequest) -> Option<TaskResponse> {
-    let missing_fields = [
-        ("panel_id", request.model_spec.panel_id.as_deref()),
-        ("panel_time", request.model_spec.panel_time.as_deref()),
-    ]
-    .iter()
-    .filter_map(|(field, value)| match value {
-        Some(value) if !value.trim().is_empty() => None,
-        _ => Some(*field),
-    })
-    .collect::<Vec<_>>();
-
-    if missing_fields.is_empty() {
-        return None;
-    }
-
-    Some(runtime_error_response(
-        request,
-        "RUNTIME_PANEL_INDEX_REQUIRED",
-        format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
-        Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
-    ))
+fn validate_fit_model_request(request: &TaskRequest) -> Option<TaskResponse> {
+    validate_model_request(&request.model_spec)
+        .map(|err| validation_error_to_task_response(&err, request))
 }
 
 fn runtime_error_response(
@@ -174,6 +141,7 @@ fn runtime_error_response(
             hint,
         }],
         artifacts: None,
+        run_record: None,
         result_payload: None,
     }
 }

@@ -17,7 +17,7 @@ function coef_row(fit::OLSFitResult, name::Symbol)
 end
 
 @testset "真实 OLS 链路" begin
-    ok = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
+    ok = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
     @test ok isa OLSFitResult
     @test glance(ok).model === :ols
     @test glance(ok).nobs == 7
@@ -34,13 +34,13 @@ end
     @test coef_row(ok, :x1).estimate ≈ 2.7333333333333347
     @test coef_row(ok, :x1).stderror ≈ 0.7180219742845957
 
-    missing_col = fit_ols_file(DEMO_CSV, "y ~ x9")
+    missing_col = fit(OLSModel, "y ~ x9", DEMO_CSV)
     @test missing_col isa ModelError
     @test missing_col.code === :unknown_variable
 end
 
 @testset "WLS 基础链路" begin
-    weighted = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; weights=:x1)
+    weighted = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; weights=:x1)
     @test weighted isa OLSFitResult
     @test glance(weighted).model === :wls
     @test tidy(weighted).vcov_label == "classical"
@@ -49,13 +49,13 @@ end
     @test coef_row(weighted, :x1).estimate ≈ 2.396059113300492
     @test coef_row(weighted, :x1).stderror ≈ 0.6371988621545017
 
-    missing_weight = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; weights=:w9)
+    missing_weight = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; weights=:w9)
     @test missing_weight isa ModelError
     @test missing_weight.code === :unknown_weight_variable
 end
 
 @testset "HC1 协方差链路" begin
-    robust = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; vcov=:HC1)
+    robust = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; vcov=:HC1)
     @test robust isa OLSFitResult
     @test tidy(robust).vcov_label == "HC1"
     @test all(row -> row.stderror !== nothing, tidy(robust).rows)
@@ -63,14 +63,14 @@ end
     @test coef_row(robust, :x1).stderror ≈ 0.7950774478930701
 
     # 不支持的协方差类型
-    unsupported = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; vcov=:gmm)
+    unsupported = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; vcov=:gmm)
     @test unsupported isa ModelError
     @test unsupported.code === :unsupported_vcov
 end
 
 @testset "Cluster 协方差链路" begin
     # 不含聚类变量的 cluster 请求应返回明确错误
-    missing_col = fit_ols_file(DEMO_CSV, "y ~ x1 + x2"; vcov=:cluster)
+    missing_col = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; vcov=:cluster)
     @test missing_col isa ModelError
     @test missing_col.code === :missing_cluster_variable
 
@@ -79,7 +79,7 @@ end
     close(cluster_io)
     write(cluster_csv, "y,x1,x2,group\n10,1,5,A\n12,2,3,A\n14,3,1,A\n20,2,6,B\n22,3,4,B\n24,4,2,B\n")
 
-    clustered = fit_ols_file(cluster_csv, "y ~ x1 + x2"; vcov=:cluster, cluster=:group)
+    clustered = fit(OLSModel, "y ~ x1 + x2", cluster_csv; vcov=:cluster, cluster_column=:group)
     @test clustered isa OLSFitResult
     @test tidy(clustered).vcov_label == "cluster"
 
@@ -87,7 +87,7 @@ end
     @test all(row -> row.stderror !== nothing, tidy(clustered).rows)
 
     # 系数应与 OLS 一致（聚类只影响标准误，不影响点估计）
-    ols = fit_ols_file(cluster_csv, "y ~ x1 + x2"; vcov=:classical)
+    ols = fit(OLSModel, "y ~ x1 + x2", cluster_csv; vcov=:classical)
     for (cr, or_) in zip(tidy(clustered).rows, tidy(ols).rows)
         @test cr.estimate ≈ or_.estimate
         @test cr.name == or_.name
@@ -102,12 +102,12 @@ end
     close(single_io)
     write(single_csv, "y,x1,x2,group\n10,1,5,A\n12,2,8,A\n14,3,1,A\n15,4,3,A\n")
 
-    single = fit_ols_file(single_csv, "y ~ x1 + x2"; vcov=:cluster, cluster=:group)
+    single = fit(OLSModel, "y ~ x1 + x2", single_csv; vcov=:cluster, cluster_column=:group)
     @test single isa ModelError
     @test single.code === :single_cluster
 
     # 不存在的聚类变量
-    bad_cluster = fit_ols_file(cluster_csv, "y ~ x1 + x2"; vcov=:cluster, cluster=:bad_col)
+    bad_cluster = fit(OLSModel, "y ~ x1 + x2", cluster_csv; vcov=:cluster, cluster_column=:bad_col)
     @test bad_cluster isa ModelError
     @test bad_cluster.code === :unknown_cluster_variable
 
@@ -120,7 +120,7 @@ end
     close(singular_io)
     write(singular_csv, "y,x1,x2\n1,1,2\n2,2,4\n3,3,6\n")
 
-    singular = fit_ols_file(singular_csv, "y ~ x1 + x2")
+    singular = fit(OLSModel, "y ~ x1 + x2", singular_csv)
     @test singular isa ModelError
     @test singular.code === :singular_design
 
@@ -128,7 +128,7 @@ end
     close(empty_io)
     write(empty_csv, "y,x1\n,1\n,2\n")
 
-    empty_result = fit_ols_file(empty_csv, "y ~ x1")
+    empty_result = fit(OLSModel, "y ~ x1", empty_csv)
     @test empty_result isa ModelError
     @test empty_result.code === :empty_effective_sample
 
@@ -137,7 +137,7 @@ end
 end
 
 @testset "结构化载荷输出" begin
-    ok = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
+    ok = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
     ok_payload = result_to_payload(ok)
     @test ok_payload["status"] == "success"
     @test haskey(ok_payload, "result_payload")
@@ -155,7 +155,7 @@ end
     ok_payload_no_augment = result_to_payload(ok; include_augment=false)
     @test !haskey(ok_payload_no_augment["result_payload"], "augment_preview")
 
-    missing_col = fit_ols_file(DEMO_CSV, "y ~ x9")
+    missing_col = fit(OLSModel, "y ~ x9", DEMO_CSV)
     err_payload = result_to_payload(missing_col)
     @test err_payload["status"] == "error"
     @test length(err_payload["messages"]) == 1
@@ -163,7 +163,7 @@ end
 end
 
 @testset "augment 能力" begin
-    ok = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
+    ok = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
     at = augment(ok)
     @test at isa AugmentTable
     @test at.nobs == 7
@@ -263,7 +263,7 @@ end
     @test pi isa NamedTuple{(:predictions, :lower, :upper)}
     @test all((pi.upper .- pi.lower) .>= (ci.upper .- ci.lower) .- 1e-10)
 
-    old = fit_ols_file(DEMO_CSV, "y ~ x1 + x2")
+    old = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
     @test old isa OLSFitResult
 end
 

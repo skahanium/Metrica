@@ -1,6 +1,6 @@
 # 文档边界
 
-本文件界定当前保留文档的职责范围。早期 foundation、dual-track、vertical slice 与 visualization 草案已删除；后续不得用“历史参考”名义重新制造并行主线。
+本文件界定当前保留文档的职责范围。早期 foundation、dual-track、vertical slice 与 visualization 草案，以及已完成里程碑的设计/计划文档均已清理；后续不得再用“历史参考”名义重新制造并行主线。
 
 ## 规则
 
@@ -47,7 +47,7 @@
 - 长期产品愿景
 - 生态方向
 - 战略性包拆分
-- 阶段 `S1-S6` 的最高层边界
+- 阶段 `S1-S7` 的最高层边界
 - 阶段划分原则与历史编号映射规则
 
 不拥有：
@@ -62,7 +62,7 @@
 
 - 阶段级施工指引
 - 各阶段的交付口径、施工原则与验收边界
-- `S6` AI 增强层的未来预留约束
+- `S7` AI 增强层的未来预留约束
 
 不拥有：
 
@@ -76,8 +76,8 @@
 拥有：
 
 - 当前唯一主设计
+- 当前稳定主链路的事实基线
 - Core / Runtime / App 分层边界
-- 真实 OLS 基线、里程碑 2 与里程碑 3 的关系
 - 教学友好、结构化结果、受控扩展等全局产品原则
 - 当前包含与排除范围
 
@@ -86,61 +86,6 @@
 - 字段级 Runtime 请求与响应细节
 - 桌面工作台组件级设计
 - 逐步实施任务清单
-
-### `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md`
-
-拥有：
-
-- 里程碑 3 面板基础的实施顺序
-- `MetricaPanel.jl`、Runtime 面板请求与 App 结构化展示的收口任务
-- 面板基础已验证事实基线的简短记录
-
-不拥有：
-
-- 项目长期愿景
-- 子系统字段级完整 schema
-- 远期可视化、IV/GLS 或动态面板模型设计
-
-### `docs/superpowers/plans/2026-05-02-milestone-4-panel-diagnostics-datasets-plan.md`
-
-拥有：
-
-- 里程碑 4 面板诊断与教学数据集的验收记录
-- Hausman、固定效应 F、Breusch-Pagan LM 的阶段口径
-- PWT / NLSY 教学数据入口的阶段记录
-
-不拥有：
-
-- 当前实施任务清单
-- 远期面板模型完整路线
-- 阶段 `S1-S6` 的总体路线
-
-### `docs/superpowers/specs/2026-05-02-metrica-milestone-5-design.md`
-
-拥有：
-
-- 里程碑 5 地基升级与数据能力的设计口径
-- React 工作台升级、`MetricaData.jl`、Runtime `/transform` 的边界
-- M5 非目标与收口约束
-
-不拥有：
-
-- M6 以后模型族路线
-- `S4-S6` 的施工细节
-- 根目录总体蓝图的长期目标
-
-### `docs/superpowers/plans/2026-05-02-milestone-5-implementation-plan.md`
-
-拥有：
-
-- 里程碑 5 的当前实施步骤与验证门禁
-- M5 技术债务清理、Track A / Track B 的任务拆分
-
-不拥有：
-
-- 长期产品愿景
-- 阶段级路线替代权
-- M10 以后模型族设计
 
 ### `docs/architecture/runtime-protocol.md`
 
@@ -178,12 +123,12 @@
 修改文档时：
 
 1. 先确认新内容是否可并入现有主设计、当前计划或子系统架构文档。
-2. 不为短期阶段新增平行主 `spec` / `plan`。
-3. 若确需新增文档，必须先说明为什么现有文档无法承载，并同步更新本文档。
+2. 不为已完成阶段保留镜像 `spec`、镜像 `plan`、历史入口或 archive 副本。
+3. 若确需新增 `spec` / `plan`，必须是当前仍在实施或即将实施的工作，并在完成后及时回收。
 4. 删除或重命名文档后，必须检查全仓库引用，避免悬空链接。
 
 ## 历史编号保留规则
 
 - 旧 `M` 号可以继续存在于 milestone `spec/plan`、测试记录与完成总结中。
-- 新阶段叙事统一使用 `S1-S6`，旧 `M` 号只作为历史映射，不再单独承担长期路线表达。
-- `docs/superpowers/specs/` 只负责当前活跃里程碑设计，不负责重写总体阶段体系。
+- 新阶段叙事统一使用 `S1-S7`，旧 `M` 号只作为历史映射，不再单独承担长期路线表达。
+- `docs/superpowers/specs/` 与 `docs/superpowers/plans/` 只保留当前活跃工作；已完成文档应直接删除。

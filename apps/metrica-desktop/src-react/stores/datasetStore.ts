@@ -5,20 +5,22 @@ interface DatasetState {
   sourcePath: string;
   activePath: string;
   summary: DatasetSummary | null;
-  isDerived: boolean;
+  isDerived: () => boolean;
   setFilePath: (p: string) => void;
-  setActivePath: (p: string, isDerived?: boolean) => void;
+  setSourceAndActivePath: (sourcePath: string, activePath: string) => void;
+  setActivePath: (p: string) => void;
   setSummary: (s: DatasetSummary | null) => void;
   resetDerived: () => void;
 }
 
-export const useDatasetStore = create<DatasetState>((set) => ({
+export const useDatasetStore = create<DatasetState>((set, get) => ({
   sourcePath: '',
   activePath: '',
   summary: null,
-  isDerived: false,
-  setFilePath: (filePath) => set({ sourcePath: filePath, activePath: filePath, isDerived: false }),
-  setActivePath: (activePath, isDerived = false) => set({ activePath, isDerived }),
+  isDerived: () => get().sourcePath !== get().activePath,
+  setFilePath: (filePath) => set({ sourcePath: filePath, activePath: filePath }),
+  setSourceAndActivePath: (sourcePath, activePath) => set({ sourcePath, activePath }),
+  setActivePath: (activePath) => set({ activePath }),
   setSummary: (summary) => set({ summary }),
-  resetDerived: () => set((state) => ({ activePath: state.sourcePath, isDerived: false })),
+  resetDerived: () => set((state) => ({ activePath: state.sourcePath })),
 }));

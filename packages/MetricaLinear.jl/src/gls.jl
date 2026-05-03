@@ -15,7 +15,7 @@ struct GLSFitResult <: MetricaBase.AbstractLinearFitResult
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
-    coef_names::Vector{Symbol}
+    coefficient_names::Vector{Symbol}
     coef_values::Vector{Float64}
     vcov_matrix::Matrix{Float64}
     stderror_values::Vector{Float64}
@@ -28,11 +28,11 @@ end
 
 MetricaBase.glance(result::GLSFitResult) = result.glance_table
 MetricaBase.tidy(result::GLSFitResult) = result.tidy_table
-MetricaBase.coef(result::GLSFitResult) = result.coef_names .=> result.coef_values
+MetricaBase.coef(result::GLSFitResult) = result.coefficient_names .=> result.coef_values
 MetricaBase.vcov(result::GLSFitResult) = result.vcov_matrix
 MetricaBase.stderror(result::GLSFitResult) = result.stderror_values
 MetricaBase.nobs(result::GLSFitResult) = length(result.response_vector)
-MetricaBase.dof(result::GLSFitResult) = length(result.response_vector) - length(result.coef_names)
+MetricaBase.dof(result::GLSFitResult) = length(result.response_vector) - length(result.coefficient_names)
 MetricaBase.r2(result::GLSFitResult) = result.glance_table.metrics[:r2]
 MetricaBase.fitted(result::GLSFitResult) = result.fitted_values
 MetricaBase.residuals(result::GLSFitResult) = result.residual_vector
@@ -79,7 +79,7 @@ function MetricaBase.predict(result::GLSFitResult;
     interval === :none && return predictions
 
     n = length(result.response_vector)
-    k = length(result.coef_names)
+    k = length(result.coefficient_names)
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]

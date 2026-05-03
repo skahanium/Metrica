@@ -110,12 +110,10 @@ export interface ColumnSummary {
 }
 
 export interface DatasetSummary {
-  nrows?: number;
-  ncols?: number;
-  dataset_summary?: { row_count: number; column_count: number };
+  nrows: number;
+  ncols: number;
   columns: ColumnSummary[];
-  preview?: Record<string, unknown>[];
-  preview_rows?: Record<string, unknown>[];
+  preview: Record<string, unknown>[];
 }
 
 // ---- 运行时请求/响应 ----
@@ -148,7 +146,72 @@ export interface TaskResponse {
   status: 'success' | 'error';
   messages: Message[];
   artifacts?: string[];
+  run_record?: RunRecord;
   result_payload?: ModelResult;
+}
+
+export interface DataLineage {
+  source_dataset: string;
+  active_dataset: string;
+  operations: Record<string, unknown>[];
+  row_count_before?: number;
+  row_count_after?: number;
+  notes: string[];
+}
+
+export interface ProjectManifest {
+  project_id: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  source_dataset: string;
+  active_dataset: string;
+  saved_model_specs: ModelSpec[];
+  last_run_id?: string | null;
+  ui_state: Record<string, unknown>;
+  data_lineage?: DataLineage | null;
+}
+
+// RunRecord 使用 discriminated union：action 字段收窄 result_summary 和 model_spec 类型。
+// 消费方通过 `run.action === 'fit_model'` 即可获取正确的类型收窄，无需 `as never`。
+
+interface RunRecordBase {
+  run_id: string;
+  started_at: string;
+  finished_at: string;
+  status: 'success' | 'error' | string;
+  dataset_ref: { source: string; path: string; format: string };
+  warnings: Array<Record<string, unknown>>;
+  messages: Message[];
+  artifacts: string[];
+}
+
+export interface FitModelRunRecord extends RunRecordBase {
+  action: 'fit_model';
+  result_summary?: ModelResult | null;
+  model_spec?: ModelSpec | null;
+  operations?: null;
+}
+
+export interface InspectRunRecord extends RunRecordBase {
+  action: 'inspect_dataset';
+  result_summary?: DatasetSummary | null;
+  model_spec?: null;
+  operations?: null;
+}
+
+export interface TransformRunRecord extends RunRecordBase {
+  action: 'transform';
+  result_summary?: TransformResult | null;
+  model_spec?: null;
+  operations?: DataOp[] | null;
+}
+
+export type RunRecord = FitModelRunRecord | InspectRunRecord | TransformRunRecord;
+
+/** Type guard: 收窄 RunRecord 为 fit_model 变体。 */
+export function isFitModelRun(run: RunRecord): run is FitModelRunRecord {
+  return run.action === 'fit_model';
 }
 
 // ---- 数据操作类型（Track B 用） ----
@@ -191,5 +254,32 @@ export interface TransformTaskResponse {
   status: 'success' | 'error';
   messages: Message[];
   artifacts?: string[];
+  run_record?: RunRecord;
   result_payload?: TransformResult;
+}
+
+export interface SaveProjectRequest {
+  task_id: string;
+  action: 'save_project';
+  project_context: { project_id: string; working_dir: string };
+  manifest: ProjectManifest;
+}
+
+export interface LoadProjectRequest {
+  task_id: string;
+  action: 'load_project';
+  project_context: { project_id: string; working_dir: string };
+}
+
+export interface ListRunsRequest {
+  task_id: string;
+  action: 'list_runs';
+  project_context: { project_id: string; working_dir: string };
+}
+
+export interface RerunTaskRequest {
+  task_id: string;
+  action: 'rerun_task';
+  project_context: { project_id: string; working_dir: string };
+  run_id: string;
 }

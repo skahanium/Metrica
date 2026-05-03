@@ -1,12 +1,20 @@
 # Runtime 协议
 
-第一阶段动作：
+## 动作列表
+
+### 第一阶段动作（S1/S2）
 
 - `inspect_dataset`
 - `fit_model`
 - `transform`
-- `export_result`
-- `explain_warning`
+
+### S3 项目系统动作
+
+- `save_project` — 保存项目清单到 `.metrica/project.json`
+- `load_project` — 从 `.metrica/project.json` 加载项目清单
+- `list_runs` — 列出 `.metrica/runs/` 下的所有运行记录
+- `rerun_task` — 根据历史运行记录重新执行任务
+- `export_report` — 导出运行报告（Markdown / CSV）
 
 每个请求必须包含 `task_id`、`action`、`project_context` 以及动作相关载荷。  
 每个响应必须包含 `task_id`、`status`、`messages`，以及可选的 `result_payload`。
@@ -24,6 +32,8 @@
 - `OPTIONS /fit_model`
 - `POST /transform`
 - `OPTIONS /transform`
+- `POST /export_report`
+- `OPTIONS /export_report`
 - `GET /health`（会话状态）
 - `GET /session/env`（变量环境）
 
@@ -405,22 +415,285 @@
 }
 ```
 
+## S3 项目系统端点
+
+### POST /save_project
+
+保存项目清单到 `<working_dir>/.metrica/project.json`。
+
+**请求示例：**
+
+```json
+{
+  "task_id": "save-project-001",
+  "action": "save_project",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  },
+  "manifest": {
+    "project_id": "alpha-demo",
+    "version": 1,
+    "created_at": "2026-05-03T12:00:00Z",
+    "updated_at": "2026-05-03T12:00:00Z",
+    "source_dataset": "/path/to/source.csv",
+    "active_dataset": "/path/to/active.csv",
+    "saved_model_specs": [
+      { "model_type": "ols", "formula": "y ~ x1 + x2" }
+    ],
+    "last_run_id": "run-001",
+    "ui_state": { "active_tab": "glance" },
+    "data_lineage": {
+      "source_dataset": "/path/to/source.csv",
+      "active_dataset": "/path/to/active.csv",
+      "operations": [],
+      "row_count_before": 100,
+      "row_count_after": 100,
+      "notes": []
+    }
+  }
+}
+```
+
+**成功响应：**
+
+```json
+{
+  "task_id": "save-project-001",
+  "status": "success",
+  "messages": [],
+  "artifacts": ["/path/to/project/.metrica/project.json"],
+  "result_payload": {
+    "project_path": "/path/to/project/.metrica/project.json",
+    "manifest": { ... }
+  }
+}
+```
+
+### POST /load_project
+
+从 `<working_dir>/.metrica/project.json` 加载项目清单。
+
+**请求示例：**
+
+```json
+{
+  "task_id": "load-project-001",
+  "action": "load_project",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  }
+}
+```
+
+**成功响应：**
+
+```json
+{
+  "task_id": "load-project-001",
+  "status": "success",
+  "messages": [],
+  "artifacts": ["/path/to/project/.metrica/project.json"],
+  "result_payload": {
+    "project_path": "/path/to/project/.metrica/project.json",
+    "manifest": { ... }
+  }
+}
+```
+
+**错误响应（项目不存在）：**
+
+```json
+{
+  "task_id": "load-project-001",
+  "status": "error",
+  "messages": [
+    {
+      "level": "error",
+      "code": "RUNTIME_PROJECT_NOT_FOUND",
+      "text": "读取文件失败（/path/to/project/.metrica/project.json）",
+      "hint": "请先保存项目。"
+    }
+  ]
+}
+```
+
+### POST /list_runs
+
+列出 `<working_dir>/.metrica/runs/` 下的所有运行记录，按 `finished_at` 降序排列。
+
+**请求示例：**
+
+```json
+{
+  "task_id": "list-runs-001",
+  "action": "list_runs",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  }
+}
+```
+
+**成功响应：**
+
+```json
+{
+  "task_id": "list-runs-001",
+  "status": "success",
+  "messages": [],
+  "result_payload": {
+    "runs": [
+      {
+        "run_id": "run-001",
+        "action": "fit_model",
+        "started_at": "1714742400000",
+        "finished_at": "1714742401000",
+        "status": "success",
+        "dataset_ref": { "source": "file", "path": "/path/to/data.csv", "format": "csv" },
+        "model_spec": { "model_type": "ols", "formula": "y ~ x1" },
+        "operations": null,
+        "warnings": [],
+        "messages": [],
+        "artifacts": [],
+        "result_summary": { "glance": { ... }, "tidy": [ ... ] },
+        "request_payload": { ... }
+      }
+    ]
+  }
+}
+```
+
+### POST /rerun_task
+
+根据历史运行记录重新执行任务。生成新的 `run_id`，若数据路径不存在则返回结构化错误。
+
+**请求示例：**
+
+```json
+{
+  "task_id": "rerun-001",
+  "action": "rerun_task",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  },
+  "run_id": "run-001"
+}
+```
+
+**成功响应：** 与原始动作（`fit_model` / `transform` / `inspect_dataset`）的响应格式相同，但 `run_id` 更新。
+
+**错误响应（数据路径失效）：**
+
+```json
+{
+  "task_id": "rerun-001",
+  "status": "error",
+  "messages": [
+    {
+      "level": "error",
+      "code": "RUNTIME_RERUN_DATASET_MISSING",
+      "text": "重跑所需数据集不存在：/path/to/missing.csv",
+      "hint": "请恢复数据文件后再重跑。"
+    }
+  ]
+}
+```
+
+### POST /export_report
+
+导出运行报告，支持 Markdown 和 CSV 格式。
+
+**请求示例：**
+
+```json
+{
+  "task_id": "export-001",
+  "action": "export_report",
+  "project_context": {
+    "project_id": "alpha-demo",
+    "working_dir": "/path/to/project"
+  },
+  "run_id": "run-001",
+  "format": "markdown"
+}
+```
+
+**支持的格式：**
+- `markdown` — 完整 Markdown 运行报告
+- `csv_tidy` — 系数表 CSV
+- `csv_glance` — 摘要指标 CSV
+- `csv_diagnostics` — 诊断结果 CSV
+
+**成功响应：**
+
+```json
+{
+  "task_id": "export-001",
+  "status": "success",
+  "messages": [],
+  "result_payload": {
+    "content": "# Metrica 单次运行报告\n...",
+    "format": "markdown",
+    "run_id": "run-001"
+  }
+}
+```
+
+**错误响应（运行记录无结果）：**
+
+```json
+{
+  "task_id": "export-001",
+  "status": "error",
+  "messages": [
+    {
+      "level": "error",
+      "code": "RUNTIME_NO_RESULT_SUMMARY",
+      "text": "该运行记录没有结果摘要，无法导出报告。",
+      "hint": "请确保运行成功后再导出。"
+    }
+  ]
+}
+```
+
 ## 当前稳定基线
 
 当前可执行端到端链路为：
 
-- 本地 CSV 输入 → `fit_model` 动作 → `ols` 或 `panel` 模型类型
+- 本地 CSV 输入 → `fit_model` 动作 → `ols`、`panel`、`iv` 或 `gls` 模型类型
 - 本地 CSV 输入 → `transform` 动作 → 派生 CSV → `fit_model` 动作
 - 结构化的 `glance` 与 `tidy` 响应载荷
 - 面板模型的结构化 `diagnostics` 响应载荷
 - 数据操作链的结构化 `preview`、`operations` 与错误定位
 - 删行与拟合错误的警告/消息传播
 
-主设计与当前实施顺序见：
+### S3 项目系统端点（已实现，待端到端验证）
 
+S3 端点已实现并通过单元测试，但尚未经过桌面端端到端流程验证：
+
+- `POST /save_project` — 保存项目清单到 `.metrica/project.json`，含 manifest 字段校验
+- `POST /load_project` — 从 `.metrica/project.json` 加载项目清单
+- `POST /list_runs` — 列出运行记录，支持 `limit`/`offset`/`action_filter`/`status_filter`
+- `POST /rerun_task` — 根据历史运行记录重新执行任务
+- `POST /export_report` — 导出运行报告（Markdown / CSV 格式）
+
+当前已知限制：
+
+- S3 端点不经过 Julia Session — 保存/加载与 Julia 内存状态完全解耦
+- 加载项目后不会自动恢复 Julia session 中的数据集
+- "项目重开后可重跑"依赖数据集文件仍在原路径
+- `rerun_task` 在 oneshot 回退模式下不可用
+- `export_report` 在 oneshot 回退模式下不可用
+
+主设计与阶段边界见：
+
+- `Metrica.jl-计量经济学框架-完善版.md`
+- `docs/roadmap/s1-foundation-and-workbench.md`
+- `docs/roadmap/s2-core-empirical-workbench.md`
 - `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
-- `docs/superpowers/plans/2026-05-01-milestone-3-panel-plan.md`
-- `docs/superpowers/plans/2026-05-02-milestone-4-panel-diagnostics-datasets-plan.md`
 
 当前实现路线补充约束：
 
