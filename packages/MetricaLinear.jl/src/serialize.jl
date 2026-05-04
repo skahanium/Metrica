@@ -96,8 +96,8 @@ function _compute_loglikelihood(result)
 end
 
 _compute_k(result::OLSFitResult) = length(result.coefficient_names)
-_compute_k(result::IVFitResult) = length(result.coef_names)
-_compute_k(result::GLSFitResult) = length(result.coef_names)
+_compute_k(result::IVFitResult) = length(result.coefficient_names)
+_compute_k(result::GLSFitResult) = length(result.coefficient_names)
 
 function _compute_aic(result)
     k = _compute_k(result)
