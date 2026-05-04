@@ -13,7 +13,7 @@ export interface ModelHistoryItem {
 }
 
 interface ModelState {
-  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson';
+  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin';
   formula: string;
   vcovType: string;
   weightsColumn: string;
@@ -26,7 +26,7 @@ interface ModelState {
   lastResult: ModelResult | null;
   modelHistory: ModelHistoryItem[];
   selectedModelIds: string[];
-  setModelType: (t: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson') => void;
+  setModelType: (t: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin') => void;
   setFormula: (f: string) => void;
   setVcovType: (v: string) => void;
   setWeightsColumn: (w: string) => void;
@@ -118,7 +118,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
       if (s.endogColumns.trim()) spec.endog_columns = s.endogColumns.split(',').map((v) => v.trim()).filter(Boolean);
     } else if (s.modelType === 'gls') {
       spec.vcov = { type: s.vcovType };
-    } else if (s.modelType === 'logit' || s.modelType === 'probit' || s.modelType === 'poisson') {
+    } else if (s.modelType === 'logit' || s.modelType === 'probit' || s.modelType === 'poisson' || s.modelType === 'ordered_logit' || s.modelType === 'multinomial_logit' || s.modelType === 'negbin') {
       spec.vcov = { type: s.vcovType };
     } else {
       spec.vcov = { type: s.vcovType };
