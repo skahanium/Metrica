@@ -130,3 +130,4 @@ lcov.info
 *.old
 .directory
 .Trash-*
+.worktrees/
