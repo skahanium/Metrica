@@ -26,32 +26,34 @@ abstract type AbstractDiscreteFitResult <: MetricaBase.AbstractFittedModel end
 
 # === 链接函数 =============================================================
 
+# linkfun: μ → η（链接函数，如 logit）
+# linkinv: η → μ（逆链接，如 logistic）
 struct Link
     name::Symbol
-    linkfun::Function
-    linkinv::Function
-    mu_eta::Function
-    variance::Function
-    initialize::Function
+    linkfun::Function       # μ → η
+    linkinv::Function       # η → μ
+    mu_eta::Function        # dμ/dη
+    variance::Function      # V(μ)
+    initialize::Function    # 工作响应初始化
 end
 
 const LOGIT_LINK = Link(
     :logit,
-    η -> 1.0 ./ (1.0 .+ exp.(-η)),
-    μ -> log.(μ ./ (1.0 .- μ)),
-    μ -> μ .* (1.0 .- μ),
-    μ -> μ .* (1.0 .- μ),
-    (y, μ) -> log.(μ ./ (1.0 .- μ)) .+ (y .- μ) ./ (μ .* (1.0 .- μ)),
+    μ -> log.(μ ./ (1.0 .- μ)),         # linkfun: μ → η
+    η -> 1.0 ./ (1.0 .+ exp.(-η)),      # linkinv: η → μ
+    μ -> μ .* (1.0 .- μ),               # mu_eta
+    μ -> μ .* (1.0 .- μ),               # variance
+    (y, μ) -> log.(μ ./ (1.0 .- μ)) .+ (y .- μ) ./ (μ .* (1.0 .- μ)),  # initialize
 )
 
 const PROBIT_LINK = let
     norm = Normal(0, 1)
     Link(
         :probit,
-        η -> cdf.(norm, η),
-        μ -> quantile.(norm, μ),
-        μ -> pdf.(norm, quantile.(norm, μ)),
-        μ -> μ .* (1.0 .- μ),
+        μ -> quantile.(norm, μ),         # linkfun: μ → η (probit)
+        η -> cdf.(norm, η),              # linkinv: η → μ
+        μ -> pdf.(norm, quantile.(norm, μ)),  # mu_eta
+        μ -> μ .* (1.0 .- μ),            # variance (approximation for binary)
         (y, μ) -> begin
             η = quantile.(norm, μ)
             η .+ (y .- μ) ./ pdf.(norm, η)
@@ -61,11 +63,11 @@ end
 
 const LOG_LINK = Link(
     :log,
-    η -> exp.(η),
-    μ -> log.(μ),
-    μ -> μ,
-    μ -> μ,
-    (y, μ) -> log.(μ) .+ (y .- μ) ./ μ,
+    μ -> log.(μ),                        # linkfun: μ → η
+    η -> exp.(η),                        # linkinv: η → μ
+    μ -> μ,                              # mu_eta
+    μ -> μ,                              # variance
+    (y, μ) -> log.(μ) .+ (y .- μ) ./ μ, # initialize
 )
 
 # === 具体模型类型（占位）==================================================

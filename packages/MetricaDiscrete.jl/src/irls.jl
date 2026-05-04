@@ -24,12 +24,18 @@ function irls(
 )
     nobs, p = size(X)
 
-    # 初始化
-    μ = clamp.(copy(y), 0.05, 0.95)
+    # 初始化：按 response 类型区分策略
+    μ = if link.name == :log
+        # 计数数据：用 (y + 0.5) 避免 log(0)
+        max.(copy(y), 0.1) .+ 0.5
+    else
+        # 二项数据：clamp 到 (0.05, 0.95)
+        clamp.(copy(y), 0.05, 0.95)
+    end
     β = zeros(p)
 
     for iter in 1:max_iter
-        η = link.linkinv(μ) .+ offset
+        η = link.linkfun(μ) .+ offset
         dμ_dη = link.mu_eta(μ)
         working_var = link.variance(μ)
         z = η .+ (y .- μ) ./ max.(dμ_dη, 1e-10)
@@ -42,7 +48,7 @@ function irls(
         β_new = Xw \ zw
 
         η_new = X * β_new .+ offset
-        μ_new = link.linkfun(η_new)
+        μ_new = link.linkinv(η_new)
         μ_new = clamp.(μ_new, 1e-10, 1.0 - 1e-10)
 
         β_change = norm(β_new - β) / (norm(β) + tol)
@@ -51,7 +57,7 @@ function irls(
 
         if β_change < tol
             η_final = X * β .+ offset
-            μ_final = link.linkfun(η_final)
+            μ_final = link.linkinv(η_final)
             μ_final = clamp.(μ_final, 1e-10, 1.0 - 1e-10)
 
             dμ_dη_final = link.mu_eta(μ_final)
