@@ -7,6 +7,7 @@ using LinearAlgebra
 using MetricaBase
 using MetricaLinear
 using Statistics
+using StatsModels
 
 export AbstractDiscreteModel, AbstractDiscreteFitResult,
     LogitModel, ProbitModel, PoissonModel,
@@ -203,10 +204,17 @@ struct NegBinFitResult <: AbstractDiscreteFitResult
     converged::Bool
 end
 
-# 子模块将在后续任务中 include
-# include("irls.jl")
-# include("logit.jl")
-# ...
+# 子模块加载
+include("irls.jl")
+include("logit.jl")
+include("probit.jl")
+include("poisson.jl")
+include("serialize.jl")
+# include("ologit.jl")
+# include("mlogit.jl")
+# include("negbin.jl")
+# include("margins.jl")
+# include("model_selection.jl")
 
 # __init__ 注册到 MODEL_REGISTRY
 function __init__()
