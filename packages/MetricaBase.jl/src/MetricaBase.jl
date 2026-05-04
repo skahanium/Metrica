@@ -380,4 +380,26 @@ function parse_metrica_formula(formula::AbstractString)
     return response_name, predictor_names
 end
 
+# === 模型注册表 ==============================================================
+
+"""
+    MODEL_REGISTRY::Dict{String, Type}
+
+全局模型注册表。Key 是 model_type 字符串，Value 是对应的模型规格类型。
+各包在 `__init__()` 中自行注册。Daemon 通过此注册表统一 dispatch。
+"""
+const MODEL_REGISTRY = Dict{String, Type}()
+
+"""
+    register_model(model_type::String, T::Type)
+
+向注册表添加一个模型类型。幂等。
+"""
+function register_model(model_type::String, T::Type)
+    MODEL_REGISTRY[model_type] = T
+    return nothing
+end
+
+export MODEL_REGISTRY, register_model
+
 end

@@ -125,4 +125,14 @@ include("iv.jl")
 include("gls.jl")
 include("serialize.jl")
 
+function __init__()
+    if isdefined(MetricaBase, :MODEL_REGISTRY)
+        merge!(MetricaBase.MODEL_REGISTRY, Dict{String, Type}(
+            "ols" => OLSModel,
+            "iv" => IVModel,
+            "gls" => GLSModel,
+        ))
+    end
+end
+
 end
