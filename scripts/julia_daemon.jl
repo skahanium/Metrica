@@ -109,8 +109,12 @@ function handle_request(req::Dict{String, Any})
                     kwargs[:omega_fn] = r -> Matrix{Float64}(I, length(r), length(r))
                 end
 
-                result = fit(ModelT, formula, dataset_path; kwargs...)
-                payload = result_to_payload(result; include_augment=include_augment)
+                result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
+                payload = if result isa MetricaDiscrete.AbstractDiscreteFitResult
+                    MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+                else
+                    MetricaLinear.result_to_payload(result; include_augment=include_augment)
+                end
 
                 if model_type == "ols" && result isa OLSFitResult
                     payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)

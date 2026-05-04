@@ -138,6 +138,17 @@ function ols_statistics(X::Matrix{Float64}, y::Vector{Float64},
     return (; coefficients, fitted, residuals, glance_table, tidy_table)
 end
 
+include("fe.jl")
+include("hdfde.jl")
+include("dk.jl")
+include("cre.jl")
+include("panel_iv.jl")
+include("re.jl")
+include("fd.jl")
+include("between.jl")
+include("diagnostics.jl")
+include("serialize.jl")
+
 """
     fit_panel(panel_data::PanelData, formula::String; method::Symbol=:fe)
 
@@ -169,16 +180,5 @@ function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::S
     end
     return estimator(panel_data, formula)
 end
-
-include("fe.jl")
-include("hdfde.jl")
-include("dk.jl")
-include("cre.jl")
-include("panel_iv.jl")
-include("re.jl")
-include("fd.jl")
-include("between.jl")
-include("diagnostics.jl")
-include("serialize.jl")
 
 end
