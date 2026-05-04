@@ -6,6 +6,8 @@ import { Sidebar } from './Sidebar';
 import { ModelForm } from './ModelForm';
 import { GlanceTable } from './GlanceTable';
 import { TidyTable } from './TidyTable';
+import { DiscreteGlanceCards } from './DiscreteGlanceCards';
+import { OddsRatioTable } from './OddsRatioTable';
 import { DiagnosticCards } from './DiagnosticCards';
 import { DiagnosticCharts } from './DiagnosticCharts';
 import { AugmentPreview } from './AugmentPreview';
@@ -76,8 +78,8 @@ export function App() {
               items={[
                 { key: 'data', label: '数据处理', children: <><DataOperationsPanel /><OperationHistory /><DataPreviewTable /></> },
                 { key: 'project', label: '项目', children: <ProjectPanel /> },
-                { key: 'glance', label: '模型概览', children: <GlanceTable /> },
-                { key: 'tidy', label: '系数表', children: <TidyTable /> },
+                { key: 'glance', label: '模型概览', children: <><GlanceTable /><DiscreteGlanceCards /></> },
+                { key: 'tidy', label: '系数表', children: <><TidyTable /><OddsRatioTable /></> },
                 { key: 'diagnostics', label: '诊断', children: <><DiagnosticCards /><DiagnosticCharts /></> },
                 { key: 'augment', label: '拟合值', children: <AugmentPreview /> },
                 { key: 'comparison', label: '模型对比', children: <ModelComparison /> },

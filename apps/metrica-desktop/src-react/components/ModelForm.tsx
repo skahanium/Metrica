@@ -68,6 +68,9 @@ export function ModelForm() {
             <Select.Option value="iv">IV / 2SLS</Select.Option>
             <Select.Option value="gls">GLS</Select.Option>
             <Select.Option value="panel">Panel</Select.Option>
+            <Select.Option value="logit">Logit</Select.Option>
+            <Select.Option value="probit">Probit</Select.Option>
+            <Select.Option value="poisson">Poisson</Select.Option>
           </Select>
         </Form.Item>
         <Form.Item label={modelType === 'panel' ? '面板公式' : 'OLS 公式'}>
@@ -120,6 +123,16 @@ export function ModelForm() {
             </Form.Item>
             <Form.Item label="聚类列">
               <Input value={clusterColumn} onChange={(e) => setClusterColumn(e.target.value)} style={{ width: 100 }} placeholder="可选" />
+            </Form.Item>
+          </>
+        ) : modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' ? (
+          <>
+            <Form.Item label="协方差">
+              <Select value={vcovType} onChange={(v) => setVcovType(v)} style={{ width: 120 }}>
+                <Select.Option value="classical">classical</Select.Option>
+                <Select.Option value="HC1">HC1</Select.Option>
+                <Select.Option value="cluster">cluster</Select.Option>
+              </Select>
             </Form.Item>
           </>
         ) : modelType === 'gls' ? (

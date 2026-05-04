@@ -19,7 +19,7 @@ export function inferWorkingDir(path: string): string {
 export interface FitModelParams {
   datasetPath: string;
   formula: string;
-  modelType?: 'ols' | 'iv' | 'gls' | 'panel';
+  modelType?: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson';
   vcovType?: string;
   weightsColumn?: string;
   clusterColumn?: string;
@@ -64,6 +64,8 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (instruments.trim()) modelSpec.instruments = instruments.split(',').map((v: string) => v.trim()).filter(Boolean);
     if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(',').map((v: string) => v.trim()).filter(Boolean);
   } else if (modelType === 'gls') {
+    modelSpec.vcov = { type: vcovType };
+  } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson') {
     modelSpec.vcov = { type: vcovType };
   } else {
     modelSpec.vcov = { type: vcovType };
