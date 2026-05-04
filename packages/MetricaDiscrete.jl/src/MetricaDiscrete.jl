@@ -7,6 +7,7 @@ using LinearAlgebra
 using MetricaBase
 using MetricaLinear
 using Optim
+using SpecialFunctions
 using Statistics
 using StatsModels
 
