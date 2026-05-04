@@ -2,6 +2,8 @@ pub mod julia_bridge;
 pub mod julia_session;
 pub mod server;
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -43,64 +45,56 @@ pub fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::PathBuf) ->
 
 // === 共享模型校验 =============================================================
 
-/// 根据 model_type 分发到具体校验器。
+/// 每个 model_type 的必填字段列表（不含 formula 和 dataset_path）。
+fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
+    HashMap::from([
+        ("ols", vec![]),
+        ("iv", vec!["instruments", "endog_columns"]),
+        ("gls", vec![]),
+        ("panel", vec!["panel_id", "panel_time"]),
+        ("logit", vec![]),
+        ("probit", vec![]),
+        ("poisson", vec![]),
+        ("ordered_logit", vec![]),
+        ("multinomial_logit", vec![]),
+        ("negbin", vec![]),
+    ])
+}
+
+/// 校验：model_type 是否在已知注册表中，且必填字段非空。
 pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
-    match spec.model_type.as_str() {
-        "ols" => None,
-        "panel" => validate_panel_spec(spec),
-        "iv" => validate_iv_spec(spec),
-        "gls" => None,
-        model_type => Some(ValidationError {
+    let required = model_required_fields();
+    match required.get(spec.model_type.as_str()) {
+        None => Some(ValidationError {
             code: "RUNTIME_UNSUPPORTED_MODEL_TYPE",
-            message: format!("runtime 当前支持 `ols`、`panel`、`iv` 与 `gls`，收到 `{model_type}`。"),
-            hint: Some("请将 model_type 设为 `ols`、`panel`、`iv` 或 `gls`。".to_string()),
+            message: format!(
+                "runtime 当前支持的模型类型：{}。收到 `{}`。",
+                required.keys().cloned().collect::<Vec<_>>().join("、"),
+                spec.model_type,
+            ),
+            hint: Some("请选择支持的模型类型。".to_string()),
         }),
+        Some(fields) => {
+            for field in fields {
+                let value: Option<&str> = match *field {
+                    "panel_id" => spec.panel_id.as_deref(),
+                    "panel_time" => spec.panel_time.as_deref(),
+                    "instruments" => spec.instruments.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
+                    "endog_columns" => spec.endog_columns.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
+                    _ => Some("present"),
+                };
+                match value {
+                    Some(v) if !v.is_empty() => {}
+                    _ => return Some(ValidationError {
+                        code: "RUNTIME_MISSING_FIELD",
+                        message: format!("模型类型 `{}` 需要字段 `{}`。", spec.model_type, field),
+                        hint: Some(format!("请提供 {}。", field)),
+                    }),
+                }
+            }
+            None
+        }
     }
-}
-
-/// 校验面板模型必须提供 panel_id 与 panel_time。
-pub fn validate_panel_spec(spec: &ModelSpec) -> Option<ValidationError> {
-    let missing_fields = [
-        ("panel_id", spec.panel_id.as_deref()),
-        ("panel_time", spec.panel_time.as_deref()),
-    ]
-    .iter()
-    .filter_map(|(field, value)| match value {
-        Some(value) if !value.trim().is_empty() => None,
-        _ => Some(*field),
-    })
-    .collect::<Vec<_>>();
-
-    if missing_fields.is_empty() {
-        return None;
-    }
-
-    Some(ValidationError {
-        code: "RUNTIME_PANEL_INDEX_REQUIRED",
-        message: format!("面板模型缺少必要索引字段：{}。", missing_fields.join(", ")),
-        hint: Some("请提供 panel_id 与 panel_time，以便 Runtime 将请求转发给面板估计器。".to_string()),
-    })
-}
-
-/// 校验 IV 模型必须提供 instruments 与 endog_columns。
-pub fn validate_iv_spec(spec: &ModelSpec) -> Option<ValidationError> {
-    let missing = [
-        ("instruments", spec.instruments.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
-        ("endog_columns", spec.endog_columns.as_ref().map(|v| v.is_empty()).unwrap_or(true)),
-    ]
-    .iter()
-    .filter_map(|(f, empty)| if *empty { Some(*f) } else { None })
-    .collect::<Vec<_>>();
-
-    if missing.is_empty() {
-        return None;
-    }
-
-    Some(ValidationError {
-        code: "RUNTIME_IV_FIELDS_REQUIRED",
-        message: format!("IV 模型缺少必要字段：{}。", missing.join(", ")),
-        hint: Some("请提供 instruments 和 endog_columns。".to_string()),
-    })
 }
 
 // === 标准化常量 ===============================================================
