@@ -6,6 +6,7 @@ using Distributions
 using LinearAlgebra
 using MetricaBase
 using MetricaLinear
+using Optim
 using Statistics
 using StatsModels
 
@@ -212,9 +213,9 @@ include("poisson.jl")
 include("serialize.jl")
 include("margins.jl")
 include("model_selection.jl")
-# include("ologit.jl")
-# include("mlogit.jl")
-# include("negbin.jl")
+include("ologit.jl")
+include("mlogit.jl")
+include("negbin.jl")
 
 # __init__ 注册到 MODEL_REGISTRY
 function __init__()
