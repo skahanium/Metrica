@@ -1,9 +1,6 @@
 # === 面板 IV 估计器 ===========================================================
-# 面板数据中的工具变量/两阶段最小二乘
+# 统一使用 StatsModels 公式
 
-"""
-面板 IV 模型规格。
-"""
 struct PanelIVModel <: MetricaBase.AbstractPanelModel
     formula::String
     instruments::Vector{String}
@@ -12,9 +9,6 @@ struct PanelIVModel <: MetricaBase.AbstractPanelModel
     time_col::Symbol
 end
 
-"""
-面板 IV 拟合结果。
-"""
 struct PanelIVFitResult <: MetricaBase.AbstractFittedModel
     formula::String
     glance_table::MetricaBase.ModelGlance
@@ -50,33 +44,28 @@ function MetricaBase.augment(result::PanelIVFitResult)
     return MetricaBase.AugmentTable(cols, nobs)
 end
 
-"""
-    fit_panel_iv(panel_data, formula; instruments, endog)
-
-使用面板 IV/2SLS 方法拟合模型。面板感知的第一阶段按个体分组处理。
-
-# 示例
-```julia
-fit_panel_iv(pd, "y ~ x1"; instruments=["z1"], endog=["x1"])
-```
-"""
 function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
                       instruments::Vector{String}, endog::Vector{String})
     data = DataFrame(panel_data.data)
     id_col = panel_data.id_col
     time_col = panel_data.time_col
 
-    nobs = nrow(data)
     unique_ids = unique(data[!, id_col])
     unique_times = unique(data[!, time_col])
     n_ids = length(unique_ids)
     n_times = length(unique_times)
 
-    # 解析公式
-    response_name, predictor_names = MetricaBase.parse_metrica_formula(formula)
+    # StatsModels 公式解析
+    model_formula = MetricaLinear.parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+    model_columns = MetricaLinear.collect_term_symbols(model_formula)
 
-    y = Float64.(data[!, Symbol(response_name)])
-    exog_vars = [Symbol(name) for name in predictor_names]
+    prepared = MetricaLinear.prepare_model_data(data, model_formula, model_columns, nothing, nothing)
+    prepared isa MetricaBase.ModelError && return prepared
+    (_, model_frame, _, X, y, _, _, _, _) = prepared
+
+    nobs = length(y)
+    base_names = Symbol.(coefnames(model_frame))
     endog_syms = Symbol.(endog)
     inst_syms = Symbol.(instruments)
 
@@ -91,26 +80,28 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
             "工具变量不存在", "工具变量 $iv 无法在数据集中找到。", "请检查变量名。")
     end
 
-    # 分离外生变量（不含内生变量）
-    exog_only = [v for v in exog_vars if v ∉ endog_syms]
+    # 分离外生 / 内生列位置
+    exog_names = [name for name in base_names if name ∉ endog_syms]
+    endog_in_base = [name for name in base_names if name in endog_syms]
+    exog_idx = [findfirst(==(name), base_names) for name in exog_names]
+    endog_idx = [findfirst(==(name), base_names) for name in endog_in_base]
 
-    # 构建矩阵
-    X_exog = hcat(ones(nobs), [Float64.(data[!, v]) for v in exog_only]...)
-    Z = hcat(ones(nobs), [Float64.(data[!, v]) for v in exog_only]...,
-             [Float64.(data[!, iv]) for iv in inst_syms]...)
-    X_endog = hcat([Float64.(data[!, ev]) for ev in endog_syms]...)
+    X_exog = X[:, exog_idx]
+    X_endog = X[:, endog_idx]
+    Z_inst = hcat([Float64.(data[!, iv]) for iv in inst_syms]...)
+    Z = hcat(X_exog, Z_inst)
 
-    # 第一阶段：按面板结构回归内生变量到工具变量
+    # 第一阶段
     Pi = Z \ X_endog
     X_endog_hat = Z * Pi
 
-    # 第一阶段 F 统计量
+    # 第一阶段 F 统计
     first_stage_stats = Dict{Symbol, Float64}()
     weak_warnings = MetricaBase.ModelWarning[]
     k_inst = length(inst_syms)
-    k_exog = size(X_exog, 2)
+    k_exog = length(exog_idx)
 
-    for (idx, ev) in enumerate(endog_syms)
+    for (idx, ev) in enumerate(endog_in_base)
         resid_fs = X_endog[:, idx] - X_endog_hat[:, idx]
         rss_fs = sum(abs2, resid_fs)
         tss_fs = sum(abs2, X_endog[:, idx] .- mean(X_endog[:, idx]))
@@ -133,9 +124,7 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
     fitted = X_second * coefficients
     residuals = y - fitted
 
-    coef_names = Symbol.(vcat(["(Intercept)"], string.(exog_only), string.(endog_syms)))
-
-    # 协方差（默认 classical，可通过 DK 扩展）
+    coef_names = Symbol.(vcat(string.(exog_names), string.(endog_in_base)))
     ncoef = length(coefficients)
     dof_val = nobs - ncoef
     sigma2 = sum(abs2, residuals) / dof_val
@@ -143,7 +132,6 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
     vcov_mat = sigma2 * XtX_inv
     se = sqrt.(diag(vcov_mat))
 
-    # 模型统计
     rss = sum(abs2, residuals)
     tss = sum(abs2, y .- mean(y))
     r2_val = iszero(tss) ? 1.0 : 1 - rss / tss

@@ -21,6 +21,9 @@ using MetricaOutput
 using LinearAlgebra: I
 using MetricaDiscrete
 
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaCausal.jl", "src", "MetricaCausal.jl"))
+using .MetricaCausal
+
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
 
@@ -64,58 +67,75 @@ function handle_request(req::Dict{String, Any})
             model_type = get(params, "model_type", "ols")
             include_augment = get(params, "return_augment", true)
 
-            if model_type == "panel"
-                panel_id = Symbol(params["panel_id"])
-                panel_time = Symbol(params["panel_time"])
-                panel_method = Symbol(get(params, "panel_method", "fe"))
-
-                df = CSV.read(dataset_path, DataFrame)
-                panel_data = MetricaBase.PanelData(df, panel_id, panel_time)
-
-                if panel_method == :hdfde
-                    fe_spec = Symbol.(get(params, "fe_spec", ["firm"]))
-                    result = fit_panel(panel_data, formula; method=:hdfde, fe_spec=fe_spec)
-                elseif panel_method == :cre
-                    result = fit_panel(panel_data, formula; method=:cre)
-                elseif panel_method == :panel_iv
-                    instruments = String.(params["instruments"])
-                    endog_columns = String.(params["endog_columns"])
-                    result = fit_panel_iv(panel_data, formula; instruments=instruments, endog=endog_columns)
-                else
-                    result = fit_panel(panel_data, formula; method=panel_method)
-                end
-                payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
-                payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
-            elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
+            if haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]
 
+                # 构造 kwargs
+                kwargs = Dict{Symbol, Any}()
                 vcov_type = get(params, "vcov", "classical")
                 vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
+                kwargs[:vcov] = vcov_symbol
                 weights = get(params, "weights", nothing)
-                weights_sym = isnothing(weights) || isempty(weights) ? nothing : Symbol(weights)
+                if !isnothing(weights) && !isempty(weights); kwargs[:weights] = Symbol(weights); end
                 cluster_col = get(params, "cluster_column", nothing)
-                cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
+                if !isnothing(cluster_col) && !isempty(cluster_col); kwargs[:cluster_column] = Symbol(cluster_col); end
 
-                kwargs = Dict{Symbol, Any}(:vcov => vcov_symbol)
-                if !isnothing(cluster_sym); kwargs[:cluster_column] = cluster_sym; end
-                if !isnothing(weights_sym); kwargs[:weights] = weights_sym; end
+                # 面板特有参数
+                if model_type in ("panel", "panel_iv", "did", "event_study")
+                    kwargs[:panel_id] = Symbol(params["panel_id"])
+                    kwargs[:panel_time] = Symbol(params["panel_time"])
+                    kwargs[:panel_method] = Symbol(get(params, "panel_method", "fe"))
+                    if haskey(params, "fe_spec")
+                        kwargs[:fe_spec] = Symbol.(params["fe_spec"])
+                    end
+                end
 
+                # IV 特有参数
                 if model_type == "iv"
-                    instruments = String.(params["instruments"])
-                    endog_columns = String.(params["endog_columns"])
-                    kwargs[:instruments] = instruments
-                    kwargs[:endog] = endog_columns
+                    kwargs[:instruments] = String.(params["instruments"])
+                    kwargs[:endog] = String.(params["endog_columns"])
+                elseif model_type == "panel_iv"
+                    kwargs[:instruments] = String.(params["instruments"])
+                    kwargs[:endog] = String.(params["endog_columns"])
                 elseif model_type == "gls"
                     kwargs[:omega_fn] = r -> Matrix{Float64}(I, length(r), length(r))
                 end
 
-                result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
-                payload = if result isa MetricaDiscrete.AbstractDiscreteFitResult
-                    MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
-                else
-                    MetricaLinear.result_to_payload(result; include_augment=include_augment)
+                # S4b Causal 特有参数
+                if haskey(params, "treated_column")
+                    kwargs[:treated_column] = Symbol(params["treated_column"])
+                end
+                if haskey(params, "post_column")
+                    kwargs[:post_column] = Symbol(params["post_column"])
+                end
+                if haskey(params, "event_time_column")
+                    kwargs[:event_time_column] = Symbol(params["event_time_column"])
+                end
+                if haskey(params, "treatment_column")
+                    kwargs[:treatment_column] = Symbol(params["treatment_column"])
+                end
+                if haskey(params, "outcome_column")
+                    kwargs[:outcome_column] = Symbol(params["outcome_column"])
                 end
 
+                result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
+
+                # 分派 result_to_payload
+                if result isa MetricaCausal.AbstractCausalFitResult
+                    payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
+                    payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+                elseif model_type in ("panel", "panel_iv")
+                    payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
+                    # 面板诊断
+                    if result isa PanelFitResult
+                        payload["result_payload"]["diagnostics"] = panel_diagnostics(result.panel_data, formula)
+                    end
+                else
+                    payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
+                end
+
+                # OLS 诊断
                 if model_type == "ols" && result isa OLSFitResult
                     payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
                 end

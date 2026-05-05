@@ -13,7 +13,7 @@ export interface ModelHistoryItem {
 }
 
 interface ModelState {
-  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin';
+  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw';
   formula: string;
   vcovType: string;
   weightsColumn: string;
@@ -23,10 +23,11 @@ interface ModelState {
   panelMethod: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv';
   instruments: string;
   endogColumns: string;
+  treatmentColumn: string;
   lastResult: ModelResult | null;
   modelHistory: ModelHistoryItem[];
   selectedModelIds: string[];
-  setModelType: (t: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin') => void;
+  setModelType: (t: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw') => void;
   setFormula: (f: string) => void;
   setVcovType: (v: string) => void;
   setWeightsColumn: (w: string) => void;
@@ -36,6 +37,7 @@ interface ModelState {
   setPanelMethod: (m: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv') => void;
   setInstruments: (v: string) => void;
   setEndogColumns: (v: string) => void;
+  setTreatmentColumn: (v: string) => void;
   setLastResult: (r: ModelResult | null) => void;
   addToHistory: (item: ModelHistoryItem) => void;
   removeFromHistory: (id: string) => void;
@@ -57,6 +59,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
   panelMethod: 'fe',
   instruments: '',
   endogColumns: '',
+  treatmentColumn: '',
   lastResult: null,
   modelHistory: [],
   selectedModelIds: [],
@@ -70,6 +73,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
   setPanelMethod: (panelMethod) => set({ panelMethod }),
   setInstruments: (instruments) => set({ instruments }),
   setEndogColumns: (endogColumns) => set({ endogColumns }),
+  setTreatmentColumn: (treatmentColumn) => set({ treatmentColumn }),
   setLastResult: (lastResult) => set({ lastResult }),
   addToHistory: (item) => set((state) => ({
     modelHistory: [item, ...state.modelHistory.filter((h) => h.id !== item.id)].slice(0, 20),
@@ -96,6 +100,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     panelMethod: (spec.panel_method as ModelState['panelMethod']) ?? state.panelMethod,
     instruments: spec.instruments?.join(', ') ?? state.instruments,
     endogColumns: spec.endog_columns?.join(', ') ?? state.endogColumns,
+    treatmentColumn: spec.treatment_column ?? state.treatmentColumn,
   })),
   buildModelSpec: () => {
     const s = get();
@@ -118,6 +123,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
       if (s.endogColumns.trim()) spec.endog_columns = s.endogColumns.split(',').map((v) => v.trim()).filter(Boolean);
     } else if (s.modelType === 'gls') {
       spec.vcov = { type: s.vcovType };
+    } else if (s.modelType === 'did' || s.modelType === 'event_study') {
+      spec.panel_id = s.panelId;
+      spec.panel_time = s.panelTime;
+      if (s.treatmentColumn.trim()) spec.treatment_column = s.treatmentColumn.trim();
+    } else if (s.modelType === 'ipw' || s.modelType === 'psm' || s.modelType === 'aipw') {
+      if (s.treatmentColumn.trim()) spec.treatment_column = s.treatmentColumn.trim();
     } else if (s.modelType === 'logit' || s.modelType === 'probit' || s.modelType === 'poisson' || s.modelType === 'ordered_logit' || s.modelType === 'multinomial_logit' || s.modelType === 'negbin') {
       spec.vcov = { type: s.vcovType };
     } else {

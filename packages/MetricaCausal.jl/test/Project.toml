@@ -1,0 +1,14 @@
+name = "MetricaCausalTests"
+uuid = "e1f2a3b4-c5d6-7890-abcd-ef567890abcd"
+
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+MetricaCausal = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
+MetricaDiscrete = "d1e2f3a4-b5c6-7890-def0-123456789abc"
+MetricaPanel = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

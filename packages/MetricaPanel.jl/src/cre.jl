@@ -1,50 +1,44 @@
 # === CRE/Mundlak 估计器 =======================================================
-# Correlated Random Effects: 将组均值作为额外回归元
+# 统一使用 StatsModels 公式
 
-"""
-    fit_crea(panel_data::PanelData, formula::String)
-
-使用 Correlated Random Effects (CRE/Mundlak) 方法拟合面板模型。
-
-将每个时变变量的组均值作为额外回归元加入 OLS，允许检验
-E(u_i | X_i) 的函数形式。组均值系数标记为 `group_mean_*`。
-
-返回 `PanelFitResult`（method = :cre）。
-"""
 function fit_crea(panel_data::MetricaBase.PanelData, formula::String)
     data = DataFrame(panel_data.data)
     id_col = panel_data.id_col
     time_col = panel_data.time_col
 
-    nobs = nrow(data)
-    unique_ids = unique(data[!, id_col])
+    # StatsModels 公式解析
+    model_formula = MetricaLinear.parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+    model_columns = MetricaLinear.collect_term_symbols(model_formula)
+
+    prepared = MetricaLinear.prepare_model_data(data, model_formula, model_columns, nothing, nothing)
+    prepared isa MetricaBase.ModelError && return prepared
+    (filtered_df, model_frame, _, X, y, _, _, _, _) = prepared
+
+    # 移除截距列
+    X_noint = X[:, 2:end]
+    nobs = length(y)
+    unique_ids = unique(filtered_df[!, id_col])
     n_ids = length(unique_ids)
+    base_names = Symbol.(coefnames(model_frame))[2:end]
 
-    # 解析公式
-    response_name, predictor_names = MetricaBase.parse_metrica_formula(formula)
-
-    y = Float64.(data[!, Symbol(response_name)])
-    X_names = [Symbol(name) for name in predictor_names]
-    X = hcat([Float64.(data[!, name]) for name in X_names]...)
-
-    # 计算组均值
-    X_group_mean = zeros(nobs, length(X_names))
+    # 组均值
+    X_group_mean = zeros(nobs, size(X_noint, 2))
     for id in unique_ids
-        mask = data[!, id_col] .== id
-        X_id = X[mask, :]
+        mask = filtered_df[!, id_col] .== id
+        X_id = X_noint[mask, :]
         gm = vec(mean(X_id, dims=1))
-        for j in 1:length(X_names)
+        for j in 1:size(X_noint, 2)
             X_group_mean[mask, j] .= gm[j]
         end
     end
 
-    # 构建设计矩阵：截距 + 原始变量 + 组均值变量
-    X_design = hcat(ones(nobs), X, X_group_mean)
-    gm_names = [Symbol("group_mean_$(name)") for name in X_names]
-    coef_names = vcat([:intercept], X_names, gm_names)
+    X_design = hcat(ones(nobs), X_noint, X_group_mean)
+    gm_names = [Symbol("group_mean_$(name)") for name in base_names]
+    coef_names = vcat([:intercept], base_names, gm_names)
 
     stats = ols_statistics(X_design, y, coef_names, :cre,
-                           Dict(:n_ids => n_ids, :n_times => length(unique(data[!, time_col]))))
+                           Dict(:n_ids => n_ids, :n_times => length(unique(filtered_df[!, time_col]))))
 
     fitted = X_design * stats.coefficients
     residuals = y - fitted

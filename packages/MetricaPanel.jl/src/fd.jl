@@ -1,19 +1,6 @@
 # === 一阶差分估计器 ===========================================================
+# 统一使用 StatsModels 公式
 
-"""
-    fit_fd(panel_data::MetricaBase.PanelData, formula::String)
-
-使用一阶差分方法拟合面板模型。
-
-核心算法：
-1. 按个体分组
-2. 计算相邻期差值
-3. 对差值数据执行 OLS
-4. 修正自由度
-
-返回 `PanelFitResult`。注：fitted_values 与 residual_vector 为差分空间中的值，
-即 fitted + residual = Δy。
-"""
 function fit_fd(panel_data::MetricaBase.PanelData, formula::String)
     data = panel_data.data
     id_col = panel_data.id_col
@@ -22,25 +9,29 @@ function fit_fd(panel_data::MetricaBase.PanelData, formula::String)
     df = DataFrame(data)
     nobs_original = nrow(df)
 
-    unique_ids = unique(df[!, id_col])
+    # StatsModels 公式解析
+    model_formula = MetricaLinear.parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+    model_columns = MetricaLinear.collect_term_symbols(model_formula)
+
+    prepared = MetricaLinear.prepare_model_data(df, model_formula, model_columns, nothing, nothing)
+    prepared isa MetricaBase.ModelError && return prepared
+    (filtered_df, model_frame, _, X, y, _, _, _, _) = prepared
+
+    # 移除截距列（差分后全为零）
+    X_noint = X[:, 2:end]
+    unique_ids = unique(filtered_df[!, id_col])
     n_ids = length(unique_ids)
 
-    # 解析公式
-    response_name, predictor_names = MetricaBase.parse_metrica_formula(formula)
-
-    y = Float64.(df[!, Symbol(response_name)])
-    X_names = [Symbol(name) for name in predictor_names]
-    X = hcat([Float64.(df[!, name]) for name in X_names]...)
-
-    # 按个体分组并计算差值
+    # 差分
     y_diff = Float64[]
-    X_diff = Matrix{Float64}(undef, 0, length(X_names))
+    X_diff = Matrix{Float64}(undef, 0, size(X_noint, 2))
 
     for id in unique_ids
-        mask = df[!, id_col] .== id
+        mask = filtered_df[!, id_col] .== id
         y_id = y[mask]
-        X_id = X[mask, :]
-        times = df[mask, time_col]
+        X_id = X_noint[mask, :]
+        times = filtered_df[mask, time_col]
 
         sort_idx = sortperm(times)
         y_id = y_id[sort_idx]
@@ -52,21 +43,11 @@ function fit_fd(panel_data::MetricaBase.PanelData, formula::String)
         end
     end
 
-    # 差分后无截距
-    X_design = X_diff
-    coef_names = X_names
+    coef_names = Symbol.(coefnames(model_frame))[2:end]  # 无截距
 
-    stats = ols_statistics(X_design, y_diff, coef_names, :fd,
+    stats = ols_statistics(X_diff, y_diff, coef_names, :fd,
                            Dict(:n_ids => n_ids, :nobs_original => nobs_original))
 
-    return PanelFitResult(
-        formula,
-        stats.glance_table,
-        stats.tidy_table,
-        panel_data,
-        stats.fitted,
-        stats.residuals,
-        coef_names,
-        :fd,
-    )
+    return PanelFitResult(formula, stats.glance_table, stats.tidy_table,
+                          panel_data, stats.fitted, stats.residuals, coef_names, :fd)
 end

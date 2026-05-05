@@ -1,5 +1,4 @@
 import { Card, Statistic, Row, Col, Typography } from 'antd';
-import { useMemo } from 'react';
 import { useModelStore } from '../stores/modelStore';
 
 export function ClassificationPreview() {

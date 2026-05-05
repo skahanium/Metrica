@@ -58,6 +58,11 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("ordered_logit", vec![]),
         ("multinomial_logit", vec![]),
         ("negbin", vec![]),
+        ("did", vec!["panel_id", "panel_time"]),
+        ("event_study", vec!["panel_id", "panel_time"]),
+        ("ipw", vec!["treatment_column"]),
+        ("psm", vec!["treatment_column"]),
+        ("aipw", vec!["treatment_column"]),
     ])
 }
 
@@ -81,6 +86,7 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     "panel_time" => spec.panel_time.as_deref(),
                     "instruments" => spec.instruments.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
                     "endog_columns" => spec.endog_columns.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
+                    "treatment_column" => spec.treatment_column.as_deref(),
                     _ => Some("present"),
                 };
                 match value {
@@ -194,6 +200,9 @@ pub struct ModelSpec {
     // M6: GLS 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub omega_spec: Option<String>,
+    // S4b: Causal 字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub treatment_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -5,7 +5,7 @@ import { useDatasetStore } from '../stores/datasetStore';
 import { useProjectStore } from '../stores/projectStore';
 import { fitModel } from '../services/runtimeClient';
 
-const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' }> = {
+const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' | 'causal' }> = {
   ols: { label: 'OLS / WLS', family: 'linear' },
   iv: { label: 'IV / 2SLS', family: 'linear' },
   gls: { label: 'GLS', family: 'linear' },
@@ -16,6 +16,11 @@ const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'pan
   ordered_logit: { label: '有序 Logit', family: 'discrete' },
   multinomial_logit: { label: '多项 Logit', family: 'discrete' },
   negbin: { label: '负二项回归', family: 'discrete' },
+  did: { label: 'DID 双重差分', family: 'causal' },
+  event_study: { label: '事件研究', family: 'causal' },
+  ipw: { label: 'IPW 逆概率加权', family: 'causal' },
+  psm: { label: 'PSM 倾向得分匹配', family: 'causal' },
+  aipw: { label: 'AIPW 双重稳健', family: 'causal' },
 };
 
 export function ModelForm() {
@@ -26,6 +31,7 @@ export function ModelForm() {
     panelId, setPanelId, panelTime, setPanelTime,
     panelMethod, setPanelMethod, setLastResult,
     instruments, setInstruments, endogColumns, setEndogColumns,
+    treatmentColumn, setTreatmentColumn,
   } = useModelStore();
   const { setLoading, setError } = useAppStore();
   const activePath = useDatasetStore((s) => s.activePath);
@@ -98,6 +104,13 @@ export function ModelForm() {
                   <Select.Option key={value} value={value}>{info.label}</Select.Option>
                 ))}
             </Select.OptGroup>
+            <Select.OptGroup label="因果推断">
+              {Object.entries(MODEL_TYPE_LABELS)
+                .filter(([, info]) => info.family === 'causal')
+                .map(([value, info]) => (
+                  <Select.Option key={value} value={value}>{info.label}</Select.Option>
+                ))}
+            </Select.OptGroup>
           </Select>
         </Form.Item>
         <Form.Item label={modelType === 'panel' ? '面板公式' : 'OLS 公式'}>
@@ -150,6 +163,24 @@ export function ModelForm() {
             </Form.Item>
             <Form.Item label="聚类列">
               <Input value={clusterColumn} onChange={(e) => setClusterColumn(e.target.value)} style={{ width: 100 }} placeholder="可选" />
+            </Form.Item>
+          </>
+        ) : modelType === 'did' || modelType === 'event_study' ? (
+          <>
+            <Form.Item label="个体列">
+              <Input value={panelId} onChange={(e) => setPanelId(e.target.value)} style={{ width: 100 }} placeholder="id" />
+            </Form.Item>
+            <Form.Item label="时间列">
+              <Input value={panelTime} onChange={(e) => setPanelTime(e.target.value)} style={{ width: 100 }} placeholder="time" />
+            </Form.Item>
+            <Form.Item label="处理变量">
+              <Input value={treatmentColumn} onChange={(e) => setTreatmentColumn(e.target.value)} style={{ width: 100 }} placeholder="treated" />
+            </Form.Item>
+          </>
+        ) : modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw' ? (
+          <>
+            <Form.Item label="处理变量">
+              <Input value={treatmentColumn} onChange={(e) => setTreatmentColumn(e.target.value)} style={{ width: 100 }} placeholder="treated" />
             </Form.Item>
           </>
         ) : modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin' ? (

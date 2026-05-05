@@ -60,9 +60,9 @@ end
         @test g.metrics[:n_ids] == 3
         @test g.metrics[:n_times] == 3
 
-        # 检查 tidy
+        # 检查 tidy（FE 无截距，截距被实体固定效应吸收）
         t = tidy(result)
-        @test length(t.rows) == 3  # intercept + mvalue + capital
+        @test length(t.rows) == 2  # mvalue + capital
         @test t.vcov_label == "classical"
         @test all(row -> row.pvalue !== nothing, t.rows)
 
