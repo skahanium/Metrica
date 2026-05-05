@@ -63,6 +63,11 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("ipw", vec!["treatment_column"]),
         ("psm", vec!["treatment_column"]),
         ("aipw", vec!["treatment_column"]),
+        // S4c: TimeSeries 模型
+        ("arima", vec!["variable", "time_column", "order"]),
+        ("var", vec!["variables", "time_column", "lags"]),
+        ("unitroot", vec!["variable", "time_column"]),
+        ("cointegration", vec!["variables", "time_column", "method"]),
     ])
 }
 
@@ -87,6 +92,13 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     "instruments" => spec.instruments.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
                     "endog_columns" => spec.endog_columns.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
                     "treatment_column" => spec.treatment_column.as_deref(),
+                    // S4c: TimeSeries 字段
+                    "time_column" => spec.time_column.as_deref(),
+                    "variable" => spec.variable.as_deref(),
+                    "variables" => spec.variables.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
+                    "order" => spec.order.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
+                    "method" => spec.ts_method.as_deref(),
+                    "lags" => spec.lags.map(|_| "present"),
                     _ => Some("present"),
                 };
                 match value {
@@ -203,6 +215,23 @@ pub struct ModelSpec {
     // S4b: Causal 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub treatment_column: Option<String>,
+    // S4c: TimeSeries 字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variable: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variables: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<Vec<i32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seasonal_order: Option<Vec<i32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ts_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lags: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deterministic: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -445,6 +474,15 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             instruments: None,
             endog_columns: None,
             omega_spec: None,
+            treatment_column: None,
+            time_column: None,
+            variable: None,
+            variables: None,
+            order: None,
+            seasonal_order: None,
+            ts_method: None,
+            lags: None,
+            deterministic: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -477,6 +515,15 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         instruments: None,
         endog_columns: None,
         omega_spec: None,
+        treatment_column: None,
+        time_column: None,
+        variable: None,
+        variables: None,
+        order: None,
+        seasonal_order: None,
+        ts_method: None,
+        lags: None,
+        deterministic: None,
     };
     request.options.return_augment = true;
     request

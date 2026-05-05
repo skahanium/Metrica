@@ -37,7 +37,28 @@
       "Bash(curl -s --request POST http://127.0.0.1:47821/fit_model -H 'Content-Type: application/json' -d '{\"task_id\":\"test-1\",\"action\":\"fit_model\",\"project_context\":{\"project_id\":\"test\",\"working_dir\":\"/Users/skahanium/Metrica/apps/metrica-desktop\"},\"dataset_ref\":{\"source\":\"file\",\"path\":\"/Users/skahanium/Metrica/apps/metrica-desktop/data/demo.csv\",\"format\":\"csv\"},\"model_spec\":{\"model_type\":\"ols\",\"formula\":\"y ~ x1 + x2\",\"vcov\":{\"type\":\"classical\"}},\"options\":{\"drop_missing\":true,\"return_augment\":false}}')",
       "Bash(python3 -m json.tool)",
       "Bash(npm test *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(METRICA_REPO_ROOT=/Users/skahanium/Metrica/.worktrees/s4a-discrete julia --project=/Users/skahanium/Metrica/.worktrees/s4a-discrete/packages/MetricaDiscrete.jl --startup-file=no --color=no /Users/skahanium/Metrica/.worktrees/s4a-discrete/scripts/julia_daemon.jl)",
+      "Bash(cargo tauri *)",
+      "Bash(pkill -f \"metrica-runtime serve\")",
+      "Bash(npm run *)",
+      "Bash(pkill -f metrica-desktop)",
+      "Bash(METRICA_JULIA_PROJECT=/Users/skahanium/Metrica/.worktrees/s4a-discrete/packages/MetricaDiscrete.jl cargo run)",
+      "Bash(curl -s http://127.0.0.1:47821/health)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Runtime: {d[\\\\\"status\\\\\"]}, Julia: {d[\\\\\"julia_healthy\\\\\"]}'\\)\")",
+      "Bash(cargo run *)",
+      "Bash(METRICA_REPO_ROOT=/Users/skahanium/Metrica/.worktrees/s4b-causal julia --project=/Users/skahanium/Metrica/.worktrees/s4b-causal/packages/MetricaDiscrete.jl --startup-file=no --color=no /Users/skahanium/Metrica/.worktrees/s4b-causal/scripts/julia_daemon.jl)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'OLS: {d[\\\\\"status\\\\\"]}, r2={d[\\\\\"result_payload\\\\\"][\\\\\"glance\\\\\"][\\\\\"metrics\\\\\"][\\\\\"r2\\\\\"]:.4f}'\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Panel FE: {d[\\\\\"status\\\\\"]}, r2={d[\\\\\"result_payload\\\\\"][\\\\\"glance\\\\\"][\\\\\"metrics\\\\\"][\\\\\"r2\\\\\"]:.4f}'\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('messages',[{}]\\)[0].get\\('text',''\\)[:200]\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Panel FE: {d[\\\\\"status\\\\\"]}, r2={d.get\\(\\\\\"result_payload\\\\\",{}\\).get\\(\\\\\"glance\\\\\",{}\\).get\\(\\\\\"metrics\\\\\",{}\\).get\\(\\\\\"r2\\\\\",\\\\\"N/A\\\\\"\\)}'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'DID: {d[\\\\\"status\\\\\"]}'\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'DID: {d[\\\\\"status\\\\\"]}, effect={d[\\\\\"result_payload\\\\\"][\\\\\"treat_effect\\\\\"]:.4f}'\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'DID: {d[\\\\\"status\\\\\"]}, effect={d[\\\\\"result_payload\\\\\"][\\\\\"treat_effect\\\\\"]:.4f}, se={d[\\\\\"result_payload\\\\\"][\\\\\"treat_effect_se\\\\\"]:.4f}'\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('messages',[{}]\\)[0].get\\('text',''\\)[:300]\\)\")",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

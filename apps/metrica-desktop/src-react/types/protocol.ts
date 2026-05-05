@@ -143,6 +143,25 @@ export interface ModelResult {
   att_se?: number;
   ate_se?: number;
   n_matched?: number;
+  // S4c: TimeSeries 字段
+  adf_statistic?: number;
+  adf_pvalue?: number;
+  pp_statistic?: number;
+  pp_pvalue?: number;
+  kpss_statistic?: number;
+  kpss_pvalue?: number;
+  unitroot_results?: UnitRootTestResult[];
+  forecast?: ForecastResult;
+  impulse_response?: number[][][];
+  variance_decomposition?: number[][][];
+  granger_causality?: GrangerCausalityResult;
+  cointegrating_vector?: number[];
+  n_cointegrating_relations?: number;
+  eigenvalues?: number[];
+  trace_stats?: number[];
+  max_eigen_stats?: number[];
+  acf_values?: number[];
+  pacf_values?: number[];
 }
 
 // ---- 数据摘要 ----
@@ -165,7 +184,7 @@ export interface DatasetSummary {
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw';
+  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -177,6 +196,15 @@ export interface ModelSpec {
   endog_columns?: string[];
   omega_spec?: string;
   treatment_column?: string;
+  // S4c: TimeSeries 字段
+  time_column?: string;
+  variable?: string;
+  variables?: string[];
+  order?: [number, number, number];
+  seasonal_order?: [number, number, number, number];
+  ts_method?: 'mle' | 'css' | 'engle_granger' | 'johansen';
+  lags?: number;
+  deterministic?: 'constant' | 'trend' | 'none';
 }
 
 export interface FitModelRequest {
@@ -329,4 +357,41 @@ export interface RerunTaskRequest {
   action: 'rerun_task';
   project_context: { project_id: string; working_dir: string };
   run_id: string;
+}
+
+// ---- S4c: 时间序列类型 ----
+
+export interface UnitRootTestResult {
+  test_name: string;
+  test_statistic: number;
+  p_value: number;
+  lags_used: number;
+  critical_values: Record<number, number>;
+  conclusion: 'reject' | 'fail_to_reject';
+}
+
+export interface ForecastResult {
+  point_forecast: number[];
+  lower_bound: number[];
+  upper_bound: number[];
+  confidence_level: number;
+  forecast_origin: number;
+  steps: number;
+}
+
+export interface GrangerCausalityResult {
+  f_stat: number;
+  p_value: number;
+  conclusion: 'reject' | 'fail_to_reject';
+}
+
+export interface TimeSeriesModelParams {
+  time_column: string;
+  variable?: string;
+  variables?: string[];
+  order?: [number, number, number];
+  seasonal_order?: [number, number, number, number];
+  method?: 'mle' | 'css' | 'engle_granger' | 'johansen';
+  lags?: number;
+  deterministic?: 'constant' | 'trend' | 'none';
 }
