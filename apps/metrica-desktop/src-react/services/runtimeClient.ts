@@ -19,7 +19,7 @@ export function inferWorkingDir(path: string): string {
 export interface FitModelParams {
   datasetPath: string;
   formula: string;
-  modelType?: string;
+  modelType?: import('../types/protocol').ModelSpec['model_type'];
   vcovType?: string;
   weightsColumn?: string;
   clusterColumn?: string;
