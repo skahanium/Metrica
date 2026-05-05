@@ -27,7 +27,8 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     # 为每个相对时期创建虚拟变量 × treated 交互列
     dummy_names = String[]
     for r in rel_dummies
-        col_name = "rel_$(r)_x_treat"
+        rs = replace(string(r), "-" => "m")  # -3 → m3
+        col_name = "rel_$(rs)_x_treat"
         df[!, Symbol(col_name)] = Float64.(df.relative_time .== r) .* Float64.(df[!, treated_column])
         push!(dummy_names, col_name)
     end
@@ -60,12 +61,13 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     period_ses = Float64[]
     period_labels = String[]
     for r in rel_dummies
-        col = Symbol("rel_$(r)_x_treat")
+        rs = replace(string(r), "-" => "m")
+        col = Symbol("rel_$(rs)_x_treat")
         idx = findfirst(==(col), coef_names)
         if !isnothing(idx)
             push!(period_coefs, coefficients[idx])
             push!(period_ses, stderrors[idx])
-            push!(period_labels, r >= -1 ? string(r) : string(r))  # Skip -1 (reference)
+            push!(period_labels, string(r))
         end
     end
 
@@ -75,9 +77,10 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     parallel_supported = true
     if length(pre_indices) >= 2
         pre_coefs = period_coefs[pre_indices]
+        q = length(pre_indices)
         pre_vcov = twfe_result.vcov[pre_indices, pre_indices]
-        f_stat = pre_coefs' * (pre_vcov \ pre_coefs) / length(pre_indices)
-        pre_trend_pvalue = 1 - cdf(FDist(length(pre_indices), dof), f_stat)
+        f_stat = (pre_coefs' * (pre_vcov \ pre_coefs)) / q
+        pre_trend_pvalue = 1 - cdf(FDist(q, max(dof, 1)), f_stat)
         parallel_supported = pre_trend_pvalue > 0.05
     end
 

@@ -68,10 +68,22 @@ function MetricaBase.fit(::Type{PSMModel}, formula::AbstractString, data;
         if eltype(col) <: Number
             mean_t = mean(col[treated_idx])
             mean_c = mean(col[control_idx])
-            sd_pooled = sqrt((var(col[treated_idx]) + var(col[control_idx])) / 2)
-            std_bias = sd_pooled > 0 ? (mean_t - mean_c) / sd_pooled : 0.0
+            sd_pooled = sqrt(max((var(col[treated_idx]) + var(col[control_idx])) / 2, 1e-10))
+            std_bias = sd_pooled > 1e-10 ? 100 * (mean_t - mean_c) / sd_pooled : 0.0
             push!(balance_data, Dict(:variable => String(col_name), :mean_treated => mean_t,
                 :mean_control => mean_c, :std_bias => std_bias))
+        else
+            # 分类变量：比较比例
+            vals_t = proportionmap(col[treated_idx])
+            vals_c = proportionmap(col[control_idx])
+            all_vals = union(keys(vals_t), keys(vals_c))
+            max_diff = 0.0
+            for v in all_vals
+                diff = abs(get(vals_t, v, 0.0) - get(vals_c, v, 0.0))
+                max_diff = max(max_diff, diff)
+            end
+            push!(balance_data, Dict(:variable => String(col_name), :mean_treated => NaN,
+                :mean_control => NaN, :std_bias => 100 * max_diff))
         end
     end
     balance_df = DataFrame(balance_data)

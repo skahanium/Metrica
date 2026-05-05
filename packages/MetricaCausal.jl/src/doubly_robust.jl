@@ -17,11 +17,12 @@ function MetricaBase.fit(::Type{AIPWModel}, formula::AbstractString, data;
     treated = treat_vec .== 1.0
     control = .!treated
 
-    # Step 1: 结果模型 (OLS)
+    # Step 1: 结果模型 (OLS) — 全数据拟合
     ols_result = MetricaBase.fit(OLSModel, outcome_formula, df)
     ols_result isa MetricaBase.ModelError && return ols_result
-    μ1_hat = MetricaBase.predict(ols_result)
-    μ0_hat = copy(μ1_hat)  # same prediction since treatment not in formula
+    μ_hat = MetricaBase.predict(ols_result)
+    μ1_hat = copy(μ_hat)
+    μ0_hat = copy(μ_hat)
 
     # Step 2: 倾向得分模型 (Logit)
     ps_result = MetricaBase.fit(LogitModel, propensity_formula, df)

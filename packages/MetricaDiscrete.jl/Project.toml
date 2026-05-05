@@ -17,11 +17,9 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
-MetricaCausal = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
 
 [sources]
 MetricaBase = {path = "../MetricaBase.jl"}
-MetricaCausal = {path = "../MetricaCausal.jl"}
 MetricaLinear = {path = "../MetricaLinear.jl"}
 MetricaOutput = {path = "../MetricaOutput.jl"}
 

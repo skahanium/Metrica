@@ -20,7 +20,9 @@ using MetricaLinear
 using MetricaOutput
 using LinearAlgebra: I
 using MetricaDiscrete
-using MetricaCausal
+
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaCausal.jl", "src", "MetricaCausal.jl"))
+using .MetricaCausal
 
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
