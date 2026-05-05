@@ -68,7 +68,7 @@ fn app_dir() -> PathBuf {
 /// 读取前端文件内容，返回 bytes 与 MIME 类型。
 fn read_frontend_file(path: &str) -> Option<(Vec<u8>, String)> {
     let safe = path.trim_start_matches('/');
-    let file_path = app_dir().join(safe);
+    let file_path = app_dir().join("dist").join(safe);
     let mime = match file_path.extension().and_then(|e| e.to_str()) {
         Some("html") => "text/html; charset=utf-8",
         Some("js") => "application/javascript; charset=utf-8",

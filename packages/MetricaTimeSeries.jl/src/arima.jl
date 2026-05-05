@@ -1,0 +1,612 @@
+# arima.jl - ARIMA 模型模块
+# 实现 ARMA/ARIMA 模型，依赖 StateSpaceModels.jl
+
+# === 类型定义 =============================================================
+
+"""
+    ARIMAModel <: AbstractTimeSeriesModel
+
+ARIMA 模型规格。
+"""
+struct ARIMAModel <: AbstractTimeSeriesModel
+    variable::Symbol
+    time_column::Symbol
+    order::Tuple{Int, Int, Int}  # (p, d, q)
+    seasonal_order::Tuple{Int, Int, Int, Int}  # (P, D, Q, s)
+    include_constant::Bool
+    method::Symbol  # :mle (Kalman) 或 :css (条件平方和)
+end
+
+"""
+    ARIMAFitResult <: AbstractTSFitResult
+
+ARIMA 模型拟合结果。
+"""
+struct ARIMAFitResult <: AbstractTSFitResult
+    variable_name::String
+    order::Tuple{Int, Int, Int}
+    seasonal_order::Tuple{Int, Int, Int, Int}
+    coefficients::Dict{Symbol, Float64}
+    std_errors::Dict{Symbol, Float64}
+    sigma2::Float64
+    loglik::Float64
+    aic::Float64
+    bic::Float64
+    residuals::Vector{Float64}
+    fitted_values::Vector{Float64}
+    original_series::Vector{Float64}
+    differenced_series::Union{Vector{Float64}, Nothing}
+    glance_table::MetricaBase.ModelGlance
+    tidy_table::MetricaBase.TidyTable
+    warnings::Vector{MetricaBase.ModelWarning}
+end
+
+"""
+    ARIMAModel(; variable, time_column, order=(1,1,1), seasonal_order=(0,0,0,0), include_constant=true, method=:mle)
+
+构造 ARIMA 模型规格。
+
+# 参数
+- `variable`: 目标变量列名
+- `time_column`: 时间列名
+- `order`: (p, d, q) 阶数
+- `seasonal_order`: (P, D, Q, s) 季节性阶数
+- `include_constant`: 是否包含常数项
+- `method`: 估计方法 (:mle 或 :css)
+"""
+function ARIMAModel(; variable::Symbol, time_column::Symbol,
+                    order::Tuple{Int,Int,Int}=(1,1,1),
+                    seasonal_order::Tuple{Int,Int,Int,Int}=(0,0,0,0),
+                    include_constant::Bool=true,
+                    method::Symbol=:mle)
+    return ARIMAModel(variable, time_column, order, seasonal_order, include_constant, method)
+end
+
+# === 拟合方法 =============================================================
+
+"""
+    fit(model::ARIMAModel, data::DataFrame) -> ARIMAFitResult
+
+拟合 ARIMA 模型。
+"""
+function MetricaBase.fit(model::ARIMAModel, data::DataFrame)
+    # 排序数据
+    data_sorted = sort_by_time(data, model.time_column)
+
+    # 提取序列
+    y = Float64.(data_sorted[!, model.variable])
+    n = length(y)
+
+    # 验证阶数
+    p, d, q = model.order
+    P, D, Q, s = model.seasonal_order
+
+    if p < 0 || d < 0 || q < 0
+        error("ARIMA 阶数 (p, d, q) 必须非负")
+    end
+    if P < 0 || D < 0 || Q < 0 || s < 0
+        error("季节性阶数 (P, D, Q, s) 必须非负")
+    end
+    if s > 0 && (P + D + Q == 0)
+        error("季节性周期 s > 0 时，P + D + Q 必须 > 0")
+    end
+
+    # 选择估计方法
+    if model.method === :mle
+        try
+            return fit_mle(model, y, n)
+        catch e
+            @warn "MLE 估计失败，尝试 CSS 方法: $e"
+            return fit_css(model, y, n)
+        end
+    else
+        return fit_css(model, y, n)
+    end
+end
+
+"""
+    fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int) -> ARIMAFitResult
+
+使用 MLE（通过 StateSpaceModels.jl 的 Kalman 滤波）拟合 ARIMA 模型。
+"""
+function fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int)
+    p, d, q = model.order
+    P, D, Q, s = model.seasonal_order
+
+    # 构建 StateSpaceModels SARIMA 模型
+    ssm_order = (p, d, q)
+    ssm_seasonal = s > 0 ? (P, D, Q, s) : nothing
+
+    if isnothing(ssm_seasonal)
+        ssm_model = StateSpaceModels.SARIMA(y, order=ssm_order, include_mean=model.include_constant)
+    else
+        ssm_model = StateSpaceModels.SARIMA(y, order=ssm_order, seasonal_order=ssm_seasonal, include_mean=model.include_constant)
+    end
+
+    # 拟合模型
+    StateSpaceModels.fit!(ssm_model)
+
+    # 提取系数
+    coefficients = Dict{Symbol, Float64}()
+    std_errors = Dict{Symbol, Float64}()
+
+    # 从结果中提取系数
+    coef_names = ssm_model.results.coefficient_table.names
+    coef_values = ssm_model.results.coefficient_table.values
+    coef_stderrs = ssm_model.results.coefficient_table.std_errors
+
+    for (i, name) in enumerate(coef_names)
+        if name == "sigma2_η"
+            continue  # 跳过方差参数
+        end
+        sym = Symbol(name)
+        coefficients[sym] = coef_values[i]
+        std_errors[sym] = coef_stderrs[i]
+    end
+
+    # 提取 sigma2
+    sigma2_idx = findfirst(==("sigma2_η"), coef_names)
+    sigma2 = isnothing(sigma2_idx) ? 0.0 : coef_values[sigma2_idx]
+
+    # 提取信息准则
+    loglik = ssm_model.results.loglik
+    aic = ssm_model.results.aic
+    bic = ssm_model.results.bic
+
+    # 计算残差和拟合值
+    y_diff = difference(y, d)
+    n_diff = length(y_diff)
+
+    # 简化的残差计算
+    residuals = zeros(n_diff)
+    fitted_values = zeros(n_diff)
+
+    # 使用 AR 系数计算拟合值
+    ar_coeffs = Float64[]
+    for i in 1:p
+        key = Symbol("ar_L$i")
+        push!(ar_coeffs, get(coefficients, key, 0.0))
+    end
+
+    ma_coeffs = Float64[]
+    for i in 1:q
+        key = Symbol("ma_L$i")
+        push!(ma_coeffs, get(coefficients, key, 0.0))
+    end
+
+    # 计算残差
+    for t in max(p, q)+1:n_diff
+        ar_part = 0.0
+        for (i, coeff) in enumerate(ar_coeffs)
+            if t - i > 0
+                ar_part += coeff * y_diff[t - i]
+            end
+        end
+
+        ma_part = 0.0
+        for (i, coeff) in enumerate(ma_coeffs)
+            if t - i > 0 && t - i <= length(residuals)
+                ma_part += coeff * residuals[t - i]
+            end
+        end
+
+        fitted_values[t] = ar_part + ma_part
+        residuals[t] = y_diff[t] - fitted_values[t]
+    end
+
+    # 如果有差分，还原拟合值
+    if d > 0
+        last_values = y[end-d+1:end]
+        fitted_original = zeros(n)
+        for i in 1:d
+            fitted_original[i] = last_values[i]
+        end
+        for i in 1:n_diff
+            fitted_original[d + i] = fitted_values[i] + (i > 1 ? fitted_original[d + i - 1] : last_values[end])
+        end
+        fitted_values = fitted_original[d+1:end]
+    end
+
+    # 构建 glance 表
+    glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
+        :nobs => n,
+        :sigma2 => sigma2,
+        :loglik => loglik,
+        :aic => aic,
+        :bic => bic,
+        :p => p,
+        :d => d,
+        :q => q,
+        :P => P,
+        :D => D,
+        :Q => Q,
+        :s => s,
+    )
+
+    model_label = Symbol("ARIMA($(p),$(d),$(q))" * (s > 0 ? "×($(P),$(D),$(Q),$(s))" : ""))
+    glance_table = MetricaBase.ModelGlance(
+        model_label,
+        n,
+        0,
+        glance_metrics,
+        MetricaBase.ModelWarning[]
+    )
+
+    # 构建 tidy 表
+    coef_rows = MetricaBase.CoefRow[]
+    for (name, value) in coefficients
+        se = std_errors[name]
+        t_stat = se > 0 ? value / se : 0.0
+        p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
+        push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value))
+    end
+
+    tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
+
+    # 警告
+    warnings = MetricaBase.ModelWarning[]
+
+    return ARIMAFitResult(
+        string(model.variable),
+        model.order,
+        model.seasonal_order,
+        coefficients,
+        std_errors,
+        sigma2,
+        loglik,
+        aic,
+        bic,
+        residuals,
+        fitted_values,
+        y,
+        d > 0 ? difference(y, d) : nothing,
+        glance_table,
+        tidy_table,
+        warnings
+    )
+end
+
+"""
+    fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int) -> ARIMAFitResult
+
+使用条件平方和（CSS）方法拟合 ARIMA 模型。
+通过数值优化（Optim）联合估计 AR 和 MA 参数。
+"""
+function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
+    p, d, q = model.order
+
+    # 差分
+    y_diff = copy(y)
+    for _ in 1:d
+        y_diff = diff(y_diff)
+    end
+    n_diff = length(y_diff)
+
+    include_const = model.include_constant
+    n_ar = p
+    n_ma = q
+    n_params = n_ar + n_ma + (include_const ? 1 : 0)
+
+    if n_params == 0
+        # 纯白噪声：无参数
+        residuals = y_diff
+        fitted = zeros(n_diff)
+        sigma2 = sum(residuals .^ 2) / n_diff
+        coefficients = Dict{Symbol, Float64}()
+        std_errors = Dict{Symbol, Float64}()
+        warnings = MetricaBase.ModelWarning[]
+    else
+        # CSS 目标函数：给定参数向量 θ，计算条件残差平方和
+        function css_objective(theta)
+            ar_coeffs = theta[1:n_ar]
+            ma_coeffs = theta[n_ar+1:n_ar+n_ma]
+            const_term = include_const ? theta[end] : 0.0
+
+            n_eff = n_diff
+            resid = zeros(n_eff)
+            fitted_vec = zeros(n_eff)
+
+            for t in 1:n_eff
+                # AR 部分
+                ar_part = 0.0
+                for i in 1:n_ar
+                    if t > i
+                        ar_part += ar_coeffs[i] * y_diff[t - i]
+                    end
+                end
+
+                # MA 部分
+                ma_part = 0.0
+                for j in 1:n_ma
+                    if t > j
+                        ma_part += ma_coeffs[j] * resid[t - j]
+                    end
+                end
+
+                fitted_vec[t] = const_term + ar_part + ma_part
+                resid[t] = y_diff[t] - fitted_vec[t]
+            end
+
+            return sum(resid .^ 2)
+        end
+
+        # 初始值：AR 部分用 OLS 初值，MA 部分从 0 开始
+        initial_theta = zeros(n_params)
+        if n_ar > 0
+            max_lag = max(p, q)
+            if max_lag > 0 && n_diff > max_lag
+                X_ar = zeros(n_diff - max_lag, p)
+                for i in 1:p
+                    X_ar[:, i] = y_diff[max_lag+1-i:n_diff-i]
+                end
+                y_reg = y_diff[max_lag+1:end]
+                initial_theta[1:n_ar] = X_ar \ y_reg
+            else
+                initial_theta[1:n_ar] .= 0.1
+            end
+        end
+        if n_ma > 0
+            initial_theta[n_ar+1:n_ar+n_ma] .= 0.0
+        end
+        if include_const
+            initial_theta[end] = mean(y_diff)
+        end
+
+        # 数值优化
+        opt_result = Optim.optimize(
+            css_objective,
+            initial_theta,
+            Optim.NelderMead(),
+            Optim.Options(iterations=1000, g_tol=1e-8)
+        )
+
+        theta_hat = Optim.minimizer(opt_result)
+        converged = Optim.converged(opt_result)
+
+        # 提取参数
+        ar_coeffs = theta_hat[1:n_ar]
+        ma_coeffs = theta_hat[n_ar+1:n_ar+n_ma]
+        const_term = include_const ? theta_hat[end] : 0.0
+
+        # 计算最终残差
+        residuals = zeros(n_diff)
+        fitted = zeros(n_diff)
+        for t in 1:n_diff
+            ar_part = 0.0
+            for i in 1:n_ar
+                if t > i
+                    ar_part += ar_coeffs[i] * y_diff[t - i]
+                end
+            end
+            ma_part = 0.0
+            for j in 1:n_ma
+                if t > j
+                    ma_part += ma_coeffs[j] * residuals[t - j]
+                end
+            end
+            fitted[t] = const_term + ar_part + ma_part
+            residuals[t] = y_diff[t] - fitted[t]
+        end
+
+        sigma2 = sum(residuals .^ 2) / max(n_diff - n_params, 1)
+
+        # 尝试从 Hessian 获取标准误
+        coefficients = Dict{Symbol, Float64}()
+        std_errors = Dict{Symbol, Float64}()
+
+        for i in 1:n_ar
+            coefficients[Symbol("ar_L$i")] = ar_coeffs[i]
+            std_errors[Symbol("ar_L$i")] = 0.0
+        end
+        for j in 1:n_ma
+            coefficients[Symbol("ma_L$j")] = ma_coeffs[j]
+            std_errors[Symbol("ma_L$j")] = 0.0
+        end
+        if include_const
+            coefficients[:constant] = const_term
+            std_errors[:constant] = 0.0
+        end
+
+        # 尝试用 Hessian 计算标准误
+        try
+            H = Optim.hessian!(opt_result)
+            if all(isfinite, H) && isposdef(H)
+                vcov = inv(H) .* 2.0 .* sigma2
+                ses = sqrt.(max.(diag(vcov), 0.0))
+                idx = 1
+                for i in 1:n_ar
+                    std_errors[Symbol("ar_L$i")] = ses[idx]
+                    idx += 1
+                end
+                for j in 1:n_ma
+                    std_errors[Symbol("ma_L$j")] = ses[idx]
+                    idx += 1
+                end
+                if include_const
+                    std_errors[:constant] = ses[idx]
+                end
+            end
+        catch
+        end
+
+        warnings = MetricaBase.ModelWarning[]
+        if !converged
+            push!(warnings, MetricaBase.ModelWarning(
+                :css_not_converged,
+                "CSS 优化未收敛",
+                "数值优化在最大迭代次数内未收敛",
+                "考虑增加 max_iter 或切换到 MLE 方法",
+                MetricaBase.warning
+            ))
+        end
+    end
+
+    # 信息准则
+    loglik = -n_diff / 2 * log(2π * sigma2) - sum(residuals .^ 2) / (2 * sigma2)
+    k = n_params + 1
+    aic = -2 * loglik + 2 * k
+    bic = -2 * loglik + k * log(n_diff)
+
+    # 构建 glance 表
+    P, D, Q, s = model.seasonal_order
+    glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
+        :nobs => n,
+        :sigma2 => sigma2,
+        :loglik => loglik,
+        :aic => aic,
+        :bic => bic,
+        :p => p,
+        :d => d,
+        :q => q,
+    )
+
+    glance_table = MetricaBase.ModelGlance(
+        Symbol("ARIMA($(p),$(d),$(q))"),
+        n,
+        0,
+        glance_metrics,
+        MetricaBase.ModelWarning[]
+    )
+
+    # 构建 tidy 表
+    coef_rows = MetricaBase.CoefRow[]
+    for (name, value) in coefficients
+        se = get(std_errors, name, 0.0)
+        t_stat = se > 0 ? value / se : 0.0
+        p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
+        push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value))
+    end
+
+    tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
+
+    return ARIMAFitResult(
+        string(model.variable),
+        model.order,
+        model.seasonal_order,
+        coefficients,
+        std_errors,
+        sigma2,
+        loglik,
+        aic,
+        bic,
+        residuals,
+        [y[1:d]; fitted],
+        y,
+        y_diff,
+        glance_table,
+        tidy_table,
+        warnings
+    )
+end
+
+# === 协议方法 =============================================================
+
+function MetricaBase.glance(result::ARIMAFitResult)
+    return result.glance_table
+end
+
+function MetricaBase.tidy(result::ARIMAFitResult)
+    return result.tidy_table
+end
+
+function MetricaBase.augment(result::ARIMAFitResult)
+    n = length(result.original_series)
+    n_resid = length(result.residuals)
+
+    sigma = sqrt(result.sigma2)
+    std_residuals = sigma > 0 ? result.residuals ./ sigma : zeros(n_resid)
+
+    obs = collect(1.0:n)
+    fitted = zeros(n)
+    resid = zeros(n)
+    std_resid = zeros(n)
+
+    start_idx = n - n_resid + 1
+    fitted[start_idx:end] = result.fitted_values
+    resid[start_idx:end] = result.residuals
+    std_resid[start_idx:end] = std_residuals
+
+    return MetricaBase.AugmentTable(
+        Dict(
+            :observation => obs,
+            :fitted => fitted,
+            :residual => resid,
+            :std_residual => std_resid,
+        ),
+        n
+    )
+end
+
+function MetricaBase.coef(result::ARIMAFitResult)
+    return collect(result.coefficients)
+end
+
+function MetricaBase.nobs(result::ARIMAFitResult)
+    return length(result.original_series)
+end
+
+# === 序列化支持 ===========================================================
+
+function result_to_payload(result::ARIMAFitResult; include_augment::Bool=true)
+    payload = Dict{String, Any}(
+        "model_type" => "arima",
+        "variable" => result.variable_name,
+        "order" => collect(result.order),
+        "seasonal_order" => collect(result.seasonal_order),
+        "nobs" => length(result.original_series),
+        "sigma2" => result.sigma2,
+        "loglik" => result.loglik,
+        "aic" => result.aic,
+        "bic" => result.bic,
+        "coefficients" => Dict(string(k) => v for (k, v) in result.coefficients),
+        "residuals" => result.residuals,
+        "fitted_values" => result.fitted_values,
+    )
+
+    # ACF 和 PACF（用于诊断图）
+    payload["acf_values"] = MetricaTimeSeries.acf(result.residuals)
+    payload["pacf_values"] = MetricaTimeSeries.pacf(result.residuals)
+
+    payload["glance"] = Dict(
+        "model" => string(result.glance_table.model),
+        "nobs" => result.glance_table.nobs,
+        "metrics" => Dict(string(k) => v for (k, v) in result.glance_table.metrics)
+    )
+
+    payload["tidy"] = Dict(
+        "rows" => [
+            Dict(
+                "term" => string(row.name),
+                "estimate" => row.estimate,
+                "stderror" => row.stderror,
+                "statistic" => row.statistic,
+                "p_value" => row.pvalue
+            )
+            for row in result.tidy_table.rows
+        ]
+    )
+
+    if !isempty(result.warnings)
+        payload["warnings"] = [
+            Dict(
+                "code" => string(w.code),
+                "title" => w.title,
+                "detail" => w.detail,
+                "hint" => w.hint,
+                "severity" => string(w.severity)
+            )
+            for w in result.warnings
+        ]
+    end
+
+    if include_augment
+        at = MetricaBase.augment(result)
+        max_preview = 50
+        payload["augment_preview"] = Dict(
+            String(k) => v[1:min(length(v), max_preview)]
+            for (k, v) in at.columns
+        )
+    end
+
+    return payload
+end
