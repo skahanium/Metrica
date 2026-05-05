@@ -126,6 +126,23 @@ export interface ModelResult {
   loglikelihood?: number;
   iterations?: number;
   converged?: boolean;
+  // S4b Causal 字段
+  treat_effect?: number;
+  treat_effect_se?: number;
+  treat_effect_pvalue?: number;
+  n_treated?: number;
+  n_control?: number;
+  period_coefficients?: number[];
+  period_stderrors?: number[];
+  period_labels?: string[];
+  pre_trend_pvalue?: number;
+  parallel_trends_supported?: boolean;
+  ate?: number;
+  att?: number;
+  atu?: number;
+  att_se?: number;
+  ate_se?: number;
+  n_matched?: number;
 }
 
 // ---- 数据摘要 ----
@@ -148,7 +165,7 @@ export interface DatasetSummary {
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin';
+  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -159,6 +176,7 @@ export interface ModelSpec {
   instruments?: string[];
   endog_columns?: string[];
   omega_spec?: string;
+  treatment_column?: string;
 }
 
 export interface FitModelRequest {

@@ -1,6 +1,6 @@
 import { Card, Descriptions, Tag } from 'antd';
 import { useModelStore } from '../stores/modelStore';
-import type { DiagnosticResult, OLSDiagnostics, PanelDiagnostics } from '../types/protocol';
+import type { DiagnosticResult, DiscreteDiagnostics, OLSDiagnostics, PanelDiagnostics } from '../types/protocol';
 import { EmptyState } from './EmptyState';
 
 type OlsDiagnosticKey = Exclude<keyof OLSDiagnostics, 'vif'>;
@@ -20,8 +20,12 @@ const PANEL_DIAG_META: Array<{ key: keyof PanelDiagnostics; label: string; descr
   { key: 'breusch_pagan_lm', label: 'Breusch-Pagan LM 检验', description: 'H0: 无随机效应（混合 OLS）' },
 ];
 
-function isPanelDiagnostics(d: OLSDiagnostics | PanelDiagnostics): d is PanelDiagnostics {
+function isPanelDiagnostics(d: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics): d is PanelDiagnostics {
   return 'hausman' in d || 'fixed_effect_f' in d || 'breusch_pagan_lm' in d;
+}
+
+function isDiscreteDiagnostics(d: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics): d is DiscreteDiagnostics {
+  return 'converged' in d || 'iterations' in d || 'pseudo_r2' in d || 'aic' in d;
 }
 
 function DiagCard({ label, description, result }: { label: string; description: string; result?: DiagnosticResult }) {
@@ -51,6 +55,10 @@ export function DiagnosticCards() {
 
   const diag = lastResult.diagnostics;
   if (!diag) return <EmptyState title="无诊断结果" />;
+
+  if (isDiscreteDiagnostics(diag)) {
+    return <EmptyState title="离散模型诊断" description="GLM 模型使用 likelihood-based 诊断（AIC/BIC/LR 检验）。" />;
+  }
 
   if (isPanelDiagnostics(diag)) {
     return (

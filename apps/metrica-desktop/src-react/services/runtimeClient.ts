@@ -19,7 +19,7 @@ export function inferWorkingDir(path: string): string {
 export interface FitModelParams {
   datasetPath: string;
   formula: string;
-  modelType?: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin';
+  modelType?: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw';
   vcovType?: string;
   weightsColumn?: string;
   clusterColumn?: string;
@@ -28,6 +28,7 @@ export interface FitModelParams {
   panelMethod?: string;
   instruments?: string;
   endogColumns?: string;
+  treatmentColumn?: string;
   workingDir?: string;
   projectId?: string;
 }
@@ -45,6 +46,7 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     panelMethod = 'fe',
     instruments = '',
     endogColumns = '',
+    treatmentColumn = '',
     workingDir = inferWorkingDir(datasetPath),
     projectId = 'alpha-demo',
   } = params;
@@ -65,6 +67,12 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(',').map((v: string) => v.trim()).filter(Boolean);
   } else if (modelType === 'gls') {
     modelSpec.vcov = { type: vcovType };
+  } else if (modelType === 'did' || modelType === 'event_study') {
+    modelSpec.panel_id = panelId;
+    modelSpec.panel_time = panelTime;
+    if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
+  } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
+    if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
   } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin') {
     modelSpec.vcov = { type: vcovType };
   } else {

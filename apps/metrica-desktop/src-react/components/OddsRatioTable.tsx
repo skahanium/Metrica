@@ -8,22 +8,16 @@ export function OddsRatioTable() {
 
   if (!lastResult) return null;
 
-  const isPoisson = lastResult.glance?.model === 'poisson';
-  const hasOR = !!lastResult.odds_ratios;
-  const hasIRR = !!lastResult.incidence_rate_ratios;
+  const irr = lastResult.incidence_rate_ratios;
+  const ors = lastResult.odds_ratios;
 
   // Poisson: show IRR table
-  if (isPoisson && hasIRR) {
+  if (lastResult.glance?.model === 'poisson' && irr) {
     const columns = [
       { title: '变量', dataIndex: 'term', key: 'term' },
       { title: '发病率比 (IRR)', dataIndex: 'irr', key: 'irr', render: (v: number) => v?.toFixed(4) },
-      { title: '95% CI 下限', dataIndex: 'ci_lower', key: 'lo', render: (v: number) => v?.toFixed(4) },
-      { title: '95% CI 上限', dataIndex: 'ci_upper', key: 'hi', render: (v: number) => v?.toFixed(4) },
     ];
-    const data = lastResult.incidence_rate_ratios.map((irr: { term: string }, i: number) => ({
-      ...irr,
-      key: irr.term ?? i,
-    }));
+    const data = irr.map((item: { term: string }, i: number) => ({ ...item, key: item.term ?? i }));
 
     return (
       <Card size="small" title="发病率比" style={{ marginBottom: 16 }}>
@@ -33,7 +27,7 @@ export function OddsRatioTable() {
   }
 
   // Logit/Probit: show OR/coefficient toggle table
-  if (hasOR) {
+  if (ors) {
     const tidyRows = lastResult.tidy || [];
 
     const columns = showOR ? [
@@ -49,7 +43,7 @@ export function OddsRatioTable() {
       { title: 'p', dataIndex: 'p_value', key: 'p', render: (v: number) => v?.toFixed(4) },
     ];
 
-    const data = lastResult.odds_ratios.map((or: { term: string }, i: number) => ({
+    const data = ors.map((or: { term: string }, i: number) => ({
       ...or,
       estimate: tidyRows[i]?.estimate,
       std_error: tidyRows[i]?.std_error,
