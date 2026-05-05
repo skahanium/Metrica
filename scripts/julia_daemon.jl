@@ -20,6 +20,7 @@ using MetricaLinear
 using MetricaOutput
 using LinearAlgebra: I
 using MetricaDiscrete
+using MetricaCausal
 
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
@@ -98,10 +99,29 @@ function handle_request(req::Dict{String, Any})
                     kwargs[:omega_fn] = r -> Matrix{Float64}(I, length(r), length(r))
                 end
 
+                # S4b Causal 特有参数
+                if haskey(params, "treated_column")
+                    kwargs[:treated_column] = Symbol(params["treated_column"])
+                end
+                if haskey(params, "post_column")
+                    kwargs[:post_column] = Symbol(params["post_column"])
+                end
+                if haskey(params, "event_time_column")
+                    kwargs[:event_time_column] = Symbol(params["event_time_column"])
+                end
+                if haskey(params, "treatment_column")
+                    kwargs[:treatment_column] = Symbol(params["treatment_column"])
+                end
+                if haskey(params, "outcome_column")
+                    kwargs[:outcome_column] = Symbol(params["outcome_column"])
+                end
+
                 result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
 
                 # 分派 result_to_payload
-                if result isa MetricaDiscrete.AbstractDiscreteFitResult
+                if result isa MetricaCausal.AbstractCausalFitResult
+                    payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
                     payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
