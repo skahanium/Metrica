@@ -17,6 +17,10 @@ using .MetricaDiagnostics
 include(joinpath(String(ARGS[2]), "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
 using .MetricaPanel
 
+# 加载调查模型模块
+include(joinpath(String(ARGS[2]), "packages", "MetricaSurvey.jl", "src", "MetricaSurvey.jl"))
+using .MetricaSurvey
+
 request = JSON3.read(ARGS[1])
 action = String(request.action)
 dataset_path = String(request.dataset_ref.path)
@@ -63,6 +67,30 @@ else
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
         payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
         payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
+        payload
+    elseif model_type in ("survey_ols", "survey_logit", "survey_probit", "survey_poisson")
+        # 调查模型拟合
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+
+        kwargs = Dict{Symbol, Any}()
+        kwargs[:weights_column] = Symbol(String(request.model_spec.weights_column))
+        if haskey(request.model_spec, :strata_column) && !isnothing(request.model_spec.strata_column) && !isempty(request.model_spec.strata_column)
+            kwargs[:strata_column] = Symbol(String(request.model_spec.strata_column))
+        end
+        if haskey(request.model_spec, :psu_column) && !isnothing(request.model_spec.psu_column) && !isempty(request.model_spec.psu_column)
+            kwargs[:psu_column] = Symbol(String(request.model_spec.psu_column))
+        end
+        if haskey(request.model_spec, :fpc_column) && !isnothing(request.model_spec.fpc_column) && !isempty(request.model_spec.fpc_column)
+            kwargs[:fpc_column] = Symbol(String(request.model_spec.fpc_column))
+        end
+
+        # 使用 MODEL_REGISTRY 获取模型类型
+        ModelT = MetricaBase.MODEL_REGISTRY[model_type]
+        result = MetricaBase.fit(ModelT, formula, df; kwargs...)
+
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
         payload
     else
         # OLS/WLS 模型拟合

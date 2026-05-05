@@ -19,7 +19,7 @@ export function inferWorkingDir(path: string): string {
 export interface FitModelParams {
   datasetPath: string;
   formula: string;
-  modelType?: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw';
+  modelType?: string;
   vcovType?: string;
   weightsColumn?: string;
   clusterColumn?: string;
@@ -29,6 +29,9 @@ export interface FitModelParams {
   instruments?: string;
   endogColumns?: string;
   treatmentColumn?: string;
+  strataColumn?: string;
+  psuColumn?: string;
+  fpcColumn?: string;
   workingDir?: string;
   projectId?: string;
 }
@@ -47,6 +50,9 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     instruments = '',
     endogColumns = '',
     treatmentColumn = '',
+    strataColumn = '',
+    psuColumn = '',
+    fpcColumn = '',
     workingDir = inferWorkingDir(datasetPath),
     projectId = 'alpha-demo',
   } = params;
@@ -75,6 +81,12 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
   } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin') {
     modelSpec.vcov = { type: vcovType };
+  } else if (modelType === 'survey_ols' || modelType === 'survey_logit' || modelType === 'survey_probit' || modelType === 'survey_poisson') {
+    modelSpec.vcov = { type: vcovType };
+    if (weightsColumn.trim()) modelSpec.weights_column = weightsColumn.trim();
+    if (strataColumn.trim()) modelSpec.strata_column = strataColumn.trim();
+    if (psuColumn.trim()) modelSpec.psu_column = psuColumn.trim();
+    if (fpcColumn.trim()) modelSpec.fpc_column = fpcColumn.trim();
   } else {
     modelSpec.vcov = { type: vcovType };
     if (weightsColumn.trim()) modelSpec.weights = weightsColumn.trim();

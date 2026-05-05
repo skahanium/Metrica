@@ -13,7 +13,7 @@ export interface ModelHistoryItem {
 }
 
 interface ModelState {
-  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw';
+  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcovType: string;
   weightsColumn: string;
@@ -24,10 +24,13 @@ interface ModelState {
   instruments: string;
   endogColumns: string;
   treatmentColumn: string;
+  strataColumn: string;
+  psuColumn: string;
+  fpcColumn: string;
   lastResult: ModelResult | null;
   modelHistory: ModelHistoryItem[];
   selectedModelIds: string[];
-  setModelType: (t: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw') => void;
+  setModelType: (t: ModelState['modelType']) => void;
   setFormula: (f: string) => void;
   setVcovType: (v: string) => void;
   setWeightsColumn: (w: string) => void;
@@ -38,6 +41,9 @@ interface ModelState {
   setInstruments: (v: string) => void;
   setEndogColumns: (v: string) => void;
   setTreatmentColumn: (v: string) => void;
+  setStrataColumn: (v: string) => void;
+  setPsuColumn: (v: string) => void;
+  setFpcColumn: (v: string) => void;
   setLastResult: (r: ModelResult | null) => void;
   addToHistory: (item: ModelHistoryItem) => void;
   removeFromHistory: (id: string) => void;
@@ -60,6 +66,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
   instruments: '',
   endogColumns: '',
   treatmentColumn: '',
+  strataColumn: '',
+  psuColumn: '',
+  fpcColumn: '',
   lastResult: null,
   modelHistory: [],
   selectedModelIds: [],
@@ -74,6 +83,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
   setInstruments: (instruments) => set({ instruments }),
   setEndogColumns: (endogColumns) => set({ endogColumns }),
   setTreatmentColumn: (treatmentColumn) => set({ treatmentColumn }),
+  setStrataColumn: (strataColumn) => set({ strataColumn }),
+  setPsuColumn: (psuColumn) => set({ psuColumn }),
+  setFpcColumn: (fpcColumn) => set({ fpcColumn }),
   setLastResult: (lastResult) => set({ lastResult }),
   addToHistory: (item) => set((state) => ({
     modelHistory: [item, ...state.modelHistory.filter((h) => h.id !== item.id)].slice(0, 20),
@@ -101,6 +113,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
     instruments: spec.instruments?.join(', ') ?? state.instruments,
     endogColumns: spec.endog_columns?.join(', ') ?? state.endogColumns,
     treatmentColumn: spec.treatment_column ?? state.treatmentColumn,
+    strataColumn: spec.strata_column ?? state.strataColumn,
+    psuColumn: spec.psu_column ?? state.psuColumn,
+    fpcColumn: spec.fpc_column ?? state.fpcColumn,
   })),
   buildModelSpec: () => {
     const s = get();
@@ -131,6 +146,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
       if (s.treatmentColumn.trim()) spec.treatment_column = s.treatmentColumn.trim();
     } else if (s.modelType === 'logit' || s.modelType === 'probit' || s.modelType === 'poisson' || s.modelType === 'ordered_logit' || s.modelType === 'multinomial_logit' || s.modelType === 'negbin') {
       spec.vcov = { type: s.vcovType };
+    } else if (s.modelType === 'survey_ols' || s.modelType === 'survey_logit' || s.modelType === 'survey_probit' || s.modelType === 'survey_poisson') {
+      spec.vcov = { type: s.vcovType };
+      if (s.weightsColumn.trim()) spec.weights_column = s.weightsColumn.trim();
+      if (s.strataColumn.trim()) spec.strata_column = s.strataColumn.trim();
+      if (s.psuColumn.trim()) spec.psu_column = s.psuColumn.trim();
+      if (s.fpcColumn.trim()) spec.fpc_column = s.fpcColumn.trim();
     } else {
       spec.vcov = { type: s.vcovType };
       if (s.weightsColumn.trim()) spec.weights = s.weightsColumn.trim();

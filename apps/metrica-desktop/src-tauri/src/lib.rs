@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use tao::event_loop::{ControlFlow, EventLoop};
+use tao::window::Icon;
 use wry::{http::Response, WebViewBuilder};
 
 /// 持有 Runtime 子进程句柄，退出时自动清理。
@@ -78,13 +79,29 @@ fn read_frontend_file(path: &str) -> Option<(Vec<u8>, String)> {
     std::fs::read(&file_path).ok().map(|data| (data, mime.to_string()))
 }
 
+/// 加载应用图标。
+fn load_icon() -> Option<Icon> {
+    let icon_path = app_dir().join("dist/assets/icons/metrica-icon-128x128.png");
+    let data = std::fs::read(&icon_path).ok()?;
+    let decoder = png::Decoder::new(std::io::Cursor::new(&data));
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).ok()?;
+    let rgba = buf[..info.buffer_size()].to_vec();
+    Icon::from_rgba(rgba, info.width, info.height).ok()
+}
+
 pub fn run() {
     let event_loop = EventLoop::new();
-    let window = tao::window::WindowBuilder::new()
+    let mut window_builder = tao::window::WindowBuilder::new()
         .with_title("Metrica Alpha — 真实 OLS 链路")
-        .with_inner_size(tao::dpi::LogicalSize::new(1200.0, 800.0))
-        .build(&event_loop)
-        .expect("创建窗口失败");
+        .with_inner_size(tao::dpi::LogicalSize::new(1200.0, 800.0));
+
+    if let Some(icon) = load_icon() {
+        window_builder = window_builder.with_window_icon(Some(icon));
+    }
+
+    let window = window_builder.build(&event_loop).expect("创建窗口失败");
 
     let _runtime = spawn_runtime().ok().map(|child| RuntimeGuard(Some(child)));
     if _runtime.is_none() {

@@ -5,7 +5,7 @@ import { useDatasetStore } from '../stores/datasetStore';
 import { useProjectStore } from '../stores/projectStore';
 import { fitModel } from '../services/runtimeClient';
 
-const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' | 'causal' }> = {
+const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' | 'causal' | 'survey' }> = {
   ols: { label: 'OLS / WLS', family: 'linear' },
   iv: { label: 'IV / 2SLS', family: 'linear' },
   gls: { label: 'GLS', family: 'linear' },
@@ -21,6 +21,10 @@ const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'pan
   ipw: { label: 'IPW 逆概率加权', family: 'causal' },
   psm: { label: 'PSM 倾向得分匹配', family: 'causal' },
   aipw: { label: 'AIPW 双重稳健', family: 'causal' },
+  survey_ols: { label: 'Survey OLS', family: 'survey' },
+  survey_logit: { label: 'Survey Logit', family: 'survey' },
+  survey_probit: { label: 'Survey Probit', family: 'survey' },
+  survey_poisson: { label: 'Survey Poisson', family: 'survey' },
 };
 
 export function ModelForm() {
@@ -32,6 +36,7 @@ export function ModelForm() {
     panelMethod, setPanelMethod, setLastResult,
     instruments, setInstruments, endogColumns, setEndogColumns,
     treatmentColumn, setTreatmentColumn,
+    strataColumn, setStrataColumn, psuColumn, setPsuColumn, fpcColumn, setFpcColumn,
   } = useModelStore();
   const { setLoading, setError } = useAppStore();
   const activePath = useDatasetStore((s) => s.activePath);
@@ -56,6 +61,9 @@ export function ModelForm() {
         panelMethod,
         instruments,
         endogColumns,
+        strataColumn,
+        psuColumn,
+        fpcColumn,
         projectId,
       });
       if (res.status === 'error') {
@@ -107,6 +115,13 @@ export function ModelForm() {
             <Select.OptGroup label="因果推断">
               {Object.entries(MODEL_TYPE_LABELS)
                 .filter(([, info]) => info.family === 'causal')
+                .map(([value, info]) => (
+                  <Select.Option key={value} value={value}>{info.label}</Select.Option>
+                ))}
+            </Select.OptGroup>
+            <Select.OptGroup label="复杂调查">
+              {Object.entries(MODEL_TYPE_LABELS)
+                .filter(([, info]) => info.family === 'survey')
                 .map(([value, info]) => (
                   <Select.Option key={value} value={value}>{info.label}</Select.Option>
                 ))}
@@ -201,6 +216,21 @@ export function ModelForm() {
                 <Select.Option value="HC1">HC1</Select.Option>
                 <Select.Option value="cluster">cluster</Select.Option>
               </Select>
+            </Form.Item>
+          </>
+        ) : modelType === 'survey_ols' || modelType === 'survey_logit' || modelType === 'survey_probit' || modelType === 'survey_poisson' ? (
+          <>
+            <Form.Item label="抽样权重列" required>
+              <Input value={weightsColumn} onChange={(e) => setWeightsColumn(e.target.value)} style={{ width: 120 }} placeholder="w" />
+            </Form.Item>
+            <Form.Item label="分层变量">
+              <Input value={strataColumn} onChange={(e) => setStrataColumn(e.target.value)} style={{ width: 100 }} placeholder="可选" />
+            </Form.Item>
+            <Form.Item label="PSU">
+              <Input value={psuColumn} onChange={(e) => setPsuColumn(e.target.value)} style={{ width: 100 }} placeholder="可选" />
+            </Form.Item>
+            <Form.Item label="FPC">
+              <Input value={fpcColumn} onChange={(e) => setFpcColumn(e.target.value)} style={{ width: 100 }} placeholder="可选" />
             </Form.Item>
           </>
         ) : (

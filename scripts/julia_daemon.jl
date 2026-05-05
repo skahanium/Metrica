@@ -35,6 +35,10 @@ using .MetricaPanel
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaData.jl", "src", "MetricaData.jl"))
 using .MetricaData
 
+# 加载调查模型模块
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaSurvey.jl", "src", "MetricaSurvey.jl"))
+using .MetricaSurvey
+
 function handle_request(req::Dict{String, Any})
     id = req["id"]
     action = req["action"]
@@ -118,6 +122,20 @@ function handle_request(req::Dict{String, Any})
                     kwargs[:outcome_column] = Symbol(params["outcome_column"])
                 end
 
+                # S4d Survey 特有参数
+                if startswith(model_type, "survey_")
+                    kwargs[:weights_column] = Symbol(params["weights_column"])
+                    if haskey(params, "strata_column") && !isempty(get(params, "strata_column", ""))
+                        kwargs[:strata_column] = Symbol(params["strata_column"])
+                    end
+                    if haskey(params, "psu_column") && !isempty(get(params, "psu_column", ""))
+                        kwargs[:psu_column] = Symbol(params["psu_column"])
+                    end
+                    if haskey(params, "fpc_column") && !isempty(get(params, "fpc_column", ""))
+                        kwargs[:fpc_column] = Symbol(params["fpc_column"])
+                    end
+                end
+
                 result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
 
                 # 分派 result_to_payload
@@ -125,6 +143,8 @@ function handle_request(req::Dict{String, Any})
                     payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
                     payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaSurvey.AbstractSurveyFitResult
+                    payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                     # 面板诊断
