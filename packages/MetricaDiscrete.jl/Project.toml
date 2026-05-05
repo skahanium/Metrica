@@ -1,0 +1,27 @@
+name = "MetricaDiscrete"
+uuid = "d1e2f3a4-b5c6-7890-def0-123456789abc"
+authors = ["Metrica Contributors"]
+version = "0.1.0"
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+MetricaOutput = "10c70d11-b779-43d3-b8f2-49770e63c885"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+
+[sources]
+MetricaBase = {path = "../MetricaBase.jl"}
+MetricaLinear = {path = "../MetricaLinear.jl"}
+MetricaOutput = {path = "../MetricaOutput.jl"}
+
+[compat]
+julia = "1.12"

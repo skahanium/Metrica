@@ -5,6 +5,19 @@ import { useDatasetStore } from '../stores/datasetStore';
 import { useProjectStore } from '../stores/projectStore';
 import { fitModel } from '../services/runtimeClient';
 
+const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' }> = {
+  ols: { label: 'OLS / WLS', family: 'linear' },
+  iv: { label: 'IV / 2SLS', family: 'linear' },
+  gls: { label: 'GLS', family: 'linear' },
+  panel: { label: 'Panel', family: 'panel' },
+  logit: { label: 'Logit', family: 'discrete' },
+  probit: { label: 'Probit', family: 'discrete' },
+  poisson: { label: 'Poisson', family: 'discrete' },
+  ordered_logit: { label: '有序 Logit', family: 'discrete' },
+  multinomial_logit: { label: '多项 Logit', family: 'discrete' },
+  negbin: { label: '负二项回归', family: 'discrete' },
+};
+
 export function ModelForm() {
   const {
     modelType, setModelType, formula, setFormula,
@@ -63,11 +76,28 @@ export function ModelForm() {
       </Typography.Text>
       <Form id="model-form" layout="inline" onFinish={handleRun}>
         <Form.Item label="模型类型">
-          <Select value={modelType} onChange={(v) => setModelType(v)} style={{ width: 100 }}>
-            <Select.Option value="ols">OLS / WLS</Select.Option>
-            <Select.Option value="iv">IV / 2SLS</Select.Option>
-            <Select.Option value="gls">GLS</Select.Option>
-            <Select.Option value="panel">Panel</Select.Option>
+          <Select value={modelType} onChange={(v) => setModelType(v)} style={{ width: 130 }}>
+            <Select.OptGroup label="线性模型">
+              {Object.entries(MODEL_TYPE_LABELS)
+                .filter(([, info]) => info.family === 'linear')
+                .map(([value, info]) => (
+                  <Select.Option key={value} value={value}>{info.label}</Select.Option>
+                ))}
+            </Select.OptGroup>
+            <Select.OptGroup label="面板模型">
+              {Object.entries(MODEL_TYPE_LABELS)
+                .filter(([, info]) => info.family === 'panel')
+                .map(([value, info]) => (
+                  <Select.Option key={value} value={value}>{info.label}</Select.Option>
+                ))}
+            </Select.OptGroup>
+            <Select.OptGroup label="离散模型">
+              {Object.entries(MODEL_TYPE_LABELS)
+                .filter(([, info]) => info.family === 'discrete')
+                .map(([value, info]) => (
+                  <Select.Option key={value} value={value}>{info.label}</Select.Option>
+                ))}
+            </Select.OptGroup>
           </Select>
         </Form.Item>
         <Form.Item label={modelType === 'panel' ? '面板公式' : 'OLS 公式'}>
@@ -120,6 +150,16 @@ export function ModelForm() {
             </Form.Item>
             <Form.Item label="聚类列">
               <Input value={clusterColumn} onChange={(e) => setClusterColumn(e.target.value)} style={{ width: 100 }} placeholder="可选" />
+            </Form.Item>
+          </>
+        ) : modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin' ? (
+          <>
+            <Form.Item label="协方差">
+              <Select value={vcovType} onChange={(v) => setVcovType(v)} style={{ width: 120 }}>
+                <Select.Option value="classical">classical</Select.Option>
+                <Select.Option value="HC1">HC1</Select.Option>
+                <Select.Option value="cluster">cluster</Select.Option>
+              </Select>
             </Form.Item>
           </>
         ) : modelType === 'gls' ? (

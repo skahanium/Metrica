@@ -61,6 +61,30 @@ export interface PanelDiagnostics {
   breusch_pagan_lm?: DiagnosticResult;
 }
 
+// ---- 诊断类型（Discrete / GLM） ----
+
+export interface DiscreteDiagnostics {
+  converged?: boolean;
+  iterations?: number;
+  pseudo_r2?: number;
+  loglikelihood?: number;
+  aic?: number;
+  bic?: number;
+  deviance?: number;
+}
+
+export interface OddsRatioEntry {
+  term: string;
+  odds_ratio: number;
+  ci_lower: number;
+  ci_upper: number;
+}
+
+export interface IRREntry {
+  term: string;
+  irr: number;
+}
+
 // ---- 模型结果 ----
 
 export interface GlanceResult {
@@ -91,12 +115,17 @@ export interface AugmentRow {
 export interface ModelResult {
   glance: GlanceResult;
   tidy: TidyRow[];
-  diagnostics: OLSDiagnostics | PanelDiagnostics;
+  diagnostics: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics;
+  odds_ratios?: OddsRatioEntry[];
+  incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
   warnings: Warning[];
   messages?: Message[];
   summary_text?: string;
   vcov_label?: string;
+  loglikelihood?: number;
+  iterations?: number;
+  converged?: boolean;
 }
 
 // ---- 数据摘要 ----
@@ -119,7 +148,7 @@ export interface DatasetSummary {
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gls' | 'panel';
+  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin';
   formula: string;
   vcov?: { type: string };
   weights?: string;

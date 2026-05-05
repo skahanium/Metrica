@@ -19,6 +19,7 @@ using MetricaBase
 using MetricaLinear
 using MetricaOutput
 using LinearAlgebra: I
+using MetricaDiscrete
 
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
@@ -81,56 +82,53 @@ function handle_request(req::Dict{String, Any})
                     endog_columns = String.(params["endog_columns"])
                     result = fit_panel_iv(panel_data, formula; instruments=instruments, endog=endog_columns)
                 else
-                    # 原有 FE/RE/FD/Between 分支
                     result = fit_panel(panel_data, formula; method=panel_method)
                 end
                 payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 payload["result_payload"]["diagnostics"] = panel_diagnostics(panel_data, formula)
-            elseif model_type == "iv"
-                instruments = String.(params["instruments"])
-                endog_columns = String.(params["endog_columns"])
-                vcov_type = params["vcov"]
-                vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
-                cluster_col = get(params, "cluster_column", nothing)
-                cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
+            elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
+                ModelT = MetricaBase.MODEL_REGISTRY[model_type]
 
-                result = fit(IVModel, formula, dataset_path;
-                    instruments=instruments, endog=endog_columns,
-                    vcov=vcov_symbol, cluster_column=cluster_sym)
-                payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
-
-            elseif model_type == "gls"
-                omega_fn = r -> Matrix{Float64}(I, length(r), length(r))
                 vcov_type = get(params, "vcov", "classical")
                 vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
-
-                result = fit(GLSModel, formula, dataset_path;
-                    omega_fn=omega_fn, vcov=vcov_symbol)
-                payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
-            else
-                vcov_type = params["vcov"]
-                vcov_symbol = if vcov_type == "HC1"
-                    :HC1
-                elseif vcov_type == "cluster"
-                    :cluster
-                else
-                    :classical
-                end
                 weights = get(params, "weights", nothing)
                 weights_sym = isnothing(weights) || isempty(weights) ? nothing : Symbol(weights)
                 cluster_col = get(params, "cluster_column", nothing)
                 cluster_sym = isnothing(cluster_col) || isempty(cluster_col) ? nothing : Symbol(cluster_col)
 
-                result = fit_ols_file(dataset_path, formula;
-                    vcov=vcov_symbol,
-                    weights=weights_sym,
-                    cluster=cluster_sym,
-                )
+                kwargs = Dict{Symbol, Any}(:vcov => vcov_symbol)
+                if !isnothing(cluster_sym); kwargs[:cluster_column] = cluster_sym; end
+                if !isnothing(weights_sym); kwargs[:weights] = weights_sym; end
 
-                payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
-                if result isa OLSFitResult
+                if model_type == "iv"
+                    instruments = String.(params["instruments"])
+                    endog_columns = String.(params["endog_columns"])
+                    kwargs[:instruments] = instruments
+                    kwargs[:endog] = endog_columns
+                elseif model_type == "gls"
+                    kwargs[:omega_fn] = r -> Matrix{Float64}(I, length(r), length(r))
+                end
+
+                result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
+                payload = if result isa MetricaDiscrete.AbstractDiscreteFitResult
+                    MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+                else
+                    MetricaLinear.result_to_payload(result; include_augment=include_augment)
+                end
+
+                if model_type == "ols" && result isa OLSFitResult
                     payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
                 end
+            else
+                payload = Dict(
+                    "status" => "error",
+                    "messages" => [Dict(
+                        "level" => "error",
+                        "code" => "UNKNOWN_MODEL_TYPE",
+                        "text" => "未知的模型类型：$model_type",
+                        "hint" => "当前支持：$(collect(keys(MetricaBase.MODEL_REGISTRY)))",
+                    )],
+                )
             end
         elseif action == "export_report"
             format = get(params, "format", "markdown")
