@@ -4,6 +4,7 @@ using DataFrames
 using Distributions
 using LinearAlgebra
 using MetricaBase
+using MetricaLinear
 using Statistics
 using StatsModels
 

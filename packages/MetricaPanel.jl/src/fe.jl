@@ -1,47 +1,36 @@
 # === 固定效应估计器 ===========================================================
-# 实现组内去均值算法（Within Transformation）
+# 实现组内去均值算法（Within Transformation），统一使用 StatsModels 公式
 
-"""
-    fit_fe(panel_data::MetricaBase.PanelData, formula::String)
-
-使用固定效应方法拟合面板模型。
-
-核心算法：
-1. 按个体分组
-2. 计算每个变量的组内均值
-3. 用原始值减去组内均值
-4. 对去均值后的数据执行 OLS
-5. 用个体均值重建原始尺度的拟合值
-
-返回 `PanelFitResult`。
-"""
 function fit_fe(panel_data::MetricaBase.PanelData, formula::String)
     data = panel_data.data
     id_col = panel_data.id_col
     time_col = panel_data.time_col
 
     df = DataFrame(data)
-    nobs = nrow(df)
 
-    unique_ids = unique(df[!, id_col])
-    unique_times = unique(df[!, time_col])
+    # 用 StatsModels 解析公式（与 MetricaLinear/Discrete 统一）
+    model_formula = MetricaLinear.parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+    model_columns = MetricaLinear.collect_term_symbols(model_formula)
+
+    # 用共享数据管道准备设计矩阵
+    prepared = MetricaLinear.prepare_model_data(df, model_formula, model_columns, nothing, nothing)
+    prepared isa MetricaBase.ModelError && return prepared
+    (filtered_df, model_frame, _, X, y, _, _, n_total, n_effective) = prepared
+
+    nobs = length(y)
+    unique_ids = unique(filtered_df[!, id_col])
+    unique_times = unique(filtered_df[!, time_col])
     n_ids = length(unique_ids)
     n_times = length(unique_times)
 
-    # 解析公式
-    response_name, predictor_names = MetricaBase.parse_metrica_formula(formula)
-
-    y = Float64.(df[!, Symbol(response_name)])
-    X_names = [Symbol(name) for name in predictor_names]
-    X = hcat([Float64.(df[!, name]) for name in X_names]...)
-
-    # 组内去均值，同时记录个体均值以用于重建原始尺度拟合值
+    # 组内去均值
     y_demeaned = copy(y)
     X_demeaned = copy(X)
     y_means = zeros(nobs)
 
     for id in unique_ids
-        mask = df[!, id_col] .== id
+        mask = filtered_df[!, id_col] .== id
         y_id = y[mask]
         X_id = X[mask, :]
 
@@ -55,17 +44,15 @@ function fit_fe(panel_data::MetricaBase.PanelData, formula::String)
         end
     end
 
-    # 对去均值数据执行 OLS（添加截距，理论上应为零）
-    X_design = hcat(ones(nobs), X_demeaned)
-    coef_names = vcat([:intercept], X_names)
+    # 移除 demean 后全零的截距列
+    X_demeaned_noint = X_demeaned[:, 2:end]
+    coefficient_names = Symbol.(coefnames(model_frame))[2:end]  # 去掉 intercept
 
-    stats = ols_statistics(X_design, y_demeaned, coef_names, :fe,
+    stats = ols_statistics(X_demeaned_noint, y_demeaned, coefficient_names, :fe,
                            Dict(:n_ids => n_ids, :n_times => n_times))
 
-    # 重建原始尺度的拟合值：ŷ_it = ȳ_i + X_demeaned_it * β_within
-    k = length(X_names)
-    within_beta = stats.coefficients[2:end]  # 排除截距
-    fitted_original = y_means .+ X_demeaned * within_beta
+    # 重建原始尺度拟合值（用无截距的 demeaned X + within-beta）
+    fitted_original = y_means .+ X_demeaned_noint * stats.coefficients
     residuals_original = y - fitted_original
 
     return PanelFitResult(
@@ -75,7 +62,7 @@ function fit_fe(panel_data::MetricaBase.PanelData, formula::String)
         panel_data,
         fitted_original,
         residuals_original,
-        coef_names,
+        coefficient_names,
         :fe,
     )
 end

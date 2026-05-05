@@ -8,11 +8,13 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
 
 [sources]
 MetricaBase = {path = "../MetricaBase.jl"}
+MetricaLinear = {path = "../MetricaLinear.jl"}
 
 [compat]
 DataFrames = "1"
