@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use tao::event_loop::{ControlFlow, EventLoop};
+use tao::window::Icon;
 use wry::{http::Response, WebViewBuilder};
 
 /// 持有 Runtime 子进程句柄，退出时自动清理。
@@ -78,13 +79,88 @@ fn read_frontend_file(path: &str) -> Option<(Vec<u8>, String)> {
     std::fs::read(&file_path).ok().map(|data| (data, mime.to_string()))
 }
 
+/// 加载应用图标。
+fn load_icon() -> Option<Icon> {
+    let icon_path = app_dir().join("dist/assets/icons/metrica-icon-128x128.png");
+    let data = std::fs::read(&icon_path).ok()?;
+    let decoder = png::Decoder::new(std::io::Cursor::new(&data));
+    let mut reader = decoder.read_info().ok()?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).ok()?;
+    let rgba = buf[..info.buffer_size()].to_vec();
+    Icon::from_rgba(rgba, info.width, info.height).ok()
+}
+
+/// 在 macOS 上设置 NSApplication 图标（Dock 栏 + 应用切换器）。
+/// tao 的 with_window_icon 在 macOS 上是空操作。
+/// 通过 NSApplication API 直接设置 Dock 图标和应用身份。
+#[cfg(target_os = "macos")]
+fn macos_set_app_icon() {
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::ffi::CString;
+
+    let icon_path = app_dir().join("dist/assets/icons/metrica-icon-128x128.png");
+    let cstr = match CString::new(icon_path.to_str().unwrap_or("")) {
+        Ok(c) => c,
+        Err(_) => { eprintln!("[icon] CString failed"); return; }
+    };
+
+    unsafe {
+        let app: *mut objc::runtime::Object = msg_send![class!(NSApplication), sharedApplication];
+
+        // 设置为 Regular 应用（独立 Dock 图标 + 菜单栏）
+        // NSApplicationActivationPolicyRegular = 0
+        let _: () = msg_send![app, setActivationPolicy:0usize];
+
+        // 加载图标
+        let nsstr: *mut objc::runtime::Object = msg_send![class!(NSString), stringWithUTF8String:cstr.as_ptr()];
+        if nsstr.is_null() {
+            eprintln!("[icon] NSString failed");
+            return;
+        }
+
+        let image: *mut objc::runtime::Object = msg_send![class!(NSImage), alloc];
+        let image: *mut objc::runtime::Object = msg_send![image, initWithContentsOfFile:nsstr];
+        if image.is_null() {
+            eprintln!("[icon] NSImage initWithContentsOfFile failed");
+            return;
+        }
+
+        let size: NSSize = msg_send![image, size];
+        eprintln!("[icon] NSImage size: {}x{}", size.width, size.height);
+
+        let _: () = msg_send![app, setApplicationIconImage:image];
+
+        eprintln!("[icon] macOS app icon set + activationPolicy=Regular");
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct NSSize {
+    width: f64,
+    height: f64,
+}
+
+#[cfg(not(target_os = "macos"))]
+fn macos_set_app_icon() {
+    // 非 macOS 平台不做额外处理，tao 的 with_window_icon 已足够。
+}
+
 pub fn run() {
     let event_loop = EventLoop::new();
-    let window = tao::window::WindowBuilder::new()
+    let mut window_builder = tao::window::WindowBuilder::new()
         .with_title("Metrica Alpha — 真实 OLS 链路")
-        .with_inner_size(tao::dpi::LogicalSize::new(1200.0, 800.0))
-        .build(&event_loop)
-        .expect("创建窗口失败");
+        .with_inner_size(tao::dpi::LogicalSize::new(1200.0, 800.0));
+
+    if let Some(icon) = load_icon() {
+        window_builder = window_builder.with_window_icon(Some(icon));
+    }
+
+    // macOS 需要通过 NSApp 设置 Dock 图标
+    macos_set_app_icon();
+
+    let window = window_builder.build(&event_loop).expect("创建窗口失败");
 
     let _runtime = spawn_runtime().ok().map(|child| RuntimeGuard(Some(child)));
     if _runtime.is_none() {

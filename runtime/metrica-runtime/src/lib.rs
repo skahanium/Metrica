@@ -68,6 +68,11 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("var", vec!["variables", "time_column", "lags"]),
         ("unitroot", vec!["variable", "time_column"]),
         ("cointegration", vec!["variables", "time_column", "method"]),
+        // S4d: Survey 模型
+        ("survey_ols", vec!["weights_column"]),
+        ("survey_logit", vec!["weights_column"]),
+        ("survey_probit", vec!["weights_column"]),
+        ("survey_poisson", vec!["weights_column"]),
     ])
 }
 
@@ -99,6 +104,11 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     "order" => spec.order.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
                     "method" => spec.ts_method.as_deref(),
                     "lags" => spec.lags.map(|_| "present"),
+                    // S4d: Survey 字段
+                    "weights_column" => spec.weights_column.as_deref(),
+                    "strata_column" => spec.strata_column.as_deref(),
+                    "psu_column" => spec.psu_column.as_deref(),
+                    "fpc_column" => spec.fpc_column.as_deref(),
                     _ => Some("present"),
                 };
                 match value {
@@ -232,6 +242,15 @@ pub struct ModelSpec {
     pub lags: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deterministic: Option<String>,
+    // S4d: Survey 字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weights_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strata_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub psu_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fpc_column: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -483,6 +502,10 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             ts_method: None,
             lags: None,
             deterministic: None,
+            weights_column: None,
+            strata_column: None,
+            psu_column: None,
+            fpc_column: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -524,6 +547,10 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         ts_method: None,
         lags: None,
         deterministic: None,
+        weights_column: None,
+        strata_column: None,
+        psu_column: None,
+        fpc_column: None,
     };
     request.options.return_augment = true;
     request

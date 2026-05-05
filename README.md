@@ -1,5 +1,9 @@
 # Metrica
 
+<div align="center">
+  <img src="assets/icons/metrica-icon-128x128.png" alt="Metrica Icon" width="128" height="128">
+</div>
+
 Metrica 是一个基于 Julia 的联邦式计量经济学框架，目标是在教学体验、工程一致性、性能与可扩展性上，逐步超越 Python `statsmodels`，并最终发展为可视化、原生化的计量经济学应用生态。
 
 当前目录包含：

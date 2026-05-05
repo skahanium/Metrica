@@ -25,6 +25,9 @@ import { DIDResultCards } from './DIDResultCards';
 import { EventStudyPlot } from './EventStudyPlot';
 import { TreatmentEffectSummary } from './TreatmentEffectSummary';
 import { BalanceTable } from './BalanceTable';
+import { SurveyDesignPanel } from './SurveyDesignPanel';
+import { DEFFSummary } from './DEFFSummary';
+import { StrataSummary } from './StrataSummary';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
 
@@ -84,8 +87,8 @@ export function App() {
               items={[
                 { key: 'data', label: '数据处理', children: <><DataOperationsPanel /><OperationHistory /><DataPreviewTable /></> },
                 { key: 'project', label: '项目', children: <ProjectPanel /> },
-                { key: 'glance', label: '模型概览', children: <><GlanceTable /><DiscreteGlanceCards /><DIDResultCards /><TreatmentEffectSummary /><MarginalEffectsTable /></> },
-                { key: 'tidy', label: '系数表', children: <><TidyTable /><OddsRatioTable /></> },
+                { key: 'glance', label: '模型概览', children: <><GlanceTable /><DiscreteGlanceCards /><DIDResultCards /><TreatmentEffectSummary /><MarginalEffectsTable /><SurveyDesignPanel /><StrataSummary /></> },
+                { key: 'tidy', label: '系数表', children: <><TidyTable /><OddsRatioTable /><DEFFSummary /></> },
                 { key: 'diagnostics', label: '诊断', children: <><DiagnosticCards /><DiagnosticCharts /><EventStudyPlot /><BalanceTable /></> },
                 { key: 'augment', label: '拟合值', children: <><AugmentPreview /><ClassificationPreview /></> },
                 { key: 'comparison', label: '模型对比', children: <ModelComparison /> },

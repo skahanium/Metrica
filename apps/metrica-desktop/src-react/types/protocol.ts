@@ -162,6 +162,9 @@ export interface ModelResult {
   max_eigen_stats?: number[];
   acf_values?: number[];
   pacf_values?: number[];
+  // S4d: Survey 字段
+  design_effects?: DEFFEntry[];
+  strata_summary?: StrataEntry[];
 }
 
 // ---- 数据摘要 ----
@@ -184,7 +187,7 @@ export interface DatasetSummary {
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration';
+  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -205,6 +208,11 @@ export interface ModelSpec {
   ts_method?: 'mle' | 'css' | 'engle_granger' | 'johansen';
   lags?: number;
   deterministic?: 'constant' | 'trend' | 'none';
+  // S4d: Survey 字段
+  weights_column?: string;
+  strata_column?: string;
+  psu_column?: string;
+  fpc_column?: string;
 }
 
 export interface FitModelRequest {
@@ -383,6 +391,25 @@ export interface GrangerCausalityResult {
   f_stat: number;
   p_value: number;
   conclusion: 'reject' | 'fail_to_reject';
+}
+
+// ---- S4d: 调查模型类型 ----
+
+export interface DEFFEntry {
+  term: string;
+  deff: number;
+  n_eff: number;
+  srs_se: number;
+  survey_se: number;
+}
+
+export interface StrataEntry {
+  stratum: string;
+  n: number;
+  sum_weights: number;
+  mean_weight: number;
+  min_weight: number;
+  max_weight: number;
 }
 
 export interface TimeSeriesModelParams {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+  <!-- 圆角方形底色 -->
+  <rect x="4" y="4" width="152" height="152" rx="34" fill="#1e293b"/>
+  <!-- M 折线 -->
+  <polyline points="38,122 55,78 80,100 105,56 122,122" fill="none" stroke="#f1f5f9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 数据节点 -->
+  <circle cx="55" cy="78" r="4.5" fill="#94a3b8"/>
+  <circle cx="80" cy="100" r="4.5" fill="#94a3b8"/>
+  <circle cx="105" cy="56" r="4.5" fill="#94a3b8"/>
+</svg>
