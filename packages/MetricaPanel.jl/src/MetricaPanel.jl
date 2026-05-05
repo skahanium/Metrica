@@ -182,4 +182,59 @@ function fit_panel(panel_data::MetricaBase.PanelData, formula::String; method::S
     return estimator(panel_data, formula)
 end
 
+# === MODEL_REGISTRY 兼容的 fit 入口 ===========================================
+
+function MetricaBase.fit(::Type{PanelModel}, formula::AbstractString, data;
+                          panel_id::Symbol, panel_time::Symbol,
+                          panel_method::Symbol=:fe, fe_spec::Vector{Symbol}=Symbol[],
+                          instruments::Union{Nothing,Vector{String}}=nothing,
+                          endog::Union{Nothing,Vector{String}}=nothing,
+                          vcov::Symbol=:classical, cluster_column=nothing, weights=nothing)
+    df = if data isa AbstractString
+        loaded = MetricaLinear.load_dataset(data)
+        loaded isa MetricaBase.ModelError && return loaded
+        loaded
+    else
+        data
+    end
+    panel_data = MetricaBase.PanelData(df, panel_id, panel_time)
+
+    if panel_method === :panel_iv
+        isnothing(instruments) && return MetricaBase.ModelError(:missing_instruments,
+            "Panel IV 需要 instruments 参数", "", "")
+        isnothing(endog) && return MetricaBase.ModelError(:missing_endog,
+            "Panel IV 需要 endog 参数", "", "")
+        return fit_panel_iv(panel_data, formula; instruments=instruments, endog=endog)
+    end
+
+    fit_panel(panel_data, formula; method=panel_method, fe_spec=fe_spec)
+end
+
+function MetricaBase.fit(::Type{PanelIVModel}, formula::AbstractString, data;
+                          panel_id::Symbol, panel_time::Symbol,
+                          instruments::Vector{String}, endog::Vector{String},
+                          panel_method::Symbol=:panel_iv, fe_spec::Vector{Symbol}=Symbol[],
+                          vcov::Symbol=:classical, cluster_column=nothing, weights=nothing)
+    df = if data isa AbstractString
+        loaded = MetricaLinear.load_dataset(data)
+        loaded isa MetricaBase.ModelError && return loaded
+        loaded
+    else
+        data
+    end
+    panel_data = MetricaBase.PanelData(df, panel_id, panel_time)
+    return fit_panel_iv(panel_data, formula; instruments=instruments, endog=endog)
+end
+
+# === MODEL_REGISTRY 注册 =====================================================
+
+function __init__()
+    if isdefined(MetricaBase, :MODEL_REGISTRY)
+        merge!(MetricaBase.MODEL_REGISTRY, Dict{String, Type}(
+            "panel" => PanelModel,
+            "panel_iv" => PanelIVModel,
+        ))
+    end
+end
+
 end
