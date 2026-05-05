@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- 圆角方形外框 -->
+  <rect x="16" y="16" width="480" height="480" rx="58" ry="58" fill="#4a5568"/>
+  
+  <!-- σ符号 - 几何化设计 -->
+  <g transform="translate(256, 256)">
+    <!-- σ的上半部分 - 直线 -->
+    <line x1="-80" y1="-60" x2="80" y2="-60" stroke="#f7fafc" stroke-width="12" stroke-linecap="round"/>
+    
+    <!-- σ的下半部分 - 直线 -->
+    <line x1="-80" y1="60" x2="80" y2="60" stroke="#f7fafc" stroke-width="12" stroke-linecap="round"/>
+    
+    <!-- σ的中间连接 -->
+    <line x1="0" y1="-60" x2="0" y2="60" stroke="#f7fafc" stroke-width="12" stroke-linecap="round"/>
+    
+    <!-- σ的圆弧部分 -->
+    <path d="M -80 -60 Q -120 0 -80 60" stroke="#f7fafc" stroke-width="12" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
