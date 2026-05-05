@@ -69,10 +69,15 @@ function result_to_payload(result::IPWFitResult; include_augment::Bool=true)
 end
 
 function result_to_payload(result::PSMFitResult; include_augment::Bool=true)
+    balance_rows = [Dict(
+        "variable" => row[:variable], "mean_treated" => get(row, :mean_treated, NaN),
+        "mean_control" => get(row, :mean_control, NaN), "std_bias" => get(row, :std_bias, NaN),
+    ) for row in eachrow(result.balance_table)]
     return Dict("status" => "success", "messages" => [], "result_payload" => Dict(
         "glance" => Dict("model" => "psm", "nobs" => 0, "dof" => 0, "metrics" => Dict()),
         "att" => result.att, "att_se" => result.att_se,
         "n_matched" => result.n_matched,
+        "balance_table" => balance_rows,
         "summary_text" => "PSM ATT=$(round(result.att, digits=4))",
     ), "artifacts" => [])
 end

@@ -3,7 +3,8 @@
 function MetricaBase.fit(::Type{DIDModel}, formula::AbstractString, data;
                           panel_id::Symbol, panel_time::Symbol,
                           treated_column::Symbol, post_column::Symbol,
-                          vcov::Symbol=:cluster)
+                          vcov::Symbol=:cluster, panel_method::Symbol=:fe,
+                          fe_spec::Vector{Symbol}=Symbol[], weights=nothing)
     df = if data isa AbstractString
         loaded = MetricaLinear.load_dataset(data)
         loaded isa MetricaBase.ModelError && return loaded
@@ -86,9 +87,11 @@ function MetricaBase.fit(::Type{DIDModel}, formula::AbstractString, data;
             :n_pre => n_pre, :n_post => n_post,
         ), warnings)
 
-    tidy_rows = [MetricaBase.CoefRow(coef_names[i], coefficients[i], se_values[i],
-        coefficients[i]/se_values[i], 2*(1-cdf(TDist(dof), abs(coefficients[i]/se_values[i]))))
-        for i in 1:length(coef_names)]
+    tidy_rows = [let
+        t_stat = se_values[i] > 1e-15 ? coefficients[i]/se_values[i] : 0.0
+        p_val = t_stat != 0.0 ? 2*(1-cdf(TDist(max(dof,1)), abs(t_stat))) : 1.0
+        MetricaBase.CoefRow(coef_names[i], coefficients[i], se_values[i], t_stat, p_val)
+    end for i in 1:length(coef_names)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "TWFE")
 
     return DIDFitResult(formula, glance_table, tidy_table,

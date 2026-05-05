@@ -2,8 +2,11 @@
 
 function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
                           panel_id::Symbol, panel_time::Symbol,
-                          treated_column::Symbol, event_time_column::Symbol,
-                          pre_periods::Int=3, post_periods::Int=5)
+                          treated_column::Symbol, event_time_column::Symbol=:event_time,
+                          pre_periods::Int=3, post_periods::Int=5,
+                          vcov::Symbol=:cluster, panel_method::Symbol=:fe,
+                          fe_spec::Vector{Symbol}=Symbol[], weights=nothing,
+                          post_column::Union{Symbol,Nothing}=nothing)
     df = if data isa AbstractString
         loaded = MetricaLinear.load_dataset(data)
         loaded isa MetricaBase.ModelError && return loaded
@@ -93,9 +96,11 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
             )
         ])
 
-    tidy_rows = [MetricaBase.CoefRow(coef_names[i], coefficients[i], stderrors[i],
-        coefficients[i]/stderrors[i], 2*(1-cdf(TDist(dof), abs(coefficients[i]/stderrors[i]))))
-        for i in 1:length(coef_names)]
+    tidy_rows = [let
+        t_stat = stderrors[i] > 1e-15 ? coefficients[i]/stderrors[i] : 0.0
+        p_val = t_stat != 0.0 ? 2*(1-cdf(TDist(max(dof,1)), abs(t_stat))) : 1.0
+        MetricaBase.CoefRow(coef_names[i], coefficients[i], stderrors[i], t_stat, p_val)
+    end for i in 1:length(coef_names)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "TWFE")
 
     return EventStudyFitResult(formula, glance_table, tidy_table,

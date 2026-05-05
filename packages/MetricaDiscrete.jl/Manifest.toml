@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "3258ca9ca7c730a57281ba4c05e31755dc3c16e6"
+project_hash = "ee7061c700d67158fbdceb6ff53bcfd0ba0ee3e2"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -434,8 +434,14 @@ path = "../MetricaBase.jl"
 uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 version = "0.1.0"
 
+[[deps.MetricaCausal]]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaDiscrete", "MetricaLinear", "MetricaPanel", "Statistics", "StatsModels"]
+path = "../MetricaCausal.jl"
+uuid = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
+version = "0.1.0"
+
 [[deps.MetricaDiscrete]]
-deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaCausal", "MetricaLinear", "MetricaOutput", "Optim", "SpecialFunctions", "Statistics", "StatsModels"]
 path = "."
 uuid = "d1e2f3a4-b5c6-7890-def0-123456789abc"
 version = "0.1.0"
@@ -450,6 +456,12 @@ version = "0.1.0"
 deps = ["MetricaBase"]
 path = "../MetricaOutput.jl"
 uuid = "10c70d11-b779-43d3-b8f2-49770e63c885"
+version = "0.1.0"
+
+[[deps.MetricaPanel]]
+deps = ["DataFrames", "Distributions", "FixedEffectModels", "LinearAlgebra", "MetricaBase", "MetricaLinear", "Statistics", "StatsModels"]
+path = "../MetricaPanel.jl"
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "0.1.0"
 
 [[deps.Missings]]

@@ -79,7 +79,7 @@ function handle_request(req::Dict{String, Any})
                 if !isnothing(cluster_col) && !isempty(cluster_col); kwargs[:cluster_column] = Symbol(cluster_col); end
 
                 # 面板特有参数
-                if model_type in ("panel", "panel_iv")
+                if model_type in ("panel", "panel_iv", "did", "event_study")
                     kwargs[:panel_id] = Symbol(params["panel_id"])
                     kwargs[:panel_time] = Symbol(params["panel_time"])
                     kwargs[:panel_method] = Symbol(get(params, "panel_method", "fe"))
