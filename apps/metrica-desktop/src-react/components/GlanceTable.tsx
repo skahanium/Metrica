@@ -1,6 +1,5 @@
-import { useModelStore } from '../stores/modelStore';
-import { EmptyState } from './EmptyState';
 import { Descriptions, Card } from 'antd';
+import type { ModelResult } from '../types/protocol';
 
 const METRIC_LABELS: Record<string, string> = {
   r2: 'R²',
@@ -20,11 +19,14 @@ function formatMetric(key: string, value: number): string {
   return value.toFixed(4);
 }
 
-export function GlanceTable() {
-  const lastResult = useModelStore((s) => s.lastResult);
-  if (!lastResult) return <EmptyState title="尚未运行模型" description="请配置参数后点击运行。" />;
+interface GlanceTableProps {
+  result?: ModelResult;
+}
 
-  const { glance } = lastResult;
+export function GlanceTable({ result }: GlanceTableProps) {
+  if (!result?.glance) return null;
+
+  const { glance } = result;
 
   return (
     <Card size="small">

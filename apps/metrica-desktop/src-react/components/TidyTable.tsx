@@ -1,12 +1,10 @@
 import { useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { Card } from 'antd';
-import { useModelStore } from '../stores/modelStore';
-import { EmptyState } from './EmptyState';
 import type { ColDef } from 'ag-grid-community';
+import type { TidyRow, ModelResult } from '../types/protocol';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import type { TidyRow } from '../types/protocol';
 
 const COLUMNS: ColDef<TidyRow>[] = [
   { field: 'term', headerName: '参数', width: 150 },
@@ -16,22 +14,26 @@ const COLUMNS: ColDef<TidyRow>[] = [
   { field: 'p_value', headerName: 'p 值', width: 120, valueFormatter: (p) => p.value?.toFixed(4) },
 ];
 
-export function TidyTable() {
-  const lastResult = useModelStore((s) => s.lastResult);
-  const rowData = useMemo(() => lastResult?.tidy ?? [], [lastResult]);
+interface TidyTableProps {
+  result?: ModelResult;
+}
 
-  if (!lastResult) return <EmptyState title="尚未运行模型" />;
+export function TidyTable({ result }: TidyTableProps) {
+  const rowData = useMemo(() => result?.tidy ?? [], [result]);
+
+  if (!result || !rowData.length) return null;
+
+  const gridHeight = Math.min(400, Math.max(120, (rowData.length + 1) * 42));
 
   return (
     <Card size="small">
-      {lastResult.vcov_label && (
-        <div style={{ marginBottom: 8, color: '#8c8c8c', fontSize: 13 }}>{lastResult.vcov_label}</div>
+      {result.vcov_label && (
+        <div style={{ marginBottom: 8, color: '#8c8c8c', fontSize: 13 }}>{result.vcov_label}</div>
       )}
-      <div className="ag-theme-alpine" style={{ height: Math.min(400, (rowData.length + 1) * 42) }}>
+      <div className="ag-theme-alpine" style={{ height: gridHeight, width: '100%' }}>
         <AgGridReact<TidyRow>
           rowData={rowData}
           columnDefs={COLUMNS}
-          domLayout="autoHeight"
         />
       </div>
     </Card>

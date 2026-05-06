@@ -48,12 +48,12 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, teach
       {teachingEnabled && <TeachingLayer result={result} />}
 
       {/* Model content - reads from lastResult in store */}
-      {result.glance && <GlanceTable />}
+      {result.glance && <GlanceTable result={result} />}
       {isDiscrete && <DiscreteGlanceCards />}
       {modelType === 'did' && <DIDResultCards />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary />}
       {isDiscrete && (result.odds_ratios || (result as any).irr_entries) && <OddsRatioTable />}
-      {result.tidy && result.tidy.length > 0 && <TidyTable />}
+      {result.tidy && result.tidy.length > 0 && <TidyTable result={result} />}
       {isSurvey && (
         <>
           <SurveyDesignPanel />
