@@ -1,13 +1,19 @@
-import { List, Tag, Typography } from 'antd';
+import { Typography } from 'antd';
 import { DataSourcePanel } from './DataSourcePanel';
+import { VariableCard } from './VariableCard';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useProjectStore } from '../stores/projectStore';
+import { useCommandStore } from '../stores/commandStore';
 
 const { Title, Text } = Typography;
 
 export function Sidebar() {
   const summary = useDatasetStore((s) => s.summary);
   const projectPath = useProjectStore((s) => s.projectPath);
+
+  const handleVariableClick = (name: string) => {
+    useCommandStore.getState().setInput(name, name.length);
+  };
 
   return (
     <div style={{ padding: 16, width: 280, background: '#fafafa', borderRight: '1px solid #f0f0f0', height: '100%' }}>
@@ -24,19 +30,11 @@ export function Sidebar() {
         {!summary?.columns?.length ? (
           <Text type="secondary">检查数据后将显示变量列表。</Text>
         ) : (
-          <List
-            size="small"
-            dataSource={summary.columns}
-            renderItem={(column) => (
-              <List.Item style={{ paddingLeft: 0, paddingRight: 0 }}>
-                <div style={{ minWidth: 0 }}>
-                  <Text strong style={{ display: 'block', wordBreak: 'break-all' }}>{column.name}</Text>
-                  <Text type="secondary" style={{ fontSize: 12 }}>{column.type ?? column.inferred_type ?? '未知类型'}</Text>
-                </div>
-                {(column.missing_count ?? 0) > 0 && <Tag color="gold">缺失 {column.missing_count}</Tag>}
-              </List.Item>
-            )}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {summary.columns.map((column) => (
+              <VariableCard key={column.name} column={column} onClick={handleVariableClick} />
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -8,12 +8,15 @@ interface AppState {
   juliaHealthy: boolean;
   restartCount: number;
   healthPollingId: ReturnType<typeof setInterval> | null;
+  teachingEnabled: boolean;
+  dataFullscreen: boolean;
   setActiveTab: (tab: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setJuliaHealth: (healthy: boolean, restartCount: number) => void;
   startHealthPolling: () => void;
   stopHealthPolling: () => void;
+  setDataFullscreen: (v: boolean) => void;
 }
 
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -26,11 +29,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   juliaHealthy: true,
   restartCount: 0,
   healthPollingId: null,
+  teachingEnabled: true,
+  dataFullscreen: false,
 
   setActiveTab: (activeTab) => set({ activeTab }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
   setJuliaHealth: (juliaHealthy, restartCount) => set({ juliaHealthy, restartCount }),
+  setDataFullscreen: (dataFullscreen) => set({ dataFullscreen }),
 
   startHealthPolling: () => {
     const { healthPollingId } = get();

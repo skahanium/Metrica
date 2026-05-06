@@ -10,6 +10,7 @@ export interface ModelHistoryItem {
   datasetPath: string;
   result: ModelResult;
   createdAt: string;
+  command?: string;
 }
 
 interface ModelState {
