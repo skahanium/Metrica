@@ -11,7 +11,6 @@ describe('DataOperationsPanel', () => {
       sourcePath: '/tmp/source.csv',
       activePath: '/tmp/source.csv',
       summary: null,
-      isDerived: () => false,
     });
     useTransformStore.setState({
       operations: [],
