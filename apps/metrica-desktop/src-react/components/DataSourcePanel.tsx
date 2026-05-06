@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Input, Button, Space, Typography } from 'antd';
-import { FolderOpenOutlined, SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined } from '@ant-design/icons';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useModelStore } from '../stores/modelStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useTransformStore } from '../stores/transformStore';
+import { useAppStore } from '../stores/appStore';
 import { inspectDataset, inferWorkingDir } from '../services/runtimeClient';
 
 const { Text } = Typography;
@@ -15,6 +16,7 @@ export function DataSourcePanel() {
   const setLastResult = useModelStore((s) => s.setLastResult);
   const { appendRunRecord, setDirty } = useProjectStore();
   const { clearHistory, clearOperations } = useTransformStore();
+  const setError = useAppStore((s) => s.setError);
   const [loading, setLoading] = useState(false);
 
   const handleInspect = async () => {
@@ -38,7 +40,8 @@ export function DataSourcePanel() {
       });
       setDirty(true);
     } catch (e) {
-      console.error(e);
+      const msg = e instanceof Error ? e.message : '数据加载失败';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -57,14 +60,12 @@ export function DataSourcePanel() {
           clearOperations();
           setDirty(true);
         }}
+        onPressEnter={handleInspect}
         style={{ width: '100%' }}
       />
-      <Space>
-        <Button icon={<FolderOpenOutlined />} size="small">选择文件</Button>
-        <Button icon={<SearchOutlined />} size="small" loading={loading} onClick={handleInspect}>
-          检查数据
-        </Button>
-      </Space>
+      <Button icon={<SearchOutlined />} size="small" loading={loading} onClick={handleInspect} block>
+        检查数据
+      </Button>
       {sourcePath && <Text type="secondary" style={{ fontSize: 12, wordBreak: 'break-all' }}>原始数据：{sourcePath}</Text>}
       {isDerived && <Text type="secondary" style={{ fontSize: 12, wordBreak: 'break-all' }}>建模数据：{activePath}</Text>}
     </Space>

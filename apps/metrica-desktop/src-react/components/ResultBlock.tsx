@@ -4,15 +4,11 @@ import { ReloadOutlined, CopyOutlined } from '@ant-design/icons';
 import { TeachingLayer } from './TeachingLayer';
 import { GlanceTable } from './GlanceTable';
 import { TidyTable } from './TidyTable';
-import { DiagnosticCards } from './DiagnosticCards';
-import { DiagnosticCharts } from './DiagnosticCharts';
 import { DiscreteGlanceCards } from './DiscreteGlanceCards';
 import { DIDResultCards } from './DIDResultCards';
 import { TreatmentEffectSummary } from './TreatmentEffectSummary';
 import { EventStudyPlot } from './EventStudyPlot';
 import { BalanceTable } from './BalanceTable';
-import { AugmentPreview } from './AugmentPreview';
-import { ClassificationPreview } from './ClassificationPreview';
 import { OddsRatioTable } from './OddsRatioTable';
 import { DEFFSummary } from './DEFFSummary';
 import { StrataSummary } from './StrataSummary';
@@ -65,20 +61,8 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, teach
           <StrataSummary />
         </>
       )}
-      {result.diagnostics && (
-        <>
-          <DiagnosticCards />
-          <DiagnosticCharts />
-        </>
-      )}
       {modelType === 'event_study' && <EventStudyPlot />}
       {modelType === 'psm' && <BalanceTable />}
-      {result.augment_preview && result.augment_preview.length > 0 && (
-        <>
-          <AugmentPreview />
-          {(modelType === 'logit' || modelType === 'probit') && <ClassificationPreview />}
-        </>
-      )}
     </div>
   );
 };

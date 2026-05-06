@@ -137,7 +137,7 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     project_context: { project_id: projectId, working_dir: workingDir },
     dataset_ref: { source: 'file', path: datasetPath, format: 'csv' },
     model_spec: modelSpec,
-    options: { drop_missing: true, return_augment: true },
+    options: { drop_missing: true, return_augment: false },
   };
 }
 

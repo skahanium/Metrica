@@ -73,7 +73,7 @@ function handle_request(req::Dict{String, Any})
             dataset_path = params["dataset_path"]
             formula = params["formula"]
             model_type = get(params, "model_type", "ols")
-            include_augment = get(params, "return_augment", true)
+            include_augment = get(params, "return_augment", false)
 
             if haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]
@@ -163,17 +163,8 @@ function handle_request(req::Dict{String, Any})
                 #     payload = MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
-                    # 面板诊断
-                    if result isa PanelFitResult
-                        payload["result_payload"]["diagnostics"] = panel_diagnostics(result.panel_data, formula)
-                    end
                 else
                     payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
-                end
-
-                # OLS 诊断
-                if model_type == "ols" && result isa OLSFitResult
-                    payload["result_payload"]["diagnostics"] = diagnostics_to_dict(result)
                 end
             else
                 payload = Dict(
