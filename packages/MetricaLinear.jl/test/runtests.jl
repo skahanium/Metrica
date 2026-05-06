@@ -323,6 +323,36 @@ end
     rm(iv_csv; force=true)
 end
 
+@testset "IV residual口径" begin
+    iv_csv, iv_io = mktemp()
+    close(iv_io)
+    write(iv_csv, """y,x1,x2,z1
+10,1,5,3
+12,2,3,6
+14,3,8,9
+20,2,2,4
+22,3,4,7
+24,4,6,10
+30,5,1,5
+32,6,7,11
+""")
+
+    result = fit(IVModel, "y ~ x1 + x2", iv_csv;
+                 instruments=["z1"], endog=["x2"])
+    @test result isa IVFitResult
+
+    # 残差口径检验：fitted 应基于原始解释变量，而非第二阶段预测值
+    X_orig = result.design_matrix
+    x2_actual = Float64[5,3,8,2,4,6,1,7]
+    @test X_orig ≈ hcat(ones(8), Float64[1,2,3,2,3,4,5,6], x2_actual) atol=1e-12
+
+    manual_fitted = X_orig * result.coef_values
+    @test result.fitted_values ≈ manual_fitted atol=1e-12
+    @test result.residual_vector ≈ result.response_vector - manual_fitted atol=1e-12
+
+    rm(iv_csv; force=true)
+end
+
 @testset "GLS 链路" begin
     identity_omega = r -> Matrix{Float64}(I, length(r), length(r))
     gls_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=identity_omega)

@@ -26,6 +26,7 @@ struct IVFitResult <: MetricaBase.AbstractLinearFitResult
     residual_vector::Vector{Float64}
     first_stage_stats::Dict{Symbol, Float64}
     weak_instrument_warnings::Vector{MetricaBase.ModelWarning}
+    second_stage_matrix::Matrix{Float64}
 end
 
 MetricaBase.glance(result::IVFitResult) = result.glance_table
@@ -41,7 +42,7 @@ MetricaBase.residuals(result::IVFitResult) = result.residual_vector
 
 function MetricaBase.augment(result::IVFitResult)
     nobs_val = length(result.response_vector)
-    X = result.design_matrix
+    X = result.second_stage_matrix
     residuals = result.residual_vector
 
     sigma = sqrt(sum(abs2, residuals) / (nobs_val - size(X, 2)))
@@ -85,7 +86,8 @@ function MetricaBase.predict(result::IVFitResult;
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
-    XtX_inv = inv(result.design_matrix' * result.design_matrix)
+    # 使用第二阶段矩阵计算投影，与 2SLS vcov 口径一致
+    XtX_inv = inv(result.second_stage_matrix' * result.second_stage_matrix)
 
     se_pred = if interval === :confidence
         [sqrt(sigma^2 * dot(X[i, :], XtX_inv * X[i, :])) for i in 1:size(X, 1)]
@@ -197,13 +199,17 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
     # 第二阶段
     X_second = hcat(X_exog, X_endog_hat)
     coefficients = X_second \ y
-    fitted = X_second * coefficients
+
+    # 用原始解释变量计算拟合值和残差（结构残差口径）
+    X_original = hcat(X_exog, X_endog)
+    fitted = X_original * coefficients
     residuals = y - fitted
 
     coefficient_names_sym = Symbol.(vcat(["(Intercept)"], string.(exog_only), string.(endog_syms)))
 
     ncoef = length(coefficients)
     dof_val = nobs - ncoef
+    # vcov 使用第二阶段矩阵（含投影），残差使用结构残差
     vcov_result = compute_vcov(X_second, residuals, nobs, dof_val, vcov, nothing)
     vcov_result isa MetricaBase.ModelError && return vcov_result
     vcov_mat, stderror = vcov_result
@@ -233,6 +239,6 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
 
     return IVFitResult(String(formula), glance_table, tidy_table,
         coefficient_names_sym, coefficients, vcov_mat, stderror,
-        X_second, copy(y), fitted, residuals,
-        first_stage_stats, weak_warnings)
+        X_original, copy(y), fitted, residuals,
+        first_stage_stats, weak_warnings, X_second)
 end
