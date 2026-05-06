@@ -408,6 +408,7 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
         end
 
         # 尝试用 Hessian 计算标准误
+        hessian_ok = false
         try
             H = Optim.hessian!(opt_result)
             if all(isfinite, H) && isposdef(H)
@@ -425,11 +426,63 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
                 if include_const
                     std_errors[:constant] = ses[idx]
                 end
+                hessian_ok = true
             end
         catch
         end
 
+        # 回退：有限差分数值 Hessian
+        if !hessian_ok
+            try
+                θ_opt = Optim.minimizer(opt_result)
+                ϵ = 1e-5
+                n_params = length(θ_opt)
+                H_fd = zeros(n_params, n_params)
+                f0 = css_objective(θ_opt)
+                for i in 1:n_params
+                    for j in i:n_params
+                        θ_ij = copy(θ_opt); θ_ij[i] += ϵ; θ_ij[j] += ϵ
+                        θ_i = copy(θ_opt); θ_i[i] += ϵ
+                        θ_j = copy(θ_opt); θ_j[j] += ϵ
+                        f_ij = css_objective(θ_ij)
+                        f_i = css_objective(θ_i)
+                        f_j = css_objective(θ_j)
+                        H_fd[i, j] = (f_ij - f_i - f_j + f0) / (ϵ * ϵ)
+                        H_fd[j, i] = H_fd[i, j]
+                    end
+                end
+                H_fd = (H_fd + H_fd') ./ 2
+                if isposdef(H_fd)
+                    vcov_fd = inv(H_fd) .* 2.0 .* sigma2
+                    ses_fd = sqrt.(max.(diag(vcov_fd), 0.0))
+                    idx = 1
+                    for i in 1:n_ar
+                        std_errors[Symbol("ar_L$i")] = ses_fd[idx]
+                        idx += 1
+                    end
+                    for j in 1:n_ma
+                        std_errors[Symbol("ma_L$j")] = ses_fd[idx]
+                        idx += 1
+                    end
+                    if include_const
+                        std_errors[:constant] = ses_fd[idx]
+                    end
+                    hessian_ok = true
+                end
+            catch
+            end
+        end
+
         warnings = MetricaBase.ModelWarning[]
+        if !hessian_ok
+            push!(warnings, MetricaBase.ModelWarning(
+                :css_se_unavailable,
+                "无法计算 CSS 标准误",
+                "Hessian 矩阵不可逆或有限差分 Hessian 计算失败。标准误已设为 0。",
+                "考虑使用 MLE 方法以获得可靠的标准误。",
+                MetricaBase.warning,
+            ))
+        end
         if !converged
             push!(warnings, MetricaBase.ModelWarning(
                 :css_not_converged,

@@ -48,10 +48,33 @@ function MetricaBase.fit(
 
     coefficients = irls_result.coefficients
     vcov_matrix = irls_result.vcov
+    dof = nobs - ncoef
+    # 稳健 / 聚类标准误
+    if vcov == :HC1
+        residuals = y - irls_result.fitted_values
+        XtX_inv = vcov_matrix
+        meat = X' * (X .* residuals.^2)
+        sandwich = XtX_inv * meat * XtX_inv
+        vcov_matrix = (nobs / dof) * sandwich
+    elseif vcov == :cluster && !isnothing(cluster_column)
+        cluster_sym = Symbol(cluster_column)
+        cluster_vec = dataset[!, cluster_sym]
+        residuals = y - irls_result.fitted_values
+        XtX_inv = vcov_matrix
+        unique_clusters = unique(cluster_vec)
+        G = length(unique_clusters)
+        meat = zeros(ncoef, ncoef)
+        for g in unique_clusters
+            idx = cluster_vec .== g
+            Xg = X[idx, :]
+            eg = residuals[idx]
+            meat += (Xg' * eg) * (eg' * Xg)
+        end
+        vcov_matrix = XtX_inv * meat * XtX_inv * (G / (G - 1)) * ((nobs - 1) / (nobs - ncoef))
+    end
     se_values = sqrt.(max.(diag(vcov_matrix), 0.0))
     coefficient_names = Symbol.(StatsModels.coefnames(model_frame))
 
-    dof = nobs - ncoef
     z_stats = coefficients ./ se_values
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 

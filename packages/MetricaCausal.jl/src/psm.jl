@@ -101,3 +101,9 @@ end
 
 MetricaBase.glance(result::PSMFitResult) = result.glance_table
 MetricaBase.tidy(result::PSMFitResult) = result.tidy_table
+MetricaBase.coef(result::PSMFitResult) = MetricaBase.coef(result.propensity_model)
+MetricaBase.vcov(result::PSMFitResult) = MetricaBase.vcov(result.propensity_model)
+MetricaBase.nobs(result::PSMFitResult) = result.glance_table.nobs
+MetricaBase.dof(result::PSMFitResult) = result.glance_table.dof
+MetricaBase.r2(result::PSMFitResult) = result.glance_table.metrics[:att]
+MetricaBase.stderror(result::PSMFitResult) = MetricaBase.stderror(result.propensity_model)

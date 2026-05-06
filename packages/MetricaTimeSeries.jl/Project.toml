@@ -18,4 +18,5 @@ MetricaBase = {path = "../MetricaBase.jl"}
 
 [compat]
 julia = "1.12"
-StateSpaceModels = "0.3"
+StateSpaceModels = "0.7"
+Optim = "2"

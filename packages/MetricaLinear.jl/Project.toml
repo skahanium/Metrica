@@ -11,13 +11,27 @@ FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+MetricaCausal = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
+MetricaData = "2248ac24-609b-424e-8643-ff19a1f22962"
+MetricaDiagnostics = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
+MetricaDiscrete = "d1e2f3a4-b5c6-7890-def0-123456789abc"
 MetricaOutput = "10c70d11-b779-43d3-b8f2-49770e63c885"
+MetricaPanel = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+MetricaSurvey = "7d3611f3-666b-40ba-b23f-c75757e1ca05"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
 
 [sources]
 MetricaBase = {path = "../MetricaBase.jl"}
+MetricaCausal = {path = "../MetricaCausal.jl"}
+MetricaData = {path = "../MetricaData.jl"}
+MetricaDiagnostics = {path = "../MetricaDiagnostics.jl"}
+MetricaDiscrete = {path = "../MetricaDiscrete.jl"}
 MetricaOutput = {path = "../MetricaOutput.jl"}
+MetricaPanel = {path = "../MetricaPanel.jl"}
+MetricaSurvey = {path = "../MetricaSurvey.jl"}
 
 [compat]
+Optim = "2.0.1"
 julia = "1.12"

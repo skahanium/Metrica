@@ -1,8 +1,13 @@
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::thread;
 use tao::event_loop::{ControlFlow, EventLoop};
 use tao::window::Icon;
 use wry::{http::Response, WebViewBuilder};
+
+const LOCK_SOCKET_PATH: &str = "/tmp/metrica-desktop.lock";
 
 /// 持有 Runtime 子进程句柄，退出时自动清理。
 struct RuntimeGuard(Option<Child>);
@@ -147,7 +152,40 @@ fn macos_set_app_icon() {
     // 非 macOS 平台不做额外处理，tao 的 with_window_icon 已足够。
 }
 
+/// 通知已有实例激活窗口，返回 true 表示成功通知（应退出当前进程）。
+fn notify_existing_instance() -> bool {
+    if let Ok(mut stream) = UnixStream::connect(LOCK_SOCKET_PATH) {
+        let _ = std::io::Write::write_all(&mut stream, b"activate");
+        true
+    } else {
+        false
+    }
+}
+
+/// 尝试获取单实例锁。返回 Some(listener) 表示是首个实例，
+/// 返回 None 表示已有实例在运行。
+fn try_acquire_lock() -> Option<UnixListener> {
+    // 先尝试通知已有实例
+    if notify_existing_instance() {
+        return None;
+    }
+    // 清理残留的 socket 文件
+    let _ = std::fs::remove_file(LOCK_SOCKET_PATH);
+    // 尝试绑定
+    UnixListener::bind(LOCK_SOCKET_PATH).ok()
+}
+
 pub fn run() {
+    let lock = match try_acquire_lock() {
+        Some(l) => l,
+        None => {
+            eprintln!("Metrica 已在运行，将已运行的实例前置。");
+            // 等待一下确保消息送达
+            thread::sleep(std::time::Duration::from_millis(100));
+            std::process::exit(0);
+        }
+    };
+
     let event_loop = EventLoop::new();
     let mut window_builder = tao::window::WindowBuilder::new()
         .with_title("Metrica Alpha — 真实 OLS 链路")
@@ -161,6 +199,18 @@ pub fn run() {
     macos_set_app_icon();
 
     let window = window_builder.build(&event_loop).expect("创建窗口失败");
+
+    // 后台线程：监听激活请求（第二个实例启动时发送）
+    let event_loop_proxy = event_loop.create_proxy();
+    thread::spawn(move || {
+        let listener = lock;
+        for mut stream in listener.incoming().flatten() {
+            let mut buf = [0u8; 16];
+            if matches!(stream.read(&mut buf), Ok(n) if n > 0) {
+                let _ = event_loop_proxy.send_event(());
+            }
+        }
+    });
 
     let _runtime = spawn_runtime().ok().map(|child| RuntimeGuard(Some(child)));
     if _runtime.is_none() {
@@ -197,12 +247,27 @@ pub fn run() {
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
-        if let tao::event::Event::WindowEvent {
-            event: tao::event::WindowEvent::CloseRequested,
-            ..
-        } = event
-        {
-            *control_flow = ControlFlow::Exit;
+        match event {
+            tao::event::Event::WindowEvent {
+                event: tao::event::WindowEvent::CloseRequested,
+                ..
+            } => {
+                let _ = std::fs::remove_file(LOCK_SOCKET_PATH);
+                *control_flow = ControlFlow::Exit;
+            }
+            tao::event::Event::UserEvent(()) => {
+                // 第二个实例启动时收到激活请求
+                window.set_focus();
+                #[cfg(target_os = "macos")]
+                {
+                    use objc::{class, msg_send, sel, sel_impl};
+                    unsafe {
+                        let app: *mut objc::runtime::Object = msg_send![class!(NSApplication), sharedApplication];
+                        let _: () = msg_send![app, activateIgnoringOtherApps: true];
+                    }
+                }
+            }
+            _ => {}
         }
     });
 }

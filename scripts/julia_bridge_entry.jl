@@ -5,6 +5,8 @@
 # 输出：单行 JSON 到 stdout，由 Runtime 解析为 JuliaEnvelope。
 # ==============================================================================
 
+pushfirst!(LOAD_PATH, joinpath(String(ARGS[2]), "packages"))
+
 using JSON3
 using MetricaBase
 using MetricaLinear
@@ -12,14 +14,6 @@ using MetricaOutput
 
 include(joinpath(String(ARGS[2]), "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
 using .MetricaDiagnostics
-
-# 加载面板模块
-include(joinpath(String(ARGS[2]), "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
-using .MetricaPanel
-
-# 加载调查模型模块
-include(joinpath(String(ARGS[2]), "packages", "MetricaSurvey.jl", "src", "MetricaSurvey.jl"))
-using .MetricaSurvey
 
 request = JSON3.read(ARGS[1])
 action = String(request.action)
@@ -93,26 +87,18 @@ else
         payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
         payload
     else
-        # OLS/WLS 模型拟合
-        vcov_type = String(request.model_spec.vcov.type)
-        vcov_symbol = if vcov_type == "HC1"
-            :HC1
-        elseif vcov_type == "cluster"
-            :cluster
-        else
-            :classical
+        # 通过 MODEL_REGISTRY 统一派发
+        kwargs = Dict{Symbol, Any}()
+        vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
+        vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
+        kwargs[:vcov] = vcov_symbol
+        if haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights) && !isempty(request.model_spec.weights)
+            kwargs[:weights] = Symbol(String(request.model_spec.weights))
         end
-        has_weights = haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights)
-        has_cluster = haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column)
-        result = if has_weights && has_cluster
-            fit_ols_file(dataset_path, formula; weights=Symbol(String(request.model_spec.weights)), vcov=vcov_symbol, cluster=Symbol(String(request.model_spec.cluster_column)))
-        elseif has_weights
-            fit_ols_file(dataset_path, formula; weights=Symbol(String(request.model_spec.weights)), vcov=vcov_symbol)
-        elseif has_cluster
-            fit_ols_file(dataset_path, formula; vcov=vcov_symbol, cluster=Symbol(String(request.model_spec.cluster_column)))
-        else
-            fit_ols_file(dataset_path, formula; vcov=vcov_symbol)
+        if haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column) && !isempty(request.model_spec.cluster_column)
+            kwargs[:cluster_column] = Symbol(String(request.model_spec.cluster_column))
         end
+        result = MetricaBase.fit(OLSModel, formula, dataset_path; kwargs...)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
         payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
         if result isa OLSFitResult

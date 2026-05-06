@@ -157,7 +157,7 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
         Matrix{Float64}(X), y, fitted_matrix,
         τ, coefficient_names, β,
         vcov_matrix, se_values,
-        0.0, ll_final, 0, converged, J,
+        -2.0 * ll_final, ll_final, Optim.iterations(result), converged, J,
     )
 end
 

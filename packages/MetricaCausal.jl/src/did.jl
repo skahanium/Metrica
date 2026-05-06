@@ -49,6 +49,24 @@ function MetricaBase.fit(::Type{DIDModel}, formula::AbstractString, data;
     dof = twfe_result.dof
     nobs = twfe_result.nobs
 
+    # 个体聚类标准误
+    if vcov == :cluster
+        residuals = y - X_noint * coefficients
+        XtX_inv = vcov_matrix
+        unique_ids = unique(id_vec)
+        G = length(unique_ids)
+        ncoef_did = length(coefficients)
+        meat = zeros(ncoef_did, ncoef_did)
+        for g in unique_ids
+            idx = id_vec .== g
+            Xg = X_noint[idx, :]
+            eg = residuals[idx]
+            meat += (Xg' * eg) * (eg' * Xg)
+        end
+        vcov_matrix = XtX_inv * meat * XtX_inv * (G / (G - 1)) * ((nobs - 1) / (nobs - ncoef_did))
+        se_values = sqrt.(max.(diag(vcov_matrix), 0.0))
+    end
+
     # 提取处理效应（treat_post 交互项的系数）
     treat_idx = findfirst(==(:treat_post), coef_names)
     if isnothing(treat_idx)

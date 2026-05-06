@@ -58,8 +58,8 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("ordered_logit", vec![]),
         ("multinomial_logit", vec![]),
         ("negbin", vec![]),
-        ("did", vec!["panel_id", "panel_time"]),
-        ("event_study", vec!["panel_id", "panel_time"]),
+        ("did", vec!["panel_id", "panel_time", "treated_column", "post_column"]),
+        ("event_study", vec!["panel_id", "panel_time", "treated_column", "post_column"]),
         ("ipw", vec!["treatment_column"]),
         ("psm", vec!["treatment_column"]),
         ("aipw", vec!["treatment_column"]),
@@ -97,6 +97,10 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     "instruments" => spec.instruments.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
                     "endog_columns" => spec.endog_columns.as_ref().map(|v| if v.is_empty() { "" } else { "present" }),
                     "treatment_column" => spec.treatment_column.as_deref(),
+                    "treated_column" => spec.treated_column.as_deref(),
+                    "post_column" => spec.post_column.as_deref(),
+                    "event_time_column" => spec.event_time_column.as_deref(),
+                    "outcome_column" => spec.outcome_column.as_deref(),
                     // S4c: TimeSeries 字段
                     "time_column" => spec.time_column.as_deref(),
                     "variable" => spec.variable.as_deref(),
@@ -225,6 +229,14 @@ pub struct ModelSpec {
     // S4b: Causal 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub treatment_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub treated_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event_time_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome_column: Option<String>,
     // S4c: TimeSeries 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_column: Option<String>,
@@ -444,8 +456,8 @@ fn default_demo_dir() -> String {
     }
 
     repo_root()
-        .join("apps")
-        .join("metrica-desktop")
+        .join("datasets")
+        .join("demo")
         .to_string_lossy()
         .to_string()
 }
@@ -453,15 +465,14 @@ fn default_demo_dir() -> String {
 /// 解析示例 demo CSV 路径。
 ///
 /// 优先读取环境变量 `METRICA_DEMO_CSV`；若未设置，则在 `default_demo_dir()`
-/// 的 `data/demo.csv` 子路径中查找。
+/// 中查找 `ols_demo.csv`。
 fn default_demo_csv() -> String {
     if let Ok(path) = std::env::var("METRICA_DEMO_CSV") {
         return path;
     }
 
     std::path::PathBuf::from(default_demo_dir())
-        .join("data")
-        .join("demo.csv")
+        .join("ols_demo.csv")
         .to_string_lossy()
         .to_string()
 }
@@ -494,6 +505,10 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             endog_columns: None,
             omega_spec: None,
             treatment_column: None,
+            treated_column: None,
+            post_column: None,
+            event_time_column: None,
+            outcome_column: None,
             time_column: None,
             variable: None,
             variables: None,
@@ -539,6 +554,10 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         endog_columns: None,
         omega_spec: None,
         treatment_column: None,
+        treated_column: None,
+        post_column: None,
+        event_time_column: None,
+        outcome_column: None,
         time_column: None,
         variable: None,
         variables: None,

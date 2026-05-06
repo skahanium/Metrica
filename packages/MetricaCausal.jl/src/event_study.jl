@@ -55,6 +55,25 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     coefficients = twfe_result.coefficients
     stderrors = twfe_result.stderror
     dof = twfe_result.dof
+    nobs = twfe_result.nobs
+    ncoef_es = length(coefficients)
+
+    # 个体聚类标准误
+    if vcov == :cluster
+        residuals = y - X_noint * coefficients
+        XtX_inv = twfe_result.vcov
+        unique_ids = unique(id_vec)
+        G = length(unique_ids)
+        meat = zeros(ncoef_es, ncoef_es)
+        for g in unique_ids
+            idx = id_vec .== g
+            Xg = X_noint[idx, :]
+            eg = residuals[idx]
+            meat += (Xg' * eg) * (eg' * Xg)
+        end
+        vcov_cluster = XtX_inv * meat * XtX_inv * (G / (G - 1)) * ((nobs - 1) / (nobs - ncoef_es))
+        stderrors = sqrt.(max.(diag(vcov_cluster), 0.0))
+    end
 
     # 提取各相对时期的系数
     period_coefs = Float64[]
@@ -114,3 +133,8 @@ end
 
 MetricaBase.glance(result::EventStudyFitResult) = result.glance_table
 MetricaBase.tidy(result::EventStudyFitResult) = result.tidy_table
+MetricaBase.coef(result::EventStudyFitResult) = result.coefficient_names .=> result.coefficient_values
+MetricaBase.nobs(result::EventStudyFitResult) = result.glance_table.nobs
+MetricaBase.dof(result::EventStudyFitResult) = result.glance_table.dof
+MetricaBase.r2(result::EventStudyFitResult) = NaN
+MetricaBase.stderror(result::EventStudyFitResult) = result.tidy_table.rows .|> r -> r.stderror |> Float64

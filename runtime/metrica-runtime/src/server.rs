@@ -37,7 +37,7 @@ fn lock_session(session: &SharedSession) -> Result<std::sync::MutexGuard<'_, Jul
 /// 构建含所有路由和 CORS 中间件的 axum Router。
 pub fn build_router(session: SharedSession) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:1420".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE]);
 
@@ -222,6 +222,29 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(ref instruments) = request.model_spec.instruments { params["instruments"] = json!(instruments); }
     if let Some(ref endog_columns) = request.model_spec.endog_columns { params["endog_columns"] = json!(endog_columns); }
     if let Some(ref omega_spec) = request.model_spec.omega_spec { params["omega_spec"] = json!(omega_spec); }
+
+    // S4b: 因果推断字段
+    if let Some(ref col) = request.model_spec.treatment_column { params["treatment_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.treated_column { params["treated_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.post_column { params["post_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.event_time_column { params["event_time_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.outcome_column { params["outcome_column"] = json!(col); }
+
+    // S4c: 时间序列字段
+    if let Some(ref col) = request.model_spec.time_column { params["time_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.variable { params["variable"] = json!(col); }
+    if let Some(ref cols) = request.model_spec.variables { params["variables"] = json!(cols); }
+    if let Some(ref order) = request.model_spec.order { params["order"] = json!(order); }
+    if let Some(ref order) = request.model_spec.seasonal_order { params["seasonal_order"] = json!(order); }
+    if let Some(ref m) = request.model_spec.ts_method { params["ts_method"] = json!(m); }
+    if let Some(lags) = request.model_spec.lags { params["lags"] = json!(lags); }
+    if let Some(ref det) = request.model_spec.deterministic { params["deterministic"] = json!(det); }
+
+    // S4d: 调查模型字段
+    if let Some(ref col) = request.model_spec.weights_column { params["weights_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.strata_column { params["strata_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.psu_column { params["psu_column"] = json!(col); }
+    if let Some(ref col) = request.model_spec.fpc_column { params["fpc_column"] = json!(col); }
 
     params
 }
@@ -884,7 +907,7 @@ fn json_error_response(
 /// rerun_task 需要持久化 Julia 会话，在 oneshot 模式下不可用。
 pub fn build_oneshot_router() -> Router {
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:1420".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE]);
 

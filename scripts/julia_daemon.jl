@@ -39,6 +39,10 @@ using .MetricaData
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaSurvey.jl", "src", "MetricaSurvey.jl"))
 using .MetricaSurvey
 
+# 加载时间序列模块（等待 StateSpaceModels 依赖可用）
+# include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTimeSeries.jl", "src", "MetricaTimeSeries.jl"))
+# using .MetricaTimeSeries
+
 function handle_request(req::Dict{String, Any})
     id = req["id"]
     action = req["action"]
@@ -136,6 +140,15 @@ function handle_request(req::Dict{String, Any})
                     end
                 end
 
+                # S4c TimeSeries 特有参数（等待 StateSpaceModels 依赖就绪后启用）
+                # if model_type in ("arima", "var", "unitroot", "cointegration")
+                #     kwargs[:time_column] = Symbol(params["time_column"])
+                #     if haskey(params, "variable") && !isempty(get(params, "variable", ""))
+                #         kwargs[:variable] = Symbol(params["variable"])
+                #     end
+                #     ...
+                # end
+
                 result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
 
                 # 分派 result_to_payload
@@ -145,6 +158,9 @@ function handle_request(req::Dict{String, Any})
                     payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaSurvey.AbstractSurveyFitResult
                     payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
+                # 等待 StateSpaceModels 依赖就绪
+                # elseif result isa MetricaTimeSeries.AbstractTSFitResult
+                #     payload = MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                     # 面板诊断

@@ -59,3 +59,9 @@ end
 
 MetricaBase.glance(result::IPWFitResult) = result.glance_table
 MetricaBase.tidy(result::IPWFitResult) = result.tidy_table
+MetricaBase.coef(result::IPWFitResult) = MetricaBase.coef(result.propensity_model)
+MetricaBase.vcov(result::IPWFitResult) = MetricaBase.vcov(result.propensity_model)
+MetricaBase.nobs(result::IPWFitResult) = result.glance_table.nobs
+MetricaBase.dof(result::IPWFitResult) = result.glance_table.dof
+MetricaBase.r2(result::IPWFitResult) = result.glance_table.metrics[:pseudo_r2]
+MetricaBase.stderror(result::IPWFitResult) = MetricaBase.stderror(result.propensity_model)

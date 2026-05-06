@@ -54,3 +54,9 @@ end
 
 MetricaBase.glance(result::AIPWFitResult) = result.glance_table
 MetricaBase.tidy(result::AIPWFitResult) = result.tidy_table
+MetricaBase.coef(result::AIPWFitResult) = MetricaBase.coef(result.outcome_model)
+MetricaBase.vcov(result::AIPWFitResult) = MetricaBase.vcov(result.outcome_model)
+MetricaBase.nobs(result::AIPWFitResult) = result.glance_table.nobs
+MetricaBase.dof(result::AIPWFitResult) = result.glance_table.dof
+MetricaBase.r2(result::AIPWFitResult) = result.glance_table.metrics[:pseudo_r2]
+MetricaBase.stderror(result::AIPWFitResult) = MetricaBase.stderror(result.outcome_model)

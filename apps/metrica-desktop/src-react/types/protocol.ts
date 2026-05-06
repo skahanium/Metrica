@@ -199,6 +199,10 @@ export interface ModelSpec {
   endog_columns?: string[];
   omega_spec?: string;
   treatment_column?: string;
+  treated_column?: string;
+  post_column?: string;
+  event_time_column?: string;
+  outcome_column?: string;
   // S4c: TimeSeries 字段
   time_column?: string;
   variable?: string;

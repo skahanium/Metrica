@@ -5,7 +5,7 @@ import { useDatasetStore } from '../stores/datasetStore';
 import { useProjectStore } from '../stores/projectStore';
 import { fitModel } from '../services/runtimeClient';
 
-const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' | 'causal' | 'survey' }> = {
+const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'panel' | 'discrete' | 'causal' | 'timeseries' | 'survey' }> = {
   ols: { label: 'OLS / WLS', family: 'linear' },
   iv: { label: 'IV / 2SLS', family: 'linear' },
   gls: { label: 'GLS', family: 'linear' },
@@ -21,6 +21,10 @@ const MODEL_TYPE_LABELS: Record<string, { label: string; family: 'linear' | 'pan
   ipw: { label: 'IPW 逆概率加权', family: 'causal' },
   psm: { label: 'PSM 倾向得分匹配', family: 'causal' },
   aipw: { label: 'AIPW 双重稳健', family: 'causal' },
+  arima: { label: 'ARIMA', family: 'timeseries' },
+  var: { label: 'VAR', family: 'timeseries' },
+  unitroot: { label: '单位根检验', family: 'timeseries' },
+  cointegration: { label: '协整检验', family: 'timeseries' },
   survey_ols: { label: 'Survey OLS', family: 'survey' },
   survey_logit: { label: 'Survey Logit', family: 'survey' },
   survey_probit: { label: 'Survey Probit', family: 'survey' },
@@ -35,7 +39,12 @@ export function ModelForm() {
     panelId, setPanelId, panelTime, setPanelTime,
     panelMethod, setPanelMethod, setLastResult,
     instruments, setInstruments, endogColumns, setEndogColumns,
-    treatmentColumn, setTreatmentColumn,
+    treatmentColumn, setTreatmentColumn, postColumn, setPostColumn,
+    eventTimeColumn, setEventTimeColumn, outcomeColumn, setOutcomeColumn,
+    timeColumn, setTimeColumn, tsVariable, setTsVariable, tsVariables, setTsVariables,
+    orderP, setOrderP, orderD, setOrderD, orderQ, setOrderQ,
+    seasonalP, seasonalD, seasonalQ, seasonalS,
+    tsLags, setTsLags, tsDeterministic, setTsDeterministic,
     strataColumn, setStrataColumn, psuColumn, setPsuColumn, fpcColumn, setFpcColumn,
   } = useModelStore();
   const { setLoading, setError } = useAppStore();
@@ -61,6 +70,22 @@ export function ModelForm() {
         panelMethod,
         instruments,
         endogColumns,
+        treatmentColumn,
+        postColumn,
+        eventTimeColumn,
+        outcomeColumn,
+        timeColumn,
+        tsVariable,
+        tsVariables,
+        orderP,
+        orderD,
+        orderQ,
+        seasonalP,
+        seasonalD,
+        seasonalQ,
+        seasonalS,
+        tsLags,
+        tsDeterministic,
         strataColumn,
         psuColumn,
         fpcColumn,
@@ -119,6 +144,13 @@ export function ModelForm() {
                   <Select.Option key={value} value={value}>{info.label}</Select.Option>
                 ))}
             </Select.OptGroup>
+            <Select.OptGroup label="时间序列">
+              {Object.entries(MODEL_TYPE_LABELS)
+                .filter(([, info]) => info.family === 'timeseries')
+                .map(([value, info]) => (
+                  <Select.Option key={value} value={value}>{info.label}</Select.Option>
+                ))}
+            </Select.OptGroup>
             <Select.OptGroup label="复杂调查">
               {Object.entries(MODEL_TYPE_LABELS)
                 .filter(([, info]) => info.family === 'survey')
@@ -128,7 +160,7 @@ export function ModelForm() {
             </Select.OptGroup>
           </Select>
         </Form.Item>
-        <Form.Item label={modelType === 'panel' ? '面板公式' : 'OLS 公式'}>
+        <Form.Item label={(MODEL_TYPE_LABELS[modelType]?.label ?? '模型') + ' 公式'}>
           <Input value={formula} onChange={(e) => setFormula(e.target.value)} style={{ width: 240 }} />
         </Form.Item>
         {modelType === 'panel' ? (
@@ -188,15 +220,69 @@ export function ModelForm() {
             <Form.Item label="时间列">
               <Input value={panelTime} onChange={(e) => setPanelTime(e.target.value)} style={{ width: 100 }} placeholder="time" />
             </Form.Item>
-            <Form.Item label="处理变量">
+            <Form.Item label="处理组标识">
               <Input value={treatmentColumn} onChange={(e) => setTreatmentColumn(e.target.value)} style={{ width: 100 }} placeholder="treated" />
             </Form.Item>
+            <Form.Item label="政策后标识">
+              <Input value={postColumn} onChange={(e) => setPostColumn(e.target.value)} style={{ width: 100 }} placeholder="post" />
+            </Form.Item>
+            {modelType === 'event_study' && (
+              <Form.Item label="事件时间列">
+                <Input value={eventTimeColumn} onChange={(e) => setEventTimeColumn(e.target.value)} style={{ width: 100 }} placeholder="event_time" />
+              </Form.Item>
+            )}
           </>
         ) : modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw' ? (
           <>
             <Form.Item label="处理变量">
               <Input value={treatmentColumn} onChange={(e) => setTreatmentColumn(e.target.value)} style={{ width: 100 }} placeholder="treated" />
             </Form.Item>
+            <Form.Item label="结果变量">
+              <Input value={outcomeColumn} onChange={(e) => setOutcomeColumn(e.target.value)} style={{ width: 100 }} placeholder="y" />
+            </Form.Item>
+          </>
+        ) : modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration' ? (
+          <>
+            <Form.Item label="时间列" required>
+              <Input value={timeColumn} onChange={(e) => setTimeColumn(e.target.value)} style={{ width: 100 }} placeholder="year" />
+            </Form.Item>
+            {modelType === 'arima' || modelType === 'unitroot' ? (
+              <Form.Item label="变量">
+                <Input value={tsVariable} onChange={(e) => setTsVariable(e.target.value)} style={{ width: 100 }} placeholder="y" />
+              </Form.Item>
+            ) : null}
+            {modelType === 'var' || modelType === 'cointegration' ? (
+              <Form.Item label="变量列表">
+                <Input value={tsVariables} onChange={(e) => setTsVariables(e.target.value)} style={{ width: 160 }} placeholder="gdp, cpi, rate" />
+              </Form.Item>
+            ) : null}
+            {modelType === 'arima' ? (
+              <>
+                <Form.Item label="p (AR)">
+                  <Input type="number" value={orderP} onChange={(e) => setOrderP(Number(e.target.value))} style={{ width: 60 }} min={0} />
+                </Form.Item>
+                <Form.Item label="d (I)">
+                  <Input type="number" value={orderD} onChange={(e) => setOrderD(Number(e.target.value))} style={{ width: 60 }} min={0} />
+                </Form.Item>
+                <Form.Item label="q (MA)">
+                  <Input type="number" value={orderQ} onChange={(e) => setOrderQ(Number(e.target.value))} style={{ width: 60 }} min={0} />
+                </Form.Item>
+              </>
+            ) : null}
+            {modelType === 'var' ? (
+              <Form.Item label="滞后阶数">
+                <Input type="number" value={tsLags} onChange={(e) => setTsLags(Number(e.target.value))} style={{ width: 60 }} min={1} />
+              </Form.Item>
+            ) : null}
+            {modelType === 'unitroot' || modelType === 'cointegration' ? (
+              <Form.Item label="确定性项">
+                <Select value={tsDeterministic} onChange={(v) => setTsDeterministic(v)} style={{ width: 100 }}>
+                  <Select.Option value="constant">常数</Select.Option>
+                  <Select.Option value="trend">趋势</Select.Option>
+                  <Select.Option value="none">无</Select.Option>
+                </Select>
+              </Form.Item>
+            ) : null}
           </>
         ) : modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin' ? (
           <>

@@ -13,7 +13,7 @@ export interface ModelHistoryItem {
 }
 
 interface ModelState {
-  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  modelType: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcovType: string;
   weightsColumn: string;
@@ -24,6 +24,21 @@ interface ModelState {
   instruments: string;
   endogColumns: string;
   treatmentColumn: string;
+  postColumn: string;
+  eventTimeColumn: string;
+  outcomeColumn: string;
+  timeColumn: string;
+  tsVariable: string;
+  tsVariables: string;
+  orderP: number;
+  orderD: number;
+  orderQ: number;
+  seasonalP: number;
+  seasonalD: number;
+  seasonalQ: number;
+  seasonalS: number;
+  tsLags: number;
+  tsDeterministic: 'constant' | 'trend' | 'none';
   strataColumn: string;
   psuColumn: string;
   fpcColumn: string;
@@ -41,6 +56,21 @@ interface ModelState {
   setInstruments: (v: string) => void;
   setEndogColumns: (v: string) => void;
   setTreatmentColumn: (v: string) => void;
+  setPostColumn: (v: string) => void;
+  setEventTimeColumn: (v: string) => void;
+  setOutcomeColumn: (v: string) => void;
+  setTimeColumn: (v: string) => void;
+  setTsVariable: (v: string) => void;
+  setTsVariables: (v: string) => void;
+  setOrderP: (v: number) => void;
+  setOrderD: (v: number) => void;
+  setOrderQ: (v: number) => void;
+  setSeasonalP: (v: number) => void;
+  setSeasonalD: (v: number) => void;
+  setSeasonalQ: (v: number) => void;
+  setSeasonalS: (v: number) => void;
+  setTsLags: (v: number) => void;
+  setTsDeterministic: (v: 'constant' | 'trend' | 'none') => void;
   setStrataColumn: (v: string) => void;
   setPsuColumn: (v: string) => void;
   setFpcColumn: (v: string) => void;
@@ -66,6 +96,21 @@ export const useModelStore = create<ModelState>((set, get) => ({
   instruments: '',
   endogColumns: '',
   treatmentColumn: '',
+  postColumn: '',
+  eventTimeColumn: '',
+  outcomeColumn: '',
+  timeColumn: '',
+  tsVariable: '',
+  tsVariables: '',
+  orderP: 1,
+  orderD: 0,
+  orderQ: 0,
+  seasonalP: 0,
+  seasonalD: 0,
+  seasonalQ: 0,
+  seasonalS: 0,
+  tsLags: 2,
+  tsDeterministic: 'constant',
   strataColumn: '',
   psuColumn: '',
   fpcColumn: '',
@@ -83,6 +128,21 @@ export const useModelStore = create<ModelState>((set, get) => ({
   setInstruments: (instruments) => set({ instruments }),
   setEndogColumns: (endogColumns) => set({ endogColumns }),
   setTreatmentColumn: (treatmentColumn) => set({ treatmentColumn }),
+  setPostColumn: (postColumn) => set({ postColumn }),
+  setEventTimeColumn: (eventTimeColumn) => set({ eventTimeColumn }),
+  setOutcomeColumn: (outcomeColumn) => set({ outcomeColumn }),
+  setTimeColumn: (timeColumn) => set({ timeColumn }),
+  setTsVariable: (tsVariable) => set({ tsVariable }),
+  setTsVariables: (tsVariables) => set({ tsVariables }),
+  setOrderP: (orderP) => set({ orderP }),
+  setOrderD: (orderD) => set({ orderD }),
+  setOrderQ: (orderQ) => set({ orderQ }),
+  setSeasonalP: (seasonalP) => set({ seasonalP }),
+  setSeasonalD: (seasonalD) => set({ seasonalD }),
+  setSeasonalQ: (seasonalQ) => set({ seasonalQ }),
+  setSeasonalS: (seasonalS) => set({ seasonalS }),
+  setTsLags: (tsLags) => set({ tsLags }),
+  setTsDeterministic: (tsDeterministic) => set({ tsDeterministic }),
   setStrataColumn: (strataColumn) => set({ strataColumn }),
   setPsuColumn: (psuColumn) => set({ psuColumn }),
   setFpcColumn: (fpcColumn) => set({ fpcColumn }),
@@ -141,9 +201,22 @@ export const useModelStore = create<ModelState>((set, get) => ({
     } else if (s.modelType === 'did' || s.modelType === 'event_study') {
       spec.panel_id = s.panelId;
       spec.panel_time = s.panelTime;
-      if (s.treatmentColumn.trim()) spec.treatment_column = s.treatmentColumn.trim();
+      if (s.treatmentColumn.trim()) spec.treated_column = s.treatmentColumn.trim();
+      if (s.postColumn.trim()) spec.post_column = s.postColumn.trim();
+      if (s.eventTimeColumn.trim()) spec.event_time_column = s.eventTimeColumn.trim();
     } else if (s.modelType === 'ipw' || s.modelType === 'psm' || s.modelType === 'aipw') {
       if (s.treatmentColumn.trim()) spec.treatment_column = s.treatmentColumn.trim();
+      if (s.outcomeColumn.trim()) spec.outcome_column = s.outcomeColumn.trim();
+    } else if (s.modelType === 'arima' || s.modelType === 'var' || s.modelType === 'unitroot' || s.modelType === 'cointegration') {
+      if (s.timeColumn.trim()) spec.time_column = s.timeColumn.trim();
+      if (s.tsVariable.trim()) spec.variable = s.tsVariable.trim();
+      if (s.tsVariables.trim()) spec.variables = s.tsVariables.split(',').map((v) => v.trim()).filter(Boolean);
+      spec.order = [s.orderP, s.orderD, s.orderQ];
+      if (s.seasonalP > 0 || s.seasonalQ > 0) {
+        spec.seasonal_order = [s.seasonalP, s.seasonalD, s.seasonalQ, s.seasonalS];
+      }
+      if (s.tsLags > 0) spec.lags = s.tsLags;
+      if (s.tsDeterministic !== 'constant') spec.deterministic = s.tsDeterministic;
     } else if (s.modelType === 'logit' || s.modelType === 'probit' || s.modelType === 'poisson' || s.modelType === 'ordered_logit' || s.modelType === 'multinomial_logit' || s.modelType === 'negbin') {
       spec.vcov = { type: s.vcovType };
     } else if (s.modelType === 'survey_ols' || s.modelType === 'survey_logit' || s.modelType === 'survey_probit' || s.modelType === 'survey_poisson') {

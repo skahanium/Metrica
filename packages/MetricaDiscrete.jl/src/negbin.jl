@@ -62,9 +62,12 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
     best_β = β_init
     best_α = α_init
 
+    total_iterations = 0
+    irls_converged = false
     for α_try in α_grid
         β = copy(β_init)
         for iter in 1:25
+            total_iterations += 1
             μ = max.(exp.(X * β), 1e-10)
             var_nb = μ .+ α_try .* μ.^2
             w = μ.^2 ./ max.(var_nb, 1e-10)
@@ -74,6 +77,7 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
             β_new = Xw \ zw
             if norm(β_new - β) / (norm(β) + 1e-8) < 1e-8
                 β = β_new
+                irls_converged = true
                 break
             end
             β = β_new
@@ -139,7 +143,7 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
         String(formula), glance_table, tidy_table,
         Matrix{Float64}(X), y, μ_final, log.(μ_final),
         coefficient_names, coefficients, vcov_matrix, se_values,
-        α, 0.0, loglik, 0, true,
+        α, -2.0 * loglik, loglik, total_iterations, irls_converged,
     )
 end
 

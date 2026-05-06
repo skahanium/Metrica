@@ -29,6 +29,21 @@ export interface FitModelParams {
   instruments?: string;
   endogColumns?: string;
   treatmentColumn?: string;
+  postColumn?: string;
+  eventTimeColumn?: string;
+  outcomeColumn?: string;
+  timeColumn?: string;
+  tsVariable?: string;
+  tsVariables?: string;
+  orderP?: number;
+  orderD?: number;
+  orderQ?: number;
+  seasonalP?: number;
+  seasonalD?: number;
+  seasonalQ?: number;
+  seasonalS?: number;
+  tsLags?: number;
+  tsDeterministic?: string;
   strataColumn?: string;
   psuColumn?: string;
   fpcColumn?: string;
@@ -50,6 +65,16 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     instruments = '',
     endogColumns = '',
     treatmentColumn = '',
+    postColumn = '',
+    eventTimeColumn = '',
+    outcomeColumn = '',
+    timeColumn = '',
+    tsVariable = '',
+    tsVariables = '',
+    orderP = 1, orderD = 0, orderQ = 0,
+    seasonalP = 0, seasonalD = 0, seasonalQ = 0, seasonalS = 0,
+    tsLags = 2,
+    tsDeterministic = 'constant',
     strataColumn = '',
     psuColumn = '',
     fpcColumn = '',
@@ -76,9 +101,22 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
   } else if (modelType === 'did' || modelType === 'event_study') {
     modelSpec.panel_id = panelId;
     modelSpec.panel_time = panelTime;
-    if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
+    if (treatmentColumn?.trim()) modelSpec.treated_column = treatmentColumn.trim();
+    if (postColumn?.trim()) modelSpec.post_column = postColumn.trim();
+    if (eventTimeColumn?.trim()) modelSpec.event_time_column = eventTimeColumn.trim();
   } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
     if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
+    if (outcomeColumn?.trim()) modelSpec.outcome_column = outcomeColumn.trim();
+  } else if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration') {
+    if (timeColumn.trim()) modelSpec.time_column = timeColumn.trim();
+    if (tsVariable.trim()) modelSpec.variable = tsVariable.trim();
+    if (tsVariables.trim()) modelSpec.variables = tsVariables.split(',').map((v: string) => v.trim()).filter(Boolean);
+    modelSpec.order = [orderP, orderD, orderQ];
+    if (seasonalP > 0 || seasonalQ > 0) {
+      modelSpec.seasonal_order = [seasonalP, seasonalD, seasonalQ, seasonalS];
+    }
+    if (tsLags > 0) modelSpec.lags = tsLags;
+    if (tsDeterministic !== 'constant') modelSpec.deterministic = tsDeterministic as 'constant' | 'trend' | 'none';
   } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin') {
     modelSpec.vcov = { type: vcovType };
   } else if (modelType === 'survey_ols' || modelType === 'survey_logit' || modelType === 'survey_probit' || modelType === 'survey_poisson') {
