@@ -1,72 +1,163 @@
-import { useEffect } from 'react';
-import { ConfigProvider, Layout, Tabs, theme, Alert } from 'antd';
+import { useEffect, useCallback } from 'react';
+import { ConfigProvider, Layout, theme, Alert } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { ModelForm } from './ModelForm';
-import { GlanceTable } from './GlanceTable';
-import { TidyTable } from './TidyTable';
-import { DiscreteGlanceCards } from './DiscreteGlanceCards';
-import { OddsRatioTable } from './OddsRatioTable';
-import { MarginalEffectsTable } from './MarginalEffectsTable';
-import { ClassificationPreview } from './ClassificationPreview';
-import { DiagnosticCards } from './DiagnosticCards';
-import { DiagnosticCharts } from './DiagnosticCharts';
-import { AugmentPreview } from './AugmentPreview';
-import { ErrorPanel } from './ErrorPanel';
-import { WarningPanel } from './WarningPanel';
-import { DataOperationsPanel } from './DataOperationsPanel';
-import { OperationHistory } from './OperationHistory';
-import { DataPreviewTable } from './DataPreviewTable';
-import { ProjectPanel } from './ProjectPanel';
-import { ExportPanel } from './ExportPanel';
-import { ModelComparison } from './ModelComparison';
-import { DIDResultCards } from './DIDResultCards';
-import { EventStudyPlot } from './EventStudyPlot';
-import { TreatmentEffectSummary } from './TreatmentEffectSummary';
-import { BalanceTable } from './BalanceTable';
-import { SurveyDesignPanel } from './SurveyDesignPanel';
-import { DEFFSummary } from './DEFFSummary';
-import { StrataSummary } from './StrataSummary';
+import { CommandLine } from './CommandLine';
+import { ResultFlow } from './ResultFlow';
+import { DataFullscreen } from './DataFullscreen';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
+import { useDatasetStore } from '../stores/datasetStore';
+import { parse, parseToModelSpec } from '../services/commandParser';
+import * as api from '../services/runtimeClient';
 
 const { Content, Sider } = Layout;
 
 export function App() {
   const {
-    activeTab, setActiveTab, error,
-    juliaHealthy, restartCount,
-    startHealthPolling, stopHealthPolling,
+    error, juliaHealthy, restartCount, teachingEnabled, dataFullscreen,
+    startHealthPolling, stopHealthPolling, setError, setLoading,
   } = useAppStore();
-  const lastResult = useModelStore((s) => s.lastResult);
+  const setLastResult = useModelStore((s) => s.setLastResult);
+  const addToHistory = useModelStore((s) => s.addToHistory);
+  const setSummary = useDatasetStore((s) => s.setSummary);
+  const setSourceAndActivePath = useDatasetStore((s) => s.setSourceAndActivePath);
+  const activePath = useDatasetStore((s) => s.activePath);
 
   useEffect(() => {
     startHealthPolling();
     return () => stopHealthPolling();
   }, [startHealthPolling, stopHealthPolling]);
 
+  const executeCommand = useCallback(async (input: string) => {
+    const parsed = parse(input);
+    if (parsed.error) {
+      setError(parsed.error);
+      return;
+    }
+
+    const verb = parsed.verb;
+
+    // --- use "path" ---
+    if (verb === 'use') {
+      const raw = parsed.positionals[0] || '';
+      if (raw === 'clear') {
+        useDatasetStore.getState().setSourceAndActivePath('', '');
+        useDatasetStore.getState().setSummary(null);
+        setError(null);
+        return;
+      }
+      const filePath = raw.replace(/^["']|["']$/g, '');
+      if (!filePath) { setError('请指定数据文件路径'); return; }
+      setLoading(true);
+      try {
+        const result = await api.inspectDataset(filePath);
+        setSourceAndActivePath(filePath, filePath);
+        setSummary(result);
+        setError(null);
+      } catch (e: any) {
+        setError(e.message || '数据加载失败');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // --- guard: need dataset ---
+    if (!activePath) {
+      setError('请先使用 use 命令加载数据集');
+      return;
+    }
+
+    // --- modeling commands ---
+    const modelSpecResult = parseToModelSpec(parsed);
+    if (!('error' in modelSpecResult)) {
+      setLoading(true);
+      try {
+        const result = await api.fitModel({
+          datasetPath: activePath,
+          formula: modelSpecResult.formula || '',
+          modelType: modelSpecResult.model_type,
+          vcovType: (modelSpecResult.vcov as any)?.type || 'classical',
+          weightsColumn: modelSpecResult.weights || '',
+          clusterColumn: modelSpecResult.cluster_column || '',
+          panelId: modelSpecResult.panel_id || '',
+          panelTime: modelSpecResult.panel_time || '',
+          panelMethod: modelSpecResult.panel_method || '',
+          instruments: modelSpecResult.instruments?.join(' ') || '',
+          endogColumns: modelSpecResult.endog_columns?.join(' ') || '',
+          treatmentColumn: modelSpecResult.treatment_column || '',
+          postColumn: modelSpecResult.post_column || '',
+          eventTimeColumn: modelSpecResult.event_time_column || '',
+          outcomeColumn: modelSpecResult.outcome_column || '',
+          orderP: modelSpecResult.order?.[0],
+          orderD: modelSpecResult.order?.[1],
+          orderQ: modelSpecResult.order?.[2],
+          strataColumn: modelSpecResult.strata_column || '',
+          psuColumn: modelSpecResult.psu_column || '',
+          fpcColumn: modelSpecResult.fpc_column || '',
+        });
+        const payload = (result as any).result_payload;
+        if (payload && payload.glance) {
+          setLastResult(payload);
+          addToHistory({
+            id: crypto.randomUUID(),
+            label: input,
+            runId: (result as any).task_id || '',
+            modelType: modelSpecResult.model_type,
+            formula: modelSpecResult.formula || '',
+            datasetPath: activePath,
+            result: payload,
+            createdAt: new Date().toISOString(),
+            command: input,
+          });
+          setError(null);
+        } else {
+          setError('模型返回结果异常');
+        }
+      } catch (e: any) {
+        setError(e.message || '模型拟合失败');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // parseToModelSpec returned error
+    if ('error' in modelSpecResult) {
+      setError(modelSpecResult.error);
+    }
+  }, [activePath, setLoading, setError, setLastResult, addToHistory, setSummary, setSourceAndActivePath]);
+
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>
       <Layout style={{ minHeight: '100vh' }}>
-        <Header />
+        <Header
+          teachingEnabled={teachingEnabled}
+          onToggleTeaching={() => useAppStore.getState().setTeachingEnabled(!teachingEnabled)}
+        />
         <Layout>
-          <Sider width={280} style={{ background: '#fafafa' }}>
+          <Sider width={240} style={{ background: '#fafafa' }}>
             <Sidebar />
           </Sider>
-          <Content style={{ padding: 24, background: '#fff' }}>
-            <ModelForm />
-
-            {/* 操作错误 */}
-            {error && <ErrorPanel messages={[{ code: 'ERROR', text: error }]} />}
-
-            {/* Julia 健康降级横幅 */}
+          <Content style={{ display: 'flex', flexDirection: 'column', background: '#fff' }}>
+            {error && (
+              <Alert
+                type="error"
+                message={error}
+                closable
+                onClose={() => setError(null)}
+                showIcon
+                style={{ margin: '8px 16px 0' }}
+              />
+            )}
             {!juliaHealthy && restartCount < MAX_RESTARTS && (
               <Alert
                 type="warning"
                 message={`Julia 计算引擎不可用（已自动重启 ${restartCount} 次）。运行时正在尝试自动恢复，请稍候重试。`}
                 showIcon
-                style={{ marginBottom: 16 }}
+                style={{ margin: '8px 16px 0' }}
               />
             )}
             {!juliaHealthy && restartCount >= MAX_RESTARTS && (
@@ -74,27 +165,11 @@ export function App() {
                 type="error"
                 message={`Julia 计算引擎已崩溃 ${MAX_RESTARTS} 次，已达最大重启次数。请检查 Julia 环境后刷新页面。`}
                 showIcon
-                style={{ marginBottom: 16 }}
+                style={{ margin: '8px 16px 0' }}
               />
             )}
-
-            {/* 模型警告 */}
-            {lastResult?.warnings && <WarningPanel warnings={lastResult.warnings} />}
-
-            <Tabs
-              activeKey={activeTab}
-              onChange={setActiveTab}
-              items={[
-                { key: 'data', label: '数据处理', children: <><DataOperationsPanel /><OperationHistory /><DataPreviewTable /></> },
-                { key: 'project', label: '项目', children: <ProjectPanel /> },
-                { key: 'glance', label: '模型概览', children: <><GlanceTable /><DiscreteGlanceCards /><DIDResultCards /><TreatmentEffectSummary /><MarginalEffectsTable /><SurveyDesignPanel /><StrataSummary /></> },
-                { key: 'tidy', label: '系数表', children: <><TidyTable /><OddsRatioTable /><DEFFSummary /></> },
-                { key: 'diagnostics', label: '诊断', children: <><DiagnosticCards /><DiagnosticCharts /><EventStudyPlot /><BalanceTable /></> },
-                { key: 'augment', label: '拟合值', children: <><AugmentPreview /><ClassificationPreview /></> },
-                { key: 'comparison', label: '模型对比', children: <ModelComparison /> },
-                { key: 'export', label: '导出', children: <ExportPanel /> },
-              ]}
-            />
+            {dataFullscreen ? <DataFullscreen /> : <ResultFlow onRerun={executeCommand} />}
+            <CommandLine onExecute={executeCommand} />
           </Content>
         </Layout>
       </Layout>

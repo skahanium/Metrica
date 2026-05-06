@@ -1,5 +1,5 @@
 import { Button, Space, Typography } from 'antd';
-import { FolderOpenOutlined, PlayCircleOutlined, RedoOutlined, SaveOutlined } from '@ant-design/icons';
+import { FolderOpenOutlined, RedoOutlined, SaveOutlined } from '@ant-design/icons';
 import { useAppStore } from '../stores/appStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useModelStore } from '../stores/modelStore';
@@ -8,8 +8,13 @@ import { listRuns, loadProject, rerunTask, saveProject, inferWorkingDir } from '
 
 const { Title } = Typography;
 
-export function Header() {
-  const { isLoading, setError, setLoading, activeTab } = useAppStore();
+interface HeaderProps {
+  teachingEnabled: boolean;
+  onToggleTeaching: () => void;
+}
+
+export function Header({ teachingEnabled, onToggleTeaching }: HeaderProps) {
+  const { setError, setLoading } = useAppStore();
   const { sourcePath, activePath, summary, setSourceAndActivePath } = useDatasetStore();
   const isDerived = sourcePath !== activePath;
   const { buildModelSpec, applyModelSpec, setLastResult } = useModelStore();
@@ -33,7 +38,7 @@ export function Header() {
         active_dataset: activePath,
         saved_model_specs: [buildModelSpec()],
         last_run_id: runHistory[0]?.run_id ?? null,
-        ui_state: { active_tab: activeTab, is_derived: isDerived, ncols: summary?.columns?.length ?? 0 },
+        ui_state: { is_derived: isDerived, ncols: summary?.columns?.length ?? 0 },
         data_lineage: {
           source_dataset: sourcePath,
           active_dataset: activePath,
@@ -133,9 +138,7 @@ export function Header() {
         <Button icon={<FolderOpenOutlined />} onClick={handleOpenProject}>打开项目</Button>
         <Button icon={<SaveOutlined />} onClick={handleSaveProject}>保存项目</Button>
         <Button icon={<RedoOutlined />} onClick={handleRerun}>重跑上次</Button>
-        <Button type="primary" icon={<PlayCircleOutlined />} loading={isLoading} htmlType="submit" form="model-form">
-          运行模型
-        </Button>
+        <Button onClick={onToggleTeaching}>{teachingEnabled ? '教学开' : '教学关'}</Button>
       </Space>
     </div>
   );

@@ -101,22 +101,24 @@ export const useCommandStore = create<CommandState>((set, get) => ({
     })),
 
   navigateHistoryUp: () => {
-    const { history, historyIdx } = get();
-    if (historyIdx >= history.length - 1) return null;
+    const { historyIdx } = get();
+    const hist = get().history;
+    if (historyIdx >= hist.length - 1) return null;
     const newIdx = historyIdx + 1;
     set({ historyIdx: newIdx });
-    return history[newIdx];
+    return hist[newIdx];
   },
 
   navigateHistoryDown: () => {
-    const { history, historyIdx } = get();
+    const { historyIdx } = get();
+    const hist = get().history;
     if (historyIdx <= 0) {
       set({ historyIdx: -1 });
       return '';
     }
     const newIdx = historyIdx - 1;
     set({ historyIdx: newIdx });
-    return get().history[newIdx];
+    return hist[newIdx];
   },
 
   setLastParsed: (lastParsed, parseError) =>

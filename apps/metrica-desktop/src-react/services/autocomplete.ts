@@ -1,4 +1,4 @@
-import { getGrammar, COMMAND_LIST, type CommandGrammar, type SyntaxNode } from './commandGrammar';
+import { getGrammar, COMMAND_LIST, type CommandGrammar } from './commandGrammar';
 import type { ColumnSummary } from '../types/protocol';
 
 // --- Types ---
