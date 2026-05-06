@@ -16,6 +16,7 @@ interface AppState {
   setJuliaHealth: (healthy: boolean, restartCount: number) => void;
   startHealthPolling: () => void;
   stopHealthPolling: () => void;
+  setTeachingEnabled: (v: boolean) => void;
   setDataFullscreen: (v: boolean) => void;
 }
 
@@ -36,6 +37,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
   setJuliaHealth: (juliaHealthy, restartCount) => set({ juliaHealthy, restartCount }),
+  setTeachingEnabled: (teachingEnabled) => set({ teachingEnabled }),
   setDataFullscreen: (dataFullscreen) => set({ dataFullscreen }),
 
   startHealthPolling: () => {
