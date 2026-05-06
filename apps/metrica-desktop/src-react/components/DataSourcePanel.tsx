@@ -57,6 +57,7 @@ export function DataSourcePanel() {
           clearOperations();
           setDirty(true);
         }}
+        style={{ width: '100%' }}
       />
       <Space>
         <Button icon={<FolderOpenOutlined />} size="small">选择文件</Button>

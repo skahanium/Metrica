@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { ConfigProvider, Layout, theme, Alert } from 'antd';
+import { ConfigProvider, theme, Alert } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -11,8 +11,6 @@ import { useModelStore } from '../stores/modelStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { parse, parseToModelSpec } from '../services/commandParser';
 import * as api from '../services/runtimeClient';
-
-const { Content, Sider } = Layout;
 
 export function App() {
   const {
@@ -132,16 +130,18 @@ export function App() {
 
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>
-      <Layout style={{ minHeight: '100vh' }}>
-        <Header
-          teachingEnabled={teachingEnabled}
-          onToggleTeaching={() => useAppStore.getState().setTeachingEnabled(!teachingEnabled)}
-        />
-        <Layout>
-          <Sider width={240} style={{ background: '#fafafa' }}>
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flexShrink: 0 }}>
+          <Header
+            teachingEnabled={teachingEnabled}
+            onToggleTeaching={() => useAppStore.getState().setTeachingEnabled(!teachingEnabled)}
+          />
+        </div>
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+          <div style={{ width: 280, flexShrink: 0, background: '#fafafa', overflow: 'hidden', borderRight: '1px solid #f0f0f0' }}>
             <Sidebar />
-          </Sider>
-          <Content style={{ display: 'flex', flexDirection: 'column', background: '#fff' }}>
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0 }}>
             {error && (
               <Alert
                 type="error"
@@ -149,7 +149,7 @@ export function App() {
                 closable
                 onClose={() => setError(null)}
                 showIcon
-                style={{ margin: '8px 16px 0' }}
+                style={{ flexShrink: 0, margin: '8px 16px 0' }}
               />
             )}
             {!juliaHealthy && restartCount < MAX_RESTARTS && (
@@ -157,7 +157,7 @@ export function App() {
                 type="warning"
                 message={`Julia 计算引擎不可用（已自动重启 ${restartCount} 次）。运行时正在尝试自动恢复，请稍候重试。`}
                 showIcon
-                style={{ margin: '8px 16px 0' }}
+                style={{ flexShrink: 0, margin: '8px 16px 0' }}
               />
             )}
             {!juliaHealthy && restartCount >= MAX_RESTARTS && (
@@ -165,14 +165,18 @@ export function App() {
                 type="error"
                 message={`Julia 计算引擎已崩溃 ${MAX_RESTARTS} 次，已达最大重启次数。请检查 Julia 环境后刷新页面。`}
                 showIcon
-                style={{ margin: '8px 16px 0' }}
+                style={{ flexShrink: 0, margin: '8px 16px 0' }}
               />
             )}
-            {dataFullscreen ? <DataFullscreen /> : <ResultFlow onRerun={executeCommand} />}
-            <CommandLine onExecute={executeCommand} />
-          </Content>
-        </Layout>
-      </Layout>
+            <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+              {dataFullscreen ? <DataFullscreen /> : <ResultFlow onRerun={executeCommand} />}
+            </div>
+            <div style={{ flexShrink: 0 }}>
+              <CommandLine onExecute={executeCommand} />
+            </div>
+          </div>
+        </div>
+      </div>
     </ConfigProvider>
   );
 }

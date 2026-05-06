@@ -161,9 +161,10 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute }) => {
     <div
       style={{
         position: 'relative',
-        padding: '8px 16px 4px',
-        borderTop: '1px solid #f0f0f0',
+        padding: '10px 16px 6px',
+        borderTop: '1px solid #e8e8e8',
         background: '#fafafa',
+        flexShrink: 0,
       }}
     >
       {/* Completion dropdown */}
@@ -272,18 +273,15 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute }) => {
       {/* Hint bar */}
       <div
         style={{
-          fontSize: 11,
+          fontSize: 10,
           color: '#bbb',
-          marginTop: 2,
-          paddingLeft: 24,
-          display: 'flex',
-          justifyContent: 'space-between',
+          marginTop: 4,
+          paddingLeft: 20,
+          lineHeight: '16px',
         }}
       >
-        <span>Tab 补全 . ↑↓ 浏览 . Enter 执行 . Esc 关闭</span>
-        {correction && (
-          <span style={{ color: '#faad14' }}>建议: {correction}</span>
-        )}
+        Tab 补全 · ↑↓ 浏览 · Enter 执行 · Esc 关闭
+        {correction && <span style={{ color: '#faad14', marginLeft: 12 }}>建议: {correction}</span>}
       </div>
     </div>
   );

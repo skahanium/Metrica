@@ -16,7 +16,7 @@ export function Sidebar() {
   };
 
   return (
-    <div style={{ padding: 16, width: 280, background: '#fafafa', borderRight: '1px solid #f0f0f0', height: '100%' }}>
+    <div style={{ padding: 12, background: '#fafafa', height: '100%', overflow: 'auto' }}>
       <Title level={5}>数据源</Title>
       <DataSourcePanel />
       {projectPath && (
