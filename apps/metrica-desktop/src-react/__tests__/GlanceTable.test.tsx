@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GlanceTable } from '../components/GlanceTable';
-import { useModelStore } from '../stores/modelStore';
 import type { ModelResult } from '../types/protocol';
 
 const mockResult: ModelResult = {
@@ -12,15 +11,13 @@ const mockResult: ModelResult = {
 };
 
 describe('GlanceTable', () => {
-  it('renders empty state when no result', () => {
-    useModelStore.setState({ lastResult: null });
-    render(<GlanceTable />);
-    expect(screen.getByText('尚未运行模型')).toBeDefined();
+  it('renders nothing when no result is provided', () => {
+    const { container } = render(<GlanceTable />);
+    expect(container.firstChild).toBeNull();
   });
 
   it('renders glance metrics with Chinese labels', () => {
-    useModelStore.setState({ lastResult: mockResult });
-    render(<GlanceTable />);
+    render(<GlanceTable result={mockResult} />);
     expect(screen.getByText('OLS')).toBeDefined();
     expect(screen.getByText('128')).toBeDefined();
     expect(screen.getByText('0.8100')).toBeDefined();

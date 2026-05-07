@@ -1,6 +1,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::mpsc;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -17,10 +18,14 @@ const SHUTDOWN_TIMEOUT_SECS: u64 = 5;
 ///
 /// 通过 stdin/stdout JSON lines 通信。所有 I/O 方法是同步的，
 /// 调用方应通过 `tokio::task::spawn_blocking` 包裹以避免阻塞 async 运行时。
+///
+/// stdout 读取通过独立线程 + mpsc channel 实现，避免 `read_line` 阻塞
+/// 导致超时判断失效。
 pub struct JuliaSession {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
-    stdout_reader: Option<BufReader<std::process::ChildStdout>>,
+    stdout_rx: Option<mpsc::Receiver<Result<String, String>>>,
+    reader_handle: Option<std::thread::JoinHandle<()>>,
     request_counter: u64,
     healthy: AtomicBool,
     restart_count: AtomicU32,
@@ -30,6 +35,9 @@ pub struct JuliaSession {
 
 impl JuliaSession {
     /// 启动 Julia 守护进程，等待 `{"type":"ready"}` 就绪信号。
+    ///
+    /// 启动一个独立的 reader 线程从 stdout 逐行读取，通过 mpsc channel
+    /// 发送给主线程，从而让 `recv_timeout` 能正确实现超时。
     pub fn start(repo_root: &str, project_path: &str) -> Result<Self, String> {
         let mut child = Command::new("julia")
             .arg(format!("--project={project_path}"))
@@ -53,41 +61,66 @@ impl JuliaSession {
             .take()
             .ok_or_else(|| "无法获取 Julia stdout 管道。".to_string())?;
 
-        let mut reader = BufReader::new(stdout);
-        let mut ready_line = String::new();
+        let reader = BufReader::new(stdout);
+        let (tx, rx) = mpsc::channel();
 
-        // 使用 busy-wait + 短超时实现带时限的就绪等待
-        // （不依赖 tokio，保持同步语义）
-        let start = std::time::Instant::now();
-        loop {
-            if start.elapsed() > Duration::from_secs(READY_TIMEOUT_SECS) {
-                let _ = child.kill();
-                return Err(format!(
-                    "Julia 守护进程在 {READY_TIMEOUT_SECS} 秒内未发送就绪信号。"
-                ));
-            }
-
-            match reader.read_line(&mut ready_line) {
-                Ok(0) => {
-                    // EOF — 进程已退出
-                    let status = child.wait().ok();
-                    return Err(format!(
-                        "Julia 守护进程在就绪前退出（退出码: {:?}）。",
-                        status.and_then(|s| s.code())
-                    ));
+        // 独立线程：逐行读取 stdout 并通过 channel 发送
+        let reader_handle = std::thread::spawn(move || {
+            let mut reader = reader;
+            loop {
+                let mut line = String::new();
+                match reader.read_line(&mut line) {
+                    Ok(0) => {
+                        let _ = tx.send(Err("EOF".into()));
+                        break;
+                    }
+                    Ok(_) => {
+                        if tx.send(Ok(line)).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e.to_string()));
+                        break;
+                    }
                 }
-                Ok(_) => {
-                    let trimmed = ready_line.trim();
+            }
+        });
+
+        // 等待就绪信号：通过 recv_timeout 实现真实超时
+        loop {
+            match rx.recv_timeout(Duration::from_secs(READY_TIMEOUT_SECS)) {
+                Ok(Ok(line)) => {
+                    let trimmed = line.trim();
                     if let Ok(parsed) = serde_json::from_str::<Value>(trimmed) {
                         if parsed.get("type").and_then(|v| v.as_str()) == Some("ready") {
                             break;
                         }
                     }
-                    ready_line.clear();
+                    // 非 ready 行，继续等待
                 }
-                Err(err) => {
+                Ok(Err(e)) => {
+                    // EOF 或读取错误
                     let _ = child.kill();
-                    return Err(format!("读取 Julia 就绪信号失败: {err}"));
+                    let _ = child.wait();
+                    if e == "EOF" {
+                        return Err(format!(
+                            "Julia 守护进程在就绪前退出（EOF）。"
+                        ));
+                    }
+                    return Err(format!("读取 Julia 就绪信号失败: {e}"));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!(
+                        "Julia 守护进程在 {READY_TIMEOUT_SECS} 秒内未发送就绪信号。"
+                    ));
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err("Julia stdout 读取线程意外终止。".to_string());
                 }
             }
         }
@@ -95,7 +128,8 @@ impl JuliaSession {
         Ok(Self {
             child: Some(child),
             stdin: Some(stdin),
-            stdout_reader: Some(reader),
+            stdout_rx: Some(rx),
+            reader_handle: Some(reader_handle),
             request_counter: 0,
             healthy: AtomicBool::new(true),
             restart_count: AtomicU32::new(0),
@@ -146,29 +180,14 @@ impl JuliaSession {
                 .map_err(|err| format!("刷新 Julia stdin 失败: {err}"))?;
         }
 
-        let reader = self
-            .stdout_reader
-            .as_mut()
-            .ok_or_else(|| "Julia stdout 管道不可用。".to_string())?;
+        let rx = self
+            .stdout_rx
+            .as_ref()
+            .ok_or_else(|| "Julia stdout channel 不可用。".to_string())?;
 
-        let start = std::time::Instant::now();
         loop {
-            if start.elapsed() > Duration::from_secs(REQUEST_TIMEOUT_SECS) {
-                self.mark_unhealthy();
-                return Err(format!(
-                    "Julia 请求 {request_id} 在 {REQUEST_TIMEOUT_SECS} 秒内未响应。"
-                ));
-            }
-
-            let mut line = String::new();
-            match reader.read_line(&mut line) {
-                Ok(0) => {
-                    // EOF — 进程崩溃
-                    self.mark_unhealthy();
-                    self.try_restart()?;
-                    return Err("Julia 进程意外退出。已尝试重启，请重试请求。".to_string());
-                }
-                Ok(_) => {
+            match rx.recv_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)) {
+                Ok(Ok(line)) => {
                     let trimmed = line.trim();
                     if let Ok(parsed) = serde_json::from_str::<Value>(trimmed) {
                         if parsed.get("id").and_then(|v| v.as_str()) == Some(&request_id) {
@@ -177,9 +196,24 @@ impl JuliaSession {
                         // 跳过不匹配的响应（可能是上一次的残留或错误通知）
                     }
                 }
-                Err(err) => {
+                Ok(Err(e)) => {
+                    // EOF 或读取错误
                     self.mark_unhealthy();
-                    return Err(format!("读取 Julia stdout 失败: {err}"));
+                    if e == "EOF" {
+                        self.try_restart()?;
+                        return Err("Julia 进程意外退出。已尝试重启，请重试请求。".to_string());
+                    }
+                    return Err(format!("读取 Julia stdout 失败: {e}"));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    self.mark_unhealthy();
+                    return Err(format!(
+                        "Julia 请求 {request_id} 在 {REQUEST_TIMEOUT_SECS} 秒内未响应。"
+                    ));
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    self.mark_unhealthy();
+                    return Err("Julia stdout 读取线程意外终止。".to_string());
                 }
             }
         }
@@ -217,7 +251,10 @@ impl JuliaSession {
         }
 
         self.stdin = None;
-        self.stdout_reader = None;
+        self.stdout_rx = None;
+        // reader_handle 线程会在 channel 关闭后自行退出（tx 被 drop），
+        // 不阻塞等待它，避免 shutdown 期间死锁。
+        self.reader_handle = None;
         self.child = None;
         self.healthy.store(false, Ordering::Release);
 
@@ -258,7 +295,8 @@ impl JuliaSession {
             let _ = child.wait();
         }
         self.stdin = None;
-        self.stdout_reader = None;
+        self.stdout_rx = None;
+        self.reader_handle = None;
 
         self.restart_count.store(current + 1, Ordering::Release);
 
@@ -268,7 +306,8 @@ impl JuliaSession {
         );
         self.child = fresh.child.take();
         self.stdin = fresh.stdin.take();
-        self.stdout_reader = fresh.stdout_reader.take();
+        self.stdout_rx = fresh.stdout_rx.take();
+        self.reader_handle = fresh.reader_handle.take();
         self.healthy.store(true, Ordering::Release);
 
         Ok(())
@@ -327,25 +366,49 @@ mod tests {
 
         let stdin = child.stdin.take().expect("stdin");
         let stdout = child.stdout.take().expect("stdout");
-        let mut reader = BufReader::new(stdout);
+        let reader = BufReader::new(stdout);
+        let (tx, rx) = mpsc::channel();
 
-        // 读取 ready 信号
-        let mut line = String::new();
+        // 独立线程读取 mock 进程的 stdout
+        let reader_handle = std::thread::spawn(move || {
+            let mut reader = reader;
+            loop {
+                let mut line = String::new();
+                match reader.read_line(&mut line) {
+                    Ok(0) => {
+                        let _ = tx.send(Err("EOF".into()));
+                        break;
+                    }
+                    Ok(_) => {
+                        if tx.send(Ok(line)).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e.to_string()));
+                        break;
+                    }
+                }
+            }
+        });
+
+        // 消费 ready 信号
         loop {
-            let n = reader.read_line(&mut line).expect("read ready");
-            if n == 0 {
-                break;
+            match rx.recv_timeout(Duration::from_secs(5)) {
+                Ok(Ok(line)) => {
+                    if line.trim().contains("ready") {
+                        break;
+                    }
+                }
+                _ => break,
             }
-            if line.trim().contains("ready") {
-                break;
-            }
-            line.clear();
         }
 
         JuliaSession {
             child: Some(child),
             stdin: Some(stdin),
-            stdout_reader: Some(reader),
+            stdout_rx: Some(rx),
+            reader_handle: Some(reader_handle),
             request_counter: 0,
             healthy: AtomicBool::new(true),
             // 预置为 MAX_RESTARTS 以避免 mock 测试触发真实 Julia 重启

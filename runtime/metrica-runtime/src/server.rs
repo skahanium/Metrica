@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use axum::{
     extract::State,
@@ -8,6 +8,7 @@ use axum::{
     Router,
 };
 use serde_json::json;
+use tokio::sync::{mpsc, oneshot};
 use tower_http::cors::CorsLayer;
 
 use crate::julia_bridge::execute_fit_model;
@@ -18,6 +19,7 @@ use crate::{
     TransformTaskRequest, ValidationError,
     validate_model_request,
     resolve_working_dir, resolve_dataset_path,
+    sanitize_id, safe_runs_path,
     actions,
 };
 
@@ -27,15 +29,26 @@ pub fn default_bind_addr() -> &'static str {
     DEFAULT_BIND_ADDR
 }
 
-pub type SharedSession = Arc<Mutex<JuliaSession>>;
+/// Julia 命令通道消息类型：(action, params, reply_sender)。
+pub type JuliaCommand = (String, serde_json::Value, oneshot::Sender<Result<serde_json::Value, String>>);
 
-/// 安全获取 Julia Session 锁，处理毒化情况。
-fn lock_session(session: &SharedSession) -> Result<std::sync::MutexGuard<'_, JuliaSession>, String> {
-    session.lock().map_err(|_| "Julia 会话锁已毒化，请重启运行时。".to_string())
+/// 应用共享状态：Julia 命令发送端 + 健康标志。
+#[derive(Clone)]
+pub struct AppState {
+    pub cmd_tx: mpsc::Sender<JuliaCommand>,
+    pub julia_healthy: std::sync::Arc<AtomicBool>,
+}
+
+impl AppState {
+    /// 从 JuliaSession 创建 AppState：启动 actor 线程并返回可共享的应用状态。
+    pub fn from_session(session: JuliaSession) -> Self {
+        let (cmd_tx, julia_healthy) = spawn_julia_actor(session);
+        Self { cmd_tx, julia_healthy }
+    }
 }
 
 /// 构建含所有路由和 CORS 中间件的 axum Router。
-pub fn build_router(session: SharedSession) -> Router {
+pub fn build_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
@@ -52,39 +65,37 @@ pub fn build_router(session: SharedSession) -> Router {
         .route("/rerun_task", post(rerun_task_handler))
         .route("/export_report", post(export_report_handler))
         .layer(cors)
-        .with_state(session)
+        .with_state(state)
 }
 
 /// GET /health — 返回服务状态与 Julia 守护进程健康信息。
-async fn health_handler(State(session): State<SharedSession>) -> impl IntoResponse {
-    let (julia_healthy, restart_count) = {
-        let s = session.lock().unwrap();
-        (s.is_healthy(), s.restart_count())
-    };
+///
+/// 使用原子状态读取，不阻塞于 Julia 请求锁。
+async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let julia_healthy = state.julia_healthy.load(Ordering::Acquire);
 
     Json(json!({
         "service": "metrica-runtime",
         "status": if julia_healthy { "ready" } else { "degraded" },
         "julia_healthy": julia_healthy,
-        "restart_count": restart_count,
         "supported_actions": ["inspect_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task", "export_report"],
     }))
 }
 
 /// POST /fit_model — 解析 TaskRequest，解析路径，转发到 Julia 守护进程。
 async fn fit_model_handler(
-    State(session): State<SharedSession>,
+    State(state): State<AppState>,
     body: String,
 ) -> impl IntoResponse {
-    handle_model_request(session, body, actions::FIT_MODEL).await
+    handle_model_request(state, body, actions::FIT_MODEL).await
 }
 
 /// POST /inspect_dataset — 解析 TaskRequest，解析路径，转发到 Julia 守护进程。
 async fn inspect_dataset_handler(
-    State(session): State<SharedSession>,
+    State(state): State<AppState>,
     body: String,
 ) -> impl IntoResponse {
-    handle_model_request(session, body, actions::INSPECT_DATASET).await
+    handle_model_request(state, body, actions::INSPECT_DATASET).await
 }
 
 // === Transform 辅助函数 =======================================================
@@ -112,7 +123,7 @@ fn resolve_transform_output_path(
 
 /// POST /transform — 接受数据操作链，转发到 Julia MetricaData 执行。
 async fn transform_handler(
-    State(session): State<SharedSession>,
+    State(state): State<AppState>,
     body: String,
 ) -> impl IntoResponse {
     let started_at = current_timestamp_string();
@@ -132,6 +143,12 @@ async fn transform_handler(
             StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_UNSUPPORTED_ACTION",
             format!("端点 transform 不支持动作 `{}`。", request.action),
             Some("请将 action 设为 `transform`。".to_string()),
+        );
+    }
+
+    if let Err(err) = sanitize_id(&request.task_id) {
+        return json_error_response(
+            StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_INVALID_TASK_ID", err, None,
         );
     }
 
@@ -161,13 +178,7 @@ async fn transform_handler(
         "output_path": output_path.clone(),
     });
 
-    let result = {
-        let session = session.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut s = session.lock().unwrap();
-            s.send_request(actions::TRANSFORM, params)
-        }).await
-    };
+    let result = dispatch_via_channel(&state.cmd_tx, actions::TRANSFORM, params).await;
 
     match result {
         Ok(Ok(julia_response)) => {
@@ -190,9 +201,9 @@ async fn transform_handler(
             StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_JULIA_EXECUTION_FAILED", err,
             Some("请检查 Julia 环境、依赖安装与数据操作参数。".to_string()),
         ),
-        Err(join_err) => json_error_response(
+        Err(send_err) => json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_INTERNAL_ERROR",
-            format!("内部运行时错误: {join_err}"),
+            send_err,
             Some("请重试或联系管理员。".to_string()),
         ),
     }
@@ -249,23 +260,25 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     params
 }
 
-/// 向 Julia 派发模型请求并提取响应。
-async fn dispatch_model_to_julia(
-    session: &SharedSession,
+/// 通过命令通道向 Julia 派发请求，返回结果。
+async fn dispatch_via_channel(
+    cmd_tx: &mpsc::Sender<JuliaCommand>,
     action: &str,
     params: serde_json::Value,
-) -> Result<std::result::Result<serde_json::Value, String>, tokio::task::JoinError> {
-    let s = session.clone();
-    let act = action.to_string();
-    tokio::task::spawn_blocking(move || {
-        let mut s = s.lock().unwrap();
-        s.send_request(&act, params)
-    }).await
+) -> Result<Result<serde_json::Value, String>, String> {
+    let (reply_tx, reply_rx) = oneshot::channel();
+    cmd_tx
+        .send((action.to_string(), params, reply_tx))
+        .await
+        .map_err(|_| "Julia 命令通道已关闭。".to_string())?;
+    reply_rx
+        .await
+        .map_err(|_| "Julia 响应通道已关闭。".to_string())
 }
 
 /// 共享请求处理逻辑：解析 JSON → 校验 → 解析路径 → 转发 Julia → 返回响应。
 async fn handle_model_request(
-    session: SharedSession,
+    state: AppState,
     body: String,
     expected_action: &str,
 ) -> axum::response::Response {
@@ -289,6 +302,12 @@ async fn handle_model_request(
         );
     }
 
+    if let Err(err) = sanitize_id(&request.task_id) {
+        return json_error_response(
+            StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_INVALID_TASK_ID", err, None,
+        );
+    }
+
     if request.action == actions::FIT_MODEL {
         if let Some(response) = validate_fit_model_request(&request) {
             return response;
@@ -301,7 +320,7 @@ async fn handle_model_request(
     let mut params = build_model_params(&request);
     params["dataset_path"] = json!(dataset_path.clone());
 
-    let result = dispatch_model_to_julia(&session, expected_action, params).await;
+    let result = dispatch_via_channel(&state.cmd_tx, expected_action, params).await;
 
     match result {
         Ok(Ok(julia_response)) => {
@@ -326,9 +345,9 @@ async fn handle_model_request(
             StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_JULIA_EXECUTION_FAILED", err,
             Some("请检查 Julia 环境、依赖安装与请求参数。".to_string()),
         ),
-        Err(join_err) => json_error_response(
+        Err(send_err) => json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_INTERNAL_ERROR",
-            format!("内部运行时错误: {join_err}"),
+            send_err,
             Some("请重试或联系管理员。".to_string()),
         ),
     }
@@ -467,7 +486,7 @@ async fn list_runs_handler(body: String) -> impl IntoResponse {
 }
 
 async fn rerun_task_handler(
-    State(session): State<SharedSession>,
+    State(state): State<AppState>,
     body: String,
 ) -> impl IntoResponse {
     let request: RerunTaskRequest = match serde_json::from_str(&body) {
@@ -476,8 +495,16 @@ async fn rerun_task_handler(
             return json_error_response(StatusCode::BAD_REQUEST, "unknown".to_string(), "RUNTIME_INVALID_JSON", format!("请求 JSON 解析失败: {err}"), None);
         }
     };
+    if let Err(err) = sanitize_id(&request.run_id) {
+        return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_INVALID_RUN_ID", err, None);
+    }
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
-    let run_path = runs_dir(&working_dir).join(format!("{}.json", request.run_id));
+    let run_path = match safe_runs_path(&working_dir, &request.run_id) {
+        Ok(p) => p,
+        Err(err) => {
+            return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_INVALID_RUN_ID", err, None);
+        }
+    };
     let run_record: RunRecord = match read_json_file(&run_path) {
         Ok(v) => v,
         Err(err) => {
@@ -507,7 +534,7 @@ async fn rerun_task_handler(
                 return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_REQUEST_INVALID", format!("历史请求重建失败：{err}"), None);
             }
         };
-        transform_handler(State(session), body).await.into_response()
+        transform_handler(State(state), body).await.into_response()
     } else {
         let original_request: TaskRequest = match serde_json::from_value(payload) {
             Ok(v) => v,
@@ -521,26 +548,20 @@ async fn rerun_task_handler(
                 return json_error_response(StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_RERUN_REQUEST_INVALID", format!("历史请求重建失败：{err}"), None);
             }
         };
-        handle_model_request(session, body, &action).await
+        handle_model_request(state, body, &action).await
     };
     response
 }
 
-/// 向 Julia 发送导出请求并提取 content 字段。
-async fn dispatch_export_to_julia(
-    session: &SharedSession,
+/// 通过命令通道向 Julia 发送导出请求并提取 content 字段。
+async fn dispatch_export_via_channel(
+    cmd_tx: &mpsc::Sender<JuliaCommand>,
     task_id: &str,
     params: serde_json::Value,
 ) -> Result<String, axum::response::Response> {
-    let s = session.clone();
-    let tid = task_id.to_string();
-    let julia_result = tokio::task::spawn_blocking(move || {
-        let mut s = s.lock().unwrap();
-        s.send_request(actions::EXPORT_REPORT, params)
-    })
-    .await;
+    let result = dispatch_via_channel(cmd_tx, actions::EXPORT_REPORT, params).await;
 
-    match julia_result {
+    match result {
         Ok(Ok(resp)) => {
             let jr: JuliaResponse = serde_json::from_value(resp).unwrap_or(JuliaResponse {
                 status: "error".to_string(),
@@ -551,23 +572,23 @@ async fn dispatch_export_to_julia(
         }
         Ok(Err(err)) => Err(json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            tid,
+            task_id.to_string(),
             "RUNTIME_EXPORT_FAILED",
             format!("Julia 导出失败: {err}"),
             None,
         )),
-        Err(_) => Err(json_error_response(
+        Err(send_err) => Err(json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
-            tid,
+            task_id.to_string(),
             "RUNTIME_INTERNAL_ERROR",
-            "内部运行时错误".to_string(),
+            send_err,
             None,
         )),
     }
 }
 
 async fn export_report_handler(
-    State(session): State<SharedSession>,
+    State(state): State<AppState>,
     body: String,
 ) -> impl IntoResponse {
     let request: ExportReportRequest = match serde_json::from_str(&body) {
@@ -583,8 +604,29 @@ async fn export_report_handler(
         }
     };
 
+    if let Err(err) = sanitize_id(&request.run_id) {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id,
+            "RUNTIME_INVALID_RUN_ID",
+            err,
+            None,
+        );
+    }
+
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
-    let run_path = runs_dir(&working_dir).join(format!("{}.json", request.run_id));
+    let run_path = match safe_runs_path(&working_dir, &request.run_id) {
+        Ok(p) => p,
+        Err(err) => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                request.task_id,
+                "RUNTIME_INVALID_RUN_ID",
+                err,
+                None,
+            );
+        }
+    };
     let run_record: RunRecord = match read_json_file(&run_path) {
         Ok(v) => v,
         Err(err) => {
@@ -633,7 +675,7 @@ async fn export_report_handler(
         }
     };
 
-    let content = match dispatch_export_to_julia(&session, &request.task_id, params).await {
+    let content = match dispatch_export_via_channel(&state.cmd_tx, &request.task_id, params).await {
         Ok(c) => c,
         Err(response) => return response,
     };
@@ -654,10 +696,39 @@ async fn export_report_handler(
     (StatusCode::OK, Json(response)).into_response()
 }
 
+/// 启动 Julia actor 并返回命令发送端和健康标志。
+///
+/// Actor 在独立 OS 线程中串行处理 Julia 请求，
+/// HTTP handler 通过 channel 发送命令，不持有任何 Mutex。
+pub fn spawn_julia_actor(session: JuliaSession) -> (mpsc::Sender<JuliaCommand>, std::sync::Arc<AtomicBool>) {
+    let julia_healthy = std::sync::Arc::new(AtomicBool::new(session.is_healthy()));
+    let healthy_flag = julia_healthy.clone();
+    let (cmd_tx, mut cmd_rx) = mpsc::channel::<JuliaCommand>(64);
+
+    // 专用 OS 线程：持有 JuliaSession，串行处理请求。
+    // send_request 是阻塞 I/O，在此线程执行不会阻塞 tokio 运行时。
+    std::thread::spawn(move || {
+        let mut session = session;
+        loop {
+            match cmd_rx.blocking_recv() {
+                Some((action, params, reply_tx)) => {
+                    let result = session.send_request(&action, params);
+                    healthy_flag.store(result.is_ok(), Ordering::Release);
+                    let _ = reply_tx.send(result);
+                }
+                None => break, // 所有 sender 已 drop，actor 退出
+            }
+        }
+    });
+
+    (cmd_tx, julia_healthy)
+}
+
 /// 启动 axum 服务器，带优雅关闭信号。
 pub async fn serve(bind_addr: &str, session: JuliaSession) -> Result<(), String> {
-    let shared: SharedSession = Arc::new(Mutex::new(session));
-    let app = build_router(shared);
+    let (cmd_tx, julia_healthy) = spawn_julia_actor(session);
+    let state = AppState { cmd_tx, julia_healthy };
+    let app = build_router(state);
 
     let listener = tokio::net::TcpListener::bind(bind_addr)
         .await
@@ -848,8 +919,9 @@ fn build_transform_run_record(
 }
 
 fn persist_run_record(working_dir: &std::path::Path, run_record: &RunRecord) -> Result<(), String> {
+    let sanitized_id = sanitize_id(&run_record.run_id)?;
     ensure_metrica_dir(working_dir)?;
-    let path = runs_dir(working_dir).join(format!("{}.json", run_record.run_id));
+    let path = runs_dir(working_dir).join(format!("{}.json", sanitized_id));
     write_json_file(&path, run_record)
 }
 

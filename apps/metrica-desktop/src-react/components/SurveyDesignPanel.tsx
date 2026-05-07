@@ -1,14 +1,16 @@
 import { Card, Descriptions, Typography } from 'antd';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function SurveyDesignPanel() {
-  const lastResult = useModelStore((s) => s.lastResult);
+interface SurveyDesignPanelProps {
+  result: ModelResult;
+}
 
-  if (!lastResult || !lastResult.design_effects) return null;
+export function SurveyDesignPanel({ result }: SurveyDesignPanelProps) {
+  if (!result.design_effects) return null;
 
-  const glance = lastResult.glance;
-  const deffEntries = lastResult.design_effects;
-  const strataEntries = lastResult.strata_summary;
+  const glance = result.glance;
+  const deffEntries = result.design_effects;
+  const strataEntries = result.strata_summary;
 
   const meanDeff = deffEntries.length > 0
     ? deffEntries.reduce((sum: number, d: { deff: number }) => sum + d.deff, 0) / deffEntries.length

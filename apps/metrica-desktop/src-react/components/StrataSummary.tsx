@@ -1,12 +1,14 @@
 import { Card, Table } from 'antd';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function StrataSummary() {
-  const lastResult = useModelStore((s) => s.lastResult);
+interface StrataSummaryProps {
+  result: ModelResult;
+}
 
-  if (!lastResult || !lastResult.strata_summary) return null;
+export function StrataSummary({ result }: StrataSummaryProps) {
+  if (!result.strata_summary) return null;
 
-  const strataEntries = lastResult.strata_summary;
+  const strataEntries = result.strata_summary;
 
   const columns = [
     { title: '层', dataIndex: 'stratum', key: 'stratum' },

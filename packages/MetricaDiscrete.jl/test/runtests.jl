@@ -208,6 +208,74 @@ end
     # Poisson 负值响应
     df_neg = DataFrame(y=[-1.0, 2.0, 3.0], x=randn(3))
     @test MetricaBase.fit(PoissonModel, "y ~ x", df_neg) isa MetricaBase.ModelError
+
+    # Poisson 非整数响应
+    float_csv, float_io = mktemp()
+    close(float_io)
+    write(float_csv, "y,x1\n0.2,1\n1.7,2\n3.1,3\n2.0,4\n")
+    result = MetricaBase.fit(PoissonModel, "y ~ x1", float_csv)
+    @test result isa MetricaBase.ModelError
+    @test result.code == :invalid_count_response
+    rm(float_csv; force=true)
+end
+
+# === 不支持的 vcov 类型 ========================================================
+
+@testset "UnsupportedVcov" begin
+    df = make_binary_data()
+
+    result_logit = MetricaBase.fit(LogitModel, "y ~ x1", df; vcov=:gmm)
+    @test result_logit isa MetricaBase.ModelError
+    @test result_logit.code == :unsupported_vcov
+
+    result_probit = MetricaBase.fit(ProbitModel, "y ~ x1", df; vcov=:gmm)
+    @test result_probit isa MetricaBase.ModelError
+    @test result_probit.code == :unsupported_vcov
+
+    df_count = make_count_data()
+    result_poisson = MetricaBase.fit(PoissonModel, "y ~ x1", df_count; vcov=:gmm)
+    @test result_poisson isa MetricaBase.ModelError
+    @test result_poisson.code == :unsupported_vcov
+end
+
+# === cluster 与缺失值 =========================================================
+
+@testset "ClusterWithMissingValues" begin
+    Random.seed!(123)
+    n = 200
+    X = [ones(n) randn(n)]
+    β = [0.5, 1.0]
+    η = X * β
+    p = 1.0 ./ (1.0 .+ exp.(-η))
+    y = [rand() < p_i ? 1.0 : 0.0 for p_i in p]
+    cluster_id = repeat(["A", "B", "C", "D"], div(n, 4))
+    df = DataFrame(y=allowmissing(y), x1=allowmissing(X[:, 2]), cluster=allowmissing(cluster_id))
+    df[5, :x1] = missing
+    df[10, :y] = missing
+    df[50, :cluster] = missing
+
+    result = MetricaBase.fit(LogitModel, "y ~ x1", df; vcov=:cluster, cluster_column=:cluster)
+    @test result isa LogitFitResult
+    @test result.converged
+    @test length(result.stderror_values) == 2
+
+    result_p = MetricaBase.fit(ProbitModel, "y ~ x1", df; vcov=:cluster, cluster_column=:cluster)
+    @test result_p isa ProbitFitResult
+
+    Random.seed!(456)
+    n2 = 200
+    X2 = [ones(n2) randn(n2)]
+    β2 = [1.0, 0.3]
+    λ = exp.(X2 * β2)
+    y2 = Float64.([rand(Poisson(λ_i)) for λ_i in λ])
+    cluster_id2 = repeat(["A", "B"], div(n2, 2))
+    df_count = DataFrame(y=allowmissing(y2), x1=allowmissing(X2[:, 2]), cluster=allowmissing(cluster_id2))
+    df_count[3, :x1] = missing
+    df_count[7, :y] = missing
+    df_count[20, :cluster] = missing
+
+    result_po = MetricaBase.fit(PoissonModel, "y ~ x1", df_count; vcov=:cluster, cluster_column=:cluster)
+    @test result_po isa PoissonFitResult
 end
 
 # === 协议方法一致性 ===========================================================

@@ -163,4 +163,19 @@ describe('parseToModelSpec', () => {
       expect(spec.deterministic).toBe('trend');
     }
   });
+
+  it('summarize does not produce a ModelSpec', () => {
+    const parsed = parse('summarize y x1');
+    const spec = parseToModelSpec(parsed);
+    expect('error' in spec).toBe(true);
+    if ('error' in spec) {
+      expect(spec.error).toContain('暂不支持');
+    }
+  });
+
+  it('describe does not produce a ModelSpec', () => {
+    const parsed = parse('describe');
+    const spec = parseToModelSpec(parsed);
+    expect('error' in spec).toBe(true);
+  });
 });

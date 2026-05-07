@@ -94,8 +94,8 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
   } else if (modelType === 'iv') {
     modelSpec.vcov = { type: vcovType };
     if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
-    if (instruments.trim()) modelSpec.instruments = instruments.split(',').map((v: string) => v.trim()).filter(Boolean);
-    if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(',').map((v: string) => v.trim()).filter(Boolean);
+    if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
+    if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
   } else if (modelType === 'gls') {
     modelSpec.vcov = { type: vcovType };
   } else if (modelType === 'did' || modelType === 'event_study') {

@@ -1,11 +1,14 @@
 import { Card, Table, Tag } from 'antd';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function BalanceTable() {
-  const lastResult = useModelStore((s) => s.lastResult);
-  if (!lastResult || lastResult.glance.model !== 'psm') return null;
+interface BalanceTableProps {
+  result: ModelResult;
+}
 
-  const balance = (lastResult as any).balance_table as Array<{
+export function BalanceTable({ result }: BalanceTableProps) {
+  if (result.glance.model !== 'psm') return null;
+
+  const balance = (result as any).balance_table as Array<{
     variable: string; mean_treated: number; mean_control: number; std_bias: number;
   }> | undefined;
 

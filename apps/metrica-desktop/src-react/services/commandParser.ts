@@ -111,6 +111,14 @@ export function parse(input: string): ParsedCommand {
   return { verb, positionals, options };
 }
 
+// ---- 已知模型动词集合 ----
+
+const MODEL_VERBS = new Set([
+  'regress', 'ivregress', 'gls', 'xtreg', 'xtivreg', 'logit', 'probit', 'poisson',
+  'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
+  'arima', 'var', 'dfuller', 'coint', 'svy',
+]);
+
 // ---- 动词 -> model_type 映射 ----
 
 function verbToModelType(verb: string): string {
@@ -148,6 +156,10 @@ function verbToModelType(verb: string): string {
 export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: string } {
   const { verb, positionals, options, error } = parsed;
   if (error) return { error };
+
+  if (!MODEL_VERBS.has(verb)) {
+    return { error: `命令 "${verb}" 暂不支持，请使用模型命令（如 regress）。` };
+  }
 
   const optMap = new Map(options.map(o => [o.name, o.value]));
 

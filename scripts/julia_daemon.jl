@@ -44,12 +44,22 @@ using .MetricaSurvey
 # using .MetricaTimeSeries
 
 function handle_request(req::Dict{String, Any})
-    id = req["id"]
-    action = req["action"]
-    params = req["params"]
+    id = get(req, "id", nothing)
     payload = nothing
 
     try
+        if !haskey(req, "action")
+            println(JSON3.write(Dict("type" => "error", "id" => id, "text" => "请求缺少必需字段：action")))
+            flush(stdout)
+            return
+        end
+        if !haskey(req, "params")
+            println(JSON3.write(Dict("type" => "error", "id" => id, "text" => "请求缺少必需字段：params")))
+            flush(stdout)
+            return
+        end
+        action = req["action"]
+        params = req["params"]
         if action == "inspect_dataset"
             payload = inspect_dataset(params["dataset_path"])
         elseif action == "transform"

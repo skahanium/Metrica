@@ -1,16 +1,19 @@
 import { Card, Typography } from 'antd';
 import ReactECharts from 'echarts-for-react';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function EventStudyPlot() {
-  const lastResult = useModelStore((s) => s.lastResult);
-  if (!lastResult || lastResult.glance.model !== 'event_study') return null;
+interface EventStudyPlotProps {
+  result: ModelResult;
+}
 
-  const coefs = lastResult.period_coefficients || [];
-  const ses = lastResult.period_stderrors || [];
-  const labels = lastResult.period_labels || [];
-  const pval = lastResult.pre_trend_pvalue;
-  const supported = lastResult.parallel_trends_supported;
+export function EventStudyPlot({ result }: EventStudyPlotProps) {
+  if (result.glance.model !== 'event_study') return null;
+
+  const coefs = result.period_coefficients || [];
+  const ses = result.period_stderrors || [];
+  const labels = result.period_labels || [];
+  const pval = result.pre_trend_pvalue;
+  const supported = result.parallel_trends_supported;
 
   const lower = coefs.map((c, i) => c - 1.96 * (ses[i] || 0));
   const upper = coefs.map((c, i) => c + 1.96 * (ses[i] || 0));

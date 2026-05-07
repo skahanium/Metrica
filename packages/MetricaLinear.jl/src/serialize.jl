@@ -78,10 +78,10 @@ function result_to_payload(result::OLSFitResult; include_augment::Bool=true)
     if include_augment
         augment_table = MetricaBase.augment(result)
         max_preview = min(100, augment_table.nobs)
-        augment_preview = Dict(
-            String(key) => values[1:max_preview]
-            for (key, values) in augment_table.columns
-        )
+        augment_preview = [
+            Dict(String(key) => values[i] for (key, values) in augment_table.columns)
+            for i in 1:max_preview
+        ]
         payload["result_payload"]["augment_preview"] = augment_preview
     end
 
@@ -138,7 +138,10 @@ function result_to_payload(result::IVFitResult; include_augment::Bool=true)
     if include_augment
         at = MetricaBase.augment(result)
         max_preview = min(100, at.nobs)
-        payload["result_payload"]["augment_preview"] = Dict(String(k) => v[1:max_preview] for (k, v) in at.columns)
+        payload["result_payload"]["augment_preview"] = [
+            Dict(String(k) => v[i] for (k, v) in at.columns)
+            for i in 1:max_preview
+        ]
     end
 
     return payload
@@ -167,7 +170,10 @@ function result_to_payload(result::GLSFitResult; include_augment::Bool=true)
     if include_augment
         at = MetricaBase.augment(result)
         max_preview = min(100, at.nobs)
-        payload["result_payload"]["augment_preview"] = Dict(String(k) => v[1:max_preview] for (k, v) in at.columns)
+        payload["result_payload"]["augment_preview"] = [
+            Dict(String(k) => v[i] for (k, v) in at.columns)
+            for i in 1:max_preview
+        ]
     end
 
     return payload

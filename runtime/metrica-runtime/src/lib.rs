@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 pub use server::default_bind_addr;
 pub use julia_bridge::execute_fit_model;
 pub use julia_session::JuliaSession;
-pub use server::{build_router, serve as serve_axum};
+pub use server::{build_router, serve as serve_axum, AppState};
 
 /// 解析仓库根目录。
 
@@ -637,6 +637,34 @@ pub fn health_summary() -> HealthSummary {
         status: "ready".to_string(),
         supported_actions: vec!["inspect_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task"],
     }
+}
+
+/// 校验 ID 白名单：仅允许 A-Za-z0-9_-，不能为空。
+pub fn sanitize_id(id: &str) -> Result<String, String> {
+    if id.is_empty() {
+        return Err("ID 不能为空。".into());
+    }
+    if id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        Ok(id.to_string())
+    } else {
+        Err(format!("ID '{}' 包含非法字符，仅允许 A-Za-z0-9_-。", id))
+    }
+}
+
+/// 在 runs 目录下构建安全的 run 文件路径，校验 run_id 后确认路径不越界。
+///
+/// sanitize_id 已保证 run_id 仅含 A-Za-z0-9_-，不存在路径分隔符或 `..`，
+/// 因此 `runs.join("{}.json", sanitized)` 永远在 runs 目录内。
+/// 额外做一次 starts_with 检查作为防御层。
+pub fn safe_runs_path(working_dir: &std::path::Path, run_id: &str) -> Result<std::path::PathBuf, String> {
+    let sanitized = sanitize_id(run_id)?;
+    let runs = working_dir.join(".metrica").join("runs");
+    let path = runs.join(format!("{}.json", sanitized));
+    // 防御性检查：join 结果必须仍在 runs 目录下
+    if !path.starts_with(&runs) {
+        return Err("路径越界。".into());
+    }
+    Ok(path)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

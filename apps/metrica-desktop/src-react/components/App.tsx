@@ -78,14 +78,18 @@ export function App() {
           formula: modelSpecResult.formula || '',
           modelType: modelSpecResult.model_type,
           vcovType: (modelSpecResult.vcov as any)?.type || 'classical',
-          weightsColumn: modelSpecResult.weights || '',
+          weightsColumn: modelSpecResult.weights || modelSpecResult.weights_column || '',
           clusterColumn: modelSpecResult.cluster_column || '',
           panelId: modelSpecResult.panel_id || '',
           panelTime: modelSpecResult.panel_time || '',
           panelMethod: modelSpecResult.panel_method || '',
-          instruments: modelSpecResult.instruments?.join(' ') || '',
-          endogColumns: modelSpecResult.endog_columns?.join(' ') || '',
-          treatmentColumn: modelSpecResult.treatment_column || '',
+          instruments: Array.isArray(modelSpecResult.instruments)
+            ? modelSpecResult.instruments.join(',')
+            : (modelSpecResult.instruments || ''),
+          endogColumns: Array.isArray(modelSpecResult.endog_columns)
+            ? modelSpecResult.endog_columns.join(',')
+            : (modelSpecResult.endog_columns || ''),
+          treatmentColumn: modelSpecResult.treatment_column || modelSpecResult.treated_column || '',
           postColumn: modelSpecResult.post_column || '',
           eventTimeColumn: modelSpecResult.event_time_column || '',
           outcomeColumn: modelSpecResult.outcome_column || '',

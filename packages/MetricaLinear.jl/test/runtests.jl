@@ -136,6 +136,39 @@ end
     rm(empty_csv; force=true)
 end
 
+@testset "近共线 OLS" begin
+    # x2 ≈ x1（偏差 1e-12），20 行确保 rank 满秩但条件数极高
+    near_csv, near_io = mktemp()
+    close(near_io)
+    write(near_csv, join([
+        "y,x1,x2",
+        "2,1,1.000000000001",
+        "4,2,1.999999999998",
+        "6,3,3.0000000000015",
+        "8,4,3.9999999999995",
+        "10,5,5.000000000003",
+        "12,6,5.999999999999",
+        "14,7,7.000000000002",
+        "16,8,7.9999999999985",
+        "18,9,9.0000000000005",
+        "20,10,9.9999999999975",
+        "22,11,11.000000000001",
+        "24,12,11.999999999998",
+        "26,13,13.0000000000015",
+        "28,14,13.9999999999995",
+        "30,15,15.000000000003",
+        "32,16,15.999999999999",
+        "34,17,17.000000000002",
+        "36,18,17.9999999999985",
+        "38,19,19.0000000000005",
+        "40,20,19.9999999999975",
+    ], "\n") * "\n")
+    result = fit(OLSModel, "y ~ x1 + x2", near_csv)
+    @test result isa ModelError
+    @test result.code == :near_singular_design
+    rm(near_csv; force=true)
+end
+
 @testset "结构化载荷输出" begin
     ok = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
     ok_payload = result_to_payload(ok)
@@ -147,9 +180,9 @@ end
     @test ok_payload["result_payload"]["vcov_label"] == "classical"
     @test ok_payload["result_payload"]["glance"]["metrics"]["adj_r2"] isa Real
     @test length(ok_payload["result_payload"]["warnings"]) >= 1
-    @test haskey(ok_payload["result_payload"]["augment_preview"], "fitted")
-    @test haskey(ok_payload["result_payload"]["augment_preview"], "residual")
-    @test length(ok_payload["result_payload"]["augment_preview"]["fitted"]) == 7
+    @test length(ok_payload["result_payload"]["augment_preview"]) == 7
+    @test haskey(ok_payload["result_payload"]["augment_preview"][1], "fitted")
+    @test haskey(ok_payload["result_payload"]["augment_preview"][1], "residual")
 
     # 测试 include_augment=false
     ok_payload_no_augment = result_to_payload(ok; include_augment=false)
@@ -320,6 +353,17 @@ end
     @test bad_endog isa ModelError
     @test bad_endog.code === :endog_not_in_formula
 
+    rm(iv_csv; force=true)
+end
+
+@testset "IV 欠识别" begin
+    # instruments 数量 < endog 数量
+    iv_csv, iv_io = mktemp()
+    close(iv_io)
+    write(iv_csv, "y,x1,x2,z1\n10,1,5,3\n12,2,3,6\n14,3,8,9\n20,2,2,4\n22,3,4,7\n24,4,6,10\n30,5,1,5\n32,6,7,11\n")
+    result = fit(IVModel, "y ~ x1 + x2", iv_csv; instruments=["z1"], endog=["x1", "x2"])
+    @test result isa ModelError
+    @test result.code == :underidentified_model
     rm(iv_csv; force=true)
 end
 

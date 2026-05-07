@@ -47,22 +47,22 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, teach
       {/* Teaching layer - reads from result prop directly */}
       {teachingEnabled && <TeachingLayer result={result} />}
 
-      {/* Model content - reads from lastResult in store */}
+      {/* Model content — 所有子组件通过 props 接收 result */}
       {result.glance && <GlanceTable result={result} />}
-      {isDiscrete && <DiscreteGlanceCards />}
-      {modelType === 'did' && <DIDResultCards />}
-      {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary />}
-      {isDiscrete && (result.odds_ratios || (result as any).irr_entries) && <OddsRatioTable />}
+      {isDiscrete && <DiscreteGlanceCards result={result} />}
+      {modelType === 'did' && <DIDResultCards result={result} />}
+      {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}
+      {isDiscrete && (result.odds_ratios || (result as any).irr_entries) && <OddsRatioTable result={result} />}
       {result.tidy && result.tidy.length > 0 && <TidyTable result={result} />}
       {isSurvey && (
         <>
-          <SurveyDesignPanel />
-          <DEFFSummary />
-          <StrataSummary />
+          <SurveyDesignPanel result={result} />
+          <DEFFSummary result={result} />
+          <StrataSummary result={result} />
         </>
       )}
-      {modelType === 'event_study' && <EventStudyPlot />}
-      {modelType === 'psm' && <BalanceTable />}
+      {modelType === 'event_study' && <EventStudyPlot result={result} />}
+      {modelType === 'psm' && <BalanceTable result={result} />}
     </div>
   );
 };

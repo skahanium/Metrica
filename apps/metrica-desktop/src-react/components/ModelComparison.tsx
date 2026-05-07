@@ -73,7 +73,7 @@ function validateComparisonCompatibility(models: ModelHistoryItem[]): Compatibil
 
 interface ComparisonRow {
   term: string;
-  [key: string]: string | number;
+  [key: string]: string | number | null;
 }
 
 function buildComparisonTable(selectedModels: ModelHistoryItem[]): {

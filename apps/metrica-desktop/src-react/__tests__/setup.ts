@@ -16,4 +16,11 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
+// Ant Design 表格会读取伪元素样式，jsdom 默认只打印未实现错误。
+const getComputedStyle = window.getComputedStyle.bind(window);
+Object.defineProperty(window, 'getComputedStyle', {
+  writable: true,
+  value: (elt: Element) => getComputedStyle(elt),
+});
+
 ModuleRegistry.registerModules([AllCommunityModule]);

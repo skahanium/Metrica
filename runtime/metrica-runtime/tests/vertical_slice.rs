@@ -4,16 +4,16 @@ use metrica_runtime::{
     execute_fit_model, repo_root,
     server::build_router,
     sample_fit_model_request, sample_inspect_dataset_request, sample_panel_fit_model_request,
-    JuliaSession,
+    AppState, JuliaSession,
 };
-use std::sync::{Arc, Mutex};
 
 async fn spawn_test_runtime() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     let root = repo_root();
     let julia_project = root.join("packages").join("MetricaLinear.jl");
     let session = JuliaSession::start(&root.to_string_lossy(), &julia_project.to_string_lossy())
         .expect("Julia session should start");
-    let app = build_router(Arc::new(Mutex::new(session)));
+    let state = AppState::from_session(session);
+    let app = build_router(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind test runtime");

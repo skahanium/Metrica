@@ -58,7 +58,27 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'DID: {d[\\\\\"status\\\\\"]}, effect={d[\\\\\"result_payload\\\\\"][\\\\\"treat_effect\\\\\"]:.4f}'\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'DID: {d[\\\\\"status\\\\\"]}, effect={d[\\\\\"result_payload\\\\\"][\\\\\"treat_effect\\\\\"]:.4f}, se={d[\\\\\"result_payload\\\\\"][\\\\\"treat_effect_se\\\\\"]:.4f}'\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('messages',[{}]\\)[0].get\\('text',''\\)[:300]\\)\")",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(RUST_BACKTRACE=full /Users/skahanium/Metrica/apps/metrica-desktop/src-tauri/target/debug/metrica-desktop)",
+      "Bash(killall metrica-desktop *)",
+      "Bash(pkill -9 -f metrica-runtime)",
+      "Bash(curl -s -X POST http://127.0.0.1:47821/fit_model -H \"Content-Type: application/json\" -d '{\"task_id\":\"o1\",\"action\":\"fit_model\",\"project_context\":{\"project_id\":\"d\",\"working_dir\":\"apps/metrica-desktop\"},\"dataset_ref\":{\"source\":\"file\",\"path\":\"data/demo.csv\",\"format\":\"csv\"},\"model_spec\":{\"model_type\":\"ols\",\"formula\":\"y ~ x1 + x2\",\"vcov\":{\"type\":\"classical\"}},\"options\":{\"drop_missing\":true,\"return_augment\":false}}')",
+      "Bash(/Users/skahanium/Metrica/apps/metrica-desktop/src-tauri/target/debug/metrica-desktop)",
+      "Bash(curl -s -X POST http://127.0.0.1:47821/fit_model -H \"Content-Type: application/json\" -d '{\"task_id\":\"test-1\",\"action\":\"fit_model\",\"project_context\":{\"project_id\":\"d\",\"working_dir\":\"apps/metrica-desktop\"},\"dataset_ref\":{\"source\":\"file\",\"path\":\"data/demo.csv\",\"format\":\"csv\"},\"model_spec\":{\"model_type\":\"ols\",\"formula\":\"y ~ x1 + x2\",\"vcov\":{\"type\":\"classical\"}},\"options\":{\"drop_missing\":true,\"return_augment\":false}}')",
+      "Bash(python3 -c \"import json,sys; r=json.load\\(sys.stdin\\); print\\(f'Status: {r[\\\\\"status\\\\\"]}, Model: {r.get\\(\\\\\"result_payload\\\\\",{}\\).get\\(\\\\\"glance\\\\\",{}\\).get\\(\\\\\"model\\\\\",\\\\\"?\\\\\"\\)}, R2: {r.get\\(\\\\\"result_payload\\\\\",{}\\).get\\(\\\\\"glance\\\\\",{}\\).get\\(\\\\\"metrics\\\\\",{}\\).get\\(\\\\\"r2\\\\\",\\\\\"?\\\\\"\\)}'\\)\")",
+      "Bash(/Users/skahanium/Metrica/runtime/metrica-runtime/target/debug/metrica-runtime serve *)",
+      "Bash(curl -s -X POST http://127.0.0.1:47821/fit_model -H \"Content-Type: application/json\" -d '{\"task_id\":\"t1\",\"action\":\"fit_model\",\"project_context\":{\"project_id\":\"d\",\"working_dir\":\"apps/metrica-desktop\"},\"dataset_ref\":{\"source\":\"file\",\"path\":\"data/demo.csv\",\"format\":\"csv\"},\"model_spec\":{\"model_type\":\"ols\",\"formula\":\"y ~ x1 + x2\",\"vcov\":{\"type\":\"classical\"}},\"options\":{\"drop_missing\":true,\"return_augment\":false}}')",
+      "Bash(python3 -c \"import json,sys; r=json.load\\(sys.stdin\\); g=r.get\\('result_payload',{}\\).get\\('glance',{}\\); print\\(f'Status: {r[\\\\\"status\\\\\"]}, Model: {g.get\\(\\\\\"model\\\\\",\\\\\"?\\\\\"\\)}, R²: {g.get\\(\\\\\"metrics\\\\\",{}\\).get\\(\\\\\"r2\\\\\",\\\\\"?\\\\\"\\)}'\\)\")",
+      "Bash(pkill -9 -f metrica-desktop)",
+      "Bash(rm -f /tmp/metrica-desktop.lock)",
+      "Bash(echo \"第二个实例退出码: $?\")",
+      "Read(//tmp/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Runtime: {d[\\\\\"status\\\\\"]}, Julia: {d[\\\\\"julia_healthy\\\\\"]}'\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Runtime: {d[\\\\\"status\\\\\"]}, Julia healthy: {d[\\\\\"julia_healthy\\\\\"]}'\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'BEFORE desktop: healthy={d[\\\\\"julia_healthy\\\\\"]}'\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'AFTER desktop: healthy={d[\\\\\"julia_healthy\\\\\"]}'\\)\")",
+      "Bash(curl -s -X POST http://127.0.0.1:47821/inspect_dataset -H 'Content-Type: application/json' -d '{\"task_id\":\"t1\",\"action\":\"inspect_dataset\",\"project_context\":{\"project_id\":\"d\",\"working_dir\":\"datasets/demo\"},\"dataset_ref\":{\"source\":\"file\",\"path\":\"ols_demo.csv\",\"format\":\"csv\"},\"model_spec\":{\"model_type\":\"ols\",\"formula\":\"y ~ x1\"},\"options\":{\"drop_missing\":true,\"return_augment\":false}}')",
+      "Bash(python3 -c \"import json,sys; r=json.load\\(sys.stdin\\); print\\(f'Status: {r[\\\\\"status\\\\\"]}, Rows: {r.get\\(\\\\\"result_payload\\\\\",{}\\).get\\(\\\\\"dataset_summary\\\\\",{}\\).get\\(\\\\\"row_count\\\\\",\\\\\"?\\\\\"\\)}'\\)\")"
     ]
   }
 }

@@ -201,6 +201,19 @@ function validate_design(X::Matrix{Float64}, ncoef::Int, nobs::Int)
         "请移除冗余变量或检查重复列后重试。",
     )
 
+    # 条件数检查：近奇异矩阵虽满秩但数值不稳定
+    F = qr(X)
+    r_diag = abs.(diag(F.R))
+    cond = maximum(r_diag) / max(minimum(r_diag), eps())
+    if cond > 1e12
+        return MetricaBase.ModelError(
+            :near_singular_design,
+            "设计矩阵近奇异",
+            "预测变量之间存在高度共线性（条件数 ≈ $(round(cond, sigdigits=3))），估计结果可能数值不稳定。",
+            "请移除共线变量或检查数据质量。",
+        )
+    end
+
     dof = nobs - ncoef
     dof > 0 || return MetricaBase.ModelError(
         :insufficient_degrees_of_freedom,

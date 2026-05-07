@@ -2,7 +2,7 @@
 
 ## 前置要求
 
-- Julia 1.10+
+- Julia 1.12+
 - Rust toolchain (rustup)
 - Node.js 20+
 

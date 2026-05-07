@@ -1,12 +1,14 @@
 import { Card, Table, Tag } from 'antd';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function DEFFSummary() {
-  const lastResult = useModelStore((s) => s.lastResult);
+interface DEFFSummaryProps {
+  result: ModelResult;
+}
 
-  if (!lastResult || !lastResult.design_effects) return null;
+export function DEFFSummary({ result }: DEFFSummaryProps) {
+  if (!result.design_effects) return null;
 
-  const deffEntries = lastResult.design_effects;
+  const deffEntries = result.design_effects;
 
   const columns = [
     { title: '变量', dataIndex: 'term', key: 'term' },

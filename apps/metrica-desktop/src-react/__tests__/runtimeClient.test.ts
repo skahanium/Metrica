@@ -40,6 +40,43 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.vcov?.type).toBe('cluster');
     expect(req.model_spec.cluster_column).toBe('group_id');
   });
+
+  it('passes IV instruments as array without corruption', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'data.csv',
+      formula: 'y ~ x1',
+      modelType: 'iv',
+      instruments: 'z1,z2',
+      endogColumns: 'x1',
+      vcovType: 'classical',
+    });
+    expect(req.model_spec.instruments).toEqual(['z1', 'z2']);
+    expect(req.model_spec.endog_columns).toEqual(['x1']);
+  });
+
+  it('handles space-separated instruments', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'data.csv',
+      formula: 'y ~ x1',
+      modelType: 'iv',
+      instruments: 'z1 z2 z3',
+      endogColumns: 'x1',
+      vcovType: 'classical',
+    });
+    expect(req.model_spec.instruments).toEqual(['z1', 'z2', 'z3']);
+  });
+
+  it('sets treated_column for DID model', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'panel.csv',
+      formula: 'y ~ x1',
+      modelType: 'did',
+      treatmentColumn: 'treated',
+      panelId: 'id',
+      panelTime: 'year',
+    });
+    expect(req.model_spec.treated_column).toBe('treated');
+  });
 });
 
 describe('transformDataset', () => {

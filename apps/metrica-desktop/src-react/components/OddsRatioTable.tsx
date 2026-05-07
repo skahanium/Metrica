@@ -1,18 +1,19 @@
 import { Card, Table, Switch, Typography } from 'antd';
 import { useState } from 'react';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function OddsRatioTable() {
-  const lastResult = useModelStore((s) => s.lastResult);
+interface OddsRatioTableProps {
+  result: ModelResult;
+}
+
+export function OddsRatioTable({ result }: OddsRatioTableProps) {
   const [showOR, setShowOR] = useState(true);
 
-  if (!lastResult) return null;
-
-  const irr = lastResult.incidence_rate_ratios;
-  const ors = lastResult.odds_ratios;
+  const irr = result.incidence_rate_ratios;
+  const ors = result.odds_ratios;
 
   // Poisson: show IRR table
-  if (lastResult.glance?.model === 'poisson' && irr) {
+  if (result.glance?.model === 'poisson' && irr) {
     const columns = [
       { title: '变量', dataIndex: 'term', key: 'term' },
       { title: '发病率比 (IRR)', dataIndex: 'irr', key: 'irr', render: (v: number) => v?.toFixed(4) },
@@ -28,7 +29,7 @@ export function OddsRatioTable() {
 
   // Logit/Probit: show OR/coefficient toggle table
   if (ors) {
-    const tidyRows = lastResult.tidy || [];
+    const tidyRows = result.tidy || [];
 
     const columns = showOR ? [
       { title: '变量', dataIndex: 'term', key: 'term' },

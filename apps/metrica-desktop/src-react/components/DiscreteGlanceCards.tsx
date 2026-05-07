@@ -1,11 +1,12 @@
 import { Card, Statistic, Row, Col } from 'antd';
-import { useModelStore } from '../stores/modelStore';
+import type { ModelResult } from '../types/protocol';
 
-export function DiscreteGlanceCards() {
-  const lastResult = useModelStore((s) => s.lastResult);
-  if (!lastResult) return null;
+interface DiscreteGlanceCardsProps {
+  result: ModelResult;
+}
 
-  const g = lastResult.glance;
+export function DiscreteGlanceCards({ result }: DiscreteGlanceCardsProps) {
+  const g = result.glance;
   const m = g.metrics;
 
   const isDiscrete = ['logit', 'probit', 'poisson', 'ordered_logit', 'multinomial_logit', 'negbin'].includes(g.model);

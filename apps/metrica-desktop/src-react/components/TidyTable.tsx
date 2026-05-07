@@ -1,39 +1,54 @@
 import { useMemo } from 'react';
-import { AgGridReact } from 'ag-grid-react';
-import { Card } from 'antd';
-import type { ColDef } from 'ag-grid-community';
+import { Card, Table, Typography } from 'antd';
+import type { TableColumnsType } from 'antd';
 import type { TidyRow, ModelResult } from '../types/protocol';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
 
-const COLUMNS: ColDef<TidyRow>[] = [
-  { field: 'term', headerName: '参数', width: 150 },
-  { field: 'estimate', headerName: '估计值', width: 130, valueFormatter: (p) => p.value?.toFixed(6) },
-  { field: 'std_error', headerName: '标准误', width: 130, valueFormatter: (p) => p.value?.toFixed(6) },
-  { field: 'statistic', headerName: '统计量', width: 120, valueFormatter: (p) => p.value?.toFixed(4) },
-  { field: 'p_value', headerName: 'p 值', width: 120, valueFormatter: (p) => p.value?.toFixed(4) },
+const { Text } = Typography;
+
+const COLUMNS: TableColumnsType<TidyRow> = [
+  { dataIndex: 'term', title: '参数', width: 180 },
+  { dataIndex: 'estimate', title: '估计值', align: 'right', render: (v: number | null) => v != null ? v.toFixed(6) : '—' },
+  { dataIndex: 'std_error', title: '标准误', align: 'right', render: (v: number | null) => v != null ? v.toFixed(6) : '—' },
+  { dataIndex: 'statistic', title: '统计量', align: 'right', render: (v: number | null) => v != null ? v.toFixed(4) : '—' },
+  { dataIndex: 'p_value', title: 'p 值', align: 'right', render: (v: number | null) => v != null ? v.toFixed(4) : '—' },
 ];
+
+/** 将后端字段名 (name/stderror/pvalue) 映射为前端 TidyRow 字段名 */
+function normalizeRows(raw: Record<string, unknown>[]): TidyRow[] {
+  return raw.map((r) => ({
+    term: (r.name ?? r.term ?? '') as string,
+    estimate: (r.estimate ?? null) as number | null,
+    std_error: (r.stderror ?? r.std_error ?? null) as number | null,
+    statistic: (r.statistic ?? null) as number | null,
+    p_value: (r.pvalue ?? r.p_value ?? null) as number | null,
+  }));
+}
 
 interface TidyTableProps {
   result?: ModelResult;
 }
 
 export function TidyTable({ result }: TidyTableProps) {
-  const rowData = useMemo(() => result?.tidy ?? [], [result]);
+  const rowData = useMemo(
+    () => normalizeRows((result?.tidy ?? []) as unknown as Record<string, unknown>[]),
+    [result],
+  );
 
   if (!result || !rowData.length) return null;
-
-  const gridHeight = Math.min(400, Math.max(120, (rowData.length + 1) * 42));
 
   return (
     <Card size="small">
       {result.vcov_label && (
-        <div style={{ marginBottom: 8, color: '#8c8c8c', fontSize: 13 }}>{result.vcov_label}</div>
+        <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>{result.vcov_label}</Text>
       )}
-      <div className="ag-theme-alpine" style={{ height: gridHeight, width: '100%' }}>
-        <AgGridReact<TidyRow>
-          rowData={rowData}
-          columnDefs={COLUMNS}
+      <div style={{ overflowX: 'auto' }}>
+        <Table<TidyRow>
+          bordered
+          columns={COLUMNS}
+          dataSource={rowData}
+          pagination={false}
+          rowKey="term"
+          size="small"
         />
       </div>
     </Card>

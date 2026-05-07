@@ -64,7 +64,7 @@
 │  └────────────────────────────────────────┘  │
 │  - 启动时加载 MetricaBase + MetricaLinear    │
 │  - 首次预热完成后通知前端就绪                  │
-│  - 支持 cancel 信号                          │
+│  - [计划] 支持 cancel 信号                    │
 │  - 进程崩溃自动重启（最多 3 次）              │
 └──────────────────────────────────────────────┘
 ```
@@ -78,18 +78,18 @@
 // 响应（Julia stdout → Runtime，每行一个 JSON）
 {"id": "req-001", "status": "success", "payload": {"glance": {...}, "tidy": [...], "warnings": [...]}}
 
-// 进度通知（Julia stdout → Runtime）
-{"id": "req-001", "type": "progress", "message": "正在拟合模型...", "percent": 50}
+// [计划] 进度通知（Julia stdout → Runtime）
+// {"id": "req-001", "type": "progress", "message": "正在拟合模型...", "percent": 50}
 
-// 取消信号（Runtime → Julia stdin）
-{"id": "req-001", "action": "cancel"}
+// [计划] 取消信号（Runtime → Julia stdin）
+// {"id": "req-001", "action": "cancel"}
 ```
 
 ### 关键设计点
 
 1. **预热阶段**：应用启动时拉起 Julia 并加载所有包。前端显示"正在初始化 Julia 环境..."的加载状态。预热完成后才可交互。
 2. **会话持久化**：数据集加载后留在 Julia 内存中。第二次拟合不同公式不需要重新读取 CSV。
-3. **超时与取消**：`tokio::time::timeout` 包裹 Julia 通信，超时后发送取消信号。前端可显示进度条。
+3. **超时**：Julia 通信使用读线程 + channel 实现真实超时。超时后 kill 进程并返回错误。[计划] 取消信号和进度条尚未实现。
 4. **崩溃恢复**：Julia 进程意外退出时，Runtime 自动重启并通知前端"Julia 环境已重置"。
 
 ## 请求示例

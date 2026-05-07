@@ -96,10 +96,10 @@ export interface GlanceResult {
 
 export interface TidyRow {
   term: string;
-  estimate: number;
-  std_error: number;
-  statistic: number;
-  p_value: number;
+  estimate: number | null;
+  std_error: number | null;
+  statistic: number | null;
+  p_value: number | null;
   ci_lower?: number;
   ci_upper?: number;
 }

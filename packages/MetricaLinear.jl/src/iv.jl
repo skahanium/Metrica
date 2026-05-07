@@ -168,6 +168,29 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
              [Float64.(filtered[!, v]) for v in inst_syms]...)
     X_endog = hcat([Float64.(filtered[!, v]) for v in endog_syms]...)
 
+    # 欠识别: 工具变量数 < 内生变量数
+    length(inst_syms) >= length(endog_syms) || return MetricaBase.ModelError(
+        :underidentified_model, "模型欠识别",
+        "工具变量数量 ($(length(inst_syms))) 少于内生变量数量 ($(length(endog_syms)))。",
+        "请增加工具变量或减少内生变量。",
+    )
+
+    # 秩校验（对 Z 矩阵）
+    k_second = length(exog_only) + length(endog_syms)  # 不含截距
+    rank(Z) >= k_second + 1 || return MetricaBase.ModelError(
+        :weak_rank_condition, "设计矩阵秩不足",
+        "工具变量矩阵的秩不足以识别模型参数。",
+        "请检查工具变量是否线性相关，或增加有效工具变量。",
+    )
+
+    # 自由度
+    dof_val = nobs - (k_second + 1)
+    dof_val > 0 || return MetricaBase.ModelError(
+        :insufficient_degrees_of_freedom, "自由度不足",
+        "有效样本量 ($nobs) 不足以支撑参数个数 ($(k_second+1))。",
+        "请减少参数或增加样本。",
+    )
+
     # 第一阶段
     Pi = Z \ X_endog
     X_endog_hat = Z * Pi

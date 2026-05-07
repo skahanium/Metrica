@@ -2,37 +2,24 @@
 
 Metrica 的参考线性模型实现包。
 
-## 第一阶段范围
+## 已实现能力
 
-- OLS
-- 通过 Base API 返回的共享结果对象
-- 由公式与类表数据驱动的模型拟合
-- 面向 Runtime / 脚本层的结构化结果载荷
+- OLS / WLS（加权最小二乘）
+- HC1 稳健标准误
+- Cluster 聚类稳健标准误
+- IV / 2SLS（工具变量回归）
+- GLS（广义最小二乘）
+- 结构化结果载荷（glance / tidy / augment / diagnostics / warnings）
+- 近奇异设计矩阵检测（条件数校验）
+- 欠识别 / 秩亏 / 自由度不足的结构化错误
 
-## 延后范围
+## 当前入口
 
-- IV
-- GLS
-
-## 里程碑口径说明
-
-按 `Metrica.jl-计量经济学框架-完善版.md` 的总体路线，`WLS` 仍属于 `阶段 2A (Linear)` / `里程碑 2 (教学向 OLS)` 的目标范围。
-
-但当前仓库中的 Alpha 垂直切片只负责验证最小真实 OLS 全链路，因此现阶段暂未实现：
-
-- WLS
-- HC1 / Cluster 等更丰富协方差规格
-- 更完整的线性模型族扩展
-
-换言之，`WLS` 不是被移出总路线，而是被顺延到 OLS Alpha 链路验证通过之后继续补齐。
-
-## 当前最小可用入口
-
-当前仓库中最小且已验证的真实 OLS 入口为：
-
-- `fit_ols_file(path, formula)`
-- `result_to_payload(result)`
-- `/Users/skahanium/Metrica/scripts/run_minimal_ols.jl`
+```julia
+using MetricaLinear
+result = fit(OLSModel, "y ~ x1 x2", "data.csv"; vcov=:HC1)
+payload = result_to_payload(result)
+```
 
 先初始化仓库 Julia 环境：
 
