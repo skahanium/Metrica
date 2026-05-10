@@ -184,6 +184,55 @@ export interface DatasetSummary {
   preview: Record<string, unknown>[];
 }
 
+// ---- 变量元数据 ----
+
+export interface VariableMetadata {
+  current_name: string;
+  original_name: string;
+  label: string;
+  dtype?: string;
+  format?: string;
+  missing_count?: number;
+  unique_count?: number;
+  source_state_id?: string;
+}
+
+// ---- 数据历史节点 ----
+
+export interface DataHistoryNode {
+  state_id: string;
+  source_state_id: string | null;
+  op_type: string;
+  op_args: Record<string, unknown>;
+  active_data_path: string;
+  row_count_before: number;
+  row_count_after: number;
+  col_count_before: number;
+  col_count_after: number;
+  notes: string[];
+  warnings: string[];
+  created_at: string;
+}
+
+// ---- 消息流 ----
+
+export interface MessageItem {
+  id: string;
+  kind: 'command' | 'result' | 'transform';
+  command?: string;
+  result?: ModelResult;
+  transform_result?: TransformResult;
+  created_at: string;
+  is_deleted: boolean;
+  deleted_at?: string;
+}
+
+export type SelectionMode = 'none' | 'single' | 'multi' | 'all';
+
+// ---- 保存范式 ----
+
+export type SaveParadigm = 'commands_only' | 'commands_and_results';
+
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
