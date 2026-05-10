@@ -125,7 +125,27 @@ describe('CommandLine', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(onExecute).not.toHaveBeenCalled();
-    expect(useCommandStore.getState().input).toBe('regress ');
+    expect(useCommandStore.getState().input).toBe('regress');
+    expect(useCommandStore.getState().showCompletions).toBe(false);
+  });
+
+  it('accepts highlighted completion on Tab without appending a space', () => {
+    const onExecute = vi.fn();
+    useCommandStore.setState({
+      input: 'reg',
+      cursorPos: 3,
+      completions: [{ text: 'regress', label: 'regress', description: '', kind: 'verb', priority: 1 }],
+      selectedCompletionIdx: 0,
+      showCompletions: true,
+    });
+
+    render(<CommandLine onExecute={onExecute} />);
+    const input = screen.getByPlaceholderText(/输入命令/) as HTMLInputElement;
+    fireEvent.keyDown(input, { key: 'Tab' });
+
+    expect(onExecute).not.toHaveBeenCalled();
+    expect(useCommandStore.getState().input).toBe('regress');
+    expect(useCommandStore.getState().showCompletions).toBe(false);
   });
 
   it('keeps space editable while completion menu is open', () => {
@@ -146,6 +166,7 @@ describe('CommandLine', () => {
     expect(allowed).toBe(false);
     expect(onExecute).not.toHaveBeenCalled();
     expect(useCommandStore.getState().input).toBe('reg ');
+    expect(useCommandStore.getState().showCompletions).toBe(false);
   });
 
   it('keeps backspace editable while completion menu is open', () => {
@@ -360,6 +381,92 @@ describe('CommandLine', () => {
     const menu = screen.getByTestId('completion-menu');
     expect(menu?.style.left).toContain('--completion-left');
     expect(menu?.style.width).not.toBe('');
+  });
+
+  it('shows next-position completions only after the user manually types a space after a complete token', () => {
+    useDatasetStore.setState({
+      sourcePath: '/tmp/demo.csv',
+      activePath: '/tmp/demo.csv',
+      summary: {
+        nrows: 2,
+        ncols: 3,
+        columns: [
+          { name: 'y', type: 'Int64', inferred_type: 'Int64' },
+          { name: 'x1', type: 'Int64', inferred_type: 'Int64' },
+          { name: 'x2', type: 'Int64', inferred_type: 'Int64' },
+        ],
+        preview: [],
+      },
+    });
+    render(<CommandLine onExecute={vi.fn()} />);
+    const input = screen.getByPlaceholderText(/输入命令/) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'reg', selectionStart: 3 } });
+    expect(useCommandStore.getState().showCompletions).toBe(true);
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(useCommandStore.getState().input).toBe('regress');
+    expect(useCommandStore.getState().showCompletions).toBe(false);
+
+    input.setSelectionRange(7, 7);
+    fireEvent.keyDown(input, { key: ' ' });
+
+    expect(useCommandStore.getState().input).toBe('regress ');
+    expect(useCommandStore.getState().showCompletions).toBe(true);
+    expect(screen.getByText('y')).toBeDefined();
+  });
+
+  it('does not trigger the next-position completion when space follows an incomplete token', () => {
+    render(<CommandLine onExecute={vi.fn()} />);
+    const input = screen.getByPlaceholderText(/输入命令/) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: 'reg', selectionStart: 3 } });
+    expect(useCommandStore.getState().showCompletions).toBe(true);
+
+    input.setSelectionRange(3, 3);
+    fireEvent.keyDown(input, { key: ' ' });
+
+    expect(useCommandStore.getState().input).toBe('reg ');
+    expect(useCommandStore.getState().showCompletions).toBe(false);
+    expect(screen.queryByTestId('completion-menu')).toBeNull();
+  });
+
+  it('cycles downward from the last completion back to the first', () => {
+    useCommandStore.setState({
+      input: 'regress ',
+      cursorPos: 8,
+      completions: [
+        { text: 'x1', label: 'x1', description: '', kind: 'variable', priority: 1 },
+        { text: 'x2', label: 'x2', description: '', kind: 'variable', priority: 1 },
+      ],
+      selectedCompletionIdx: 1,
+      showCompletions: true,
+    });
+
+    render(<CommandLine onExecute={vi.fn()} />);
+    const input = screen.getByPlaceholderText(/输入命令/) as HTMLInputElement;
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    expect(useCommandStore.getState().selectedCompletionIdx).toBe(0);
+  });
+
+  it('cycles upward from the first completion to the last', () => {
+    useCommandStore.setState({
+      input: 'regress ',
+      cursorPos: 8,
+      completions: [
+        { text: 'x1', label: 'x1', description: '', kind: 'variable', priority: 1 },
+        { text: 'x2', label: 'x2', description: '', kind: 'variable', priority: 1 },
+      ],
+      selectedCompletionIdx: 0,
+      showCompletions: true,
+    });
+
+    render(<CommandLine onExecute={vi.fn()} />);
+    const input = screen.getByPlaceholderText(/输入命令/) as HTMLInputElement;
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+
+    expect(useCommandStore.getState().selectedCompletionIdx).toBe(1);
   });
 
   it('flips completion menu near the right edge while keeping the anchor at the caret', () => {

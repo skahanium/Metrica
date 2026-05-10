@@ -80,17 +80,25 @@ export const useCommandStore = create<CommandState>((set, get) => ({
   },
 
   selectNextCompletion: () =>
-    set((s) => ({
-      selectedCompletionIdx: Math.min(
-        s.selectedCompletionIdx + 1,
-        s.completions.length - 1
-      ),
-    })),
+    set((s) => {
+      if (s.completions.length === 0) {
+        return { selectedCompletionIdx: 0 };
+      }
+      return {
+        selectedCompletionIdx: (s.selectedCompletionIdx + 1) % s.completions.length,
+      };
+    }),
 
   selectPrevCompletion: () =>
-    set((s) => ({
-      selectedCompletionIdx: Math.max(s.selectedCompletionIdx - 1, 0),
-    })),
+    set((s) => {
+      if (s.completions.length === 0) {
+        return { selectedCompletionIdx: 0 };
+      }
+      return {
+        selectedCompletionIdx:
+          (s.selectedCompletionIdx - 1 + s.completions.length) % s.completions.length,
+      };
+    }),
 
   hideCompletions: () => set({ showCompletions: false, correction: null }),
 

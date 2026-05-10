@@ -66,9 +66,9 @@ describe('commandStore', () => {
       useCommandStore.getState().selectNextCompletion();
       expect(useCommandStore.getState().selectedCompletionIdx).toBe(1);
       useCommandStore.getState().selectNextCompletion();
-      expect(useCommandStore.getState().selectedCompletionIdx).toBe(1); // clamped
-      useCommandStore.getState().selectPrevCompletion();
       expect(useCommandStore.getState().selectedCompletionIdx).toBe(0);
+      useCommandStore.getState().selectPrevCompletion();
+      expect(useCommandStore.getState().selectedCompletionIdx).toBe(1);
     });
 
     it('hideCompletions clears correction', () => {

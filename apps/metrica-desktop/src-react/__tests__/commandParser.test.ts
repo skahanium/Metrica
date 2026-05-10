@@ -139,7 +139,15 @@ describe('parseToModelSpec', () => {
     const r = parse('regress gdp inflation, noconstant');
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
-      expect(spec.formula).toBe('gdp ~ inflation - 1');
+      expect(spec.formula).toBe('gdp ~ 0 + inflation');
+    }
+  });
+
+  it('keeps multiple regressors separate under noconstant', () => {
+    const r = parse('regress y x1 x2, noconstant');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.formula).toBe('y ~ 0 + x1 + x2');
     }
   });
 

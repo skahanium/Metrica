@@ -173,7 +173,10 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   // 组装 formula：depvar ~ indepvar1 + indepvar2 + ...
   let formula = '';
   if (positionals.length >= 2) {
-    formula = `${positionals[0]} ~ ${positionals.slice(1).join(' + ')}`;
+    const rhs = positionals.slice(1).join(' + ');
+    formula = optMap.has('noconstant')
+      ? `${positionals[0]} ~ 0 + ${rhs}`
+      : `${positionals[0]} ~ ${rhs}`;
   } else if (positionals.length === 1) {
     formula = positionals[0];
   }
@@ -190,10 +193,6 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   if (optMap.has('cluster')) spec.cluster_column = optMap.get('cluster');
 
   if (optMap.has('weights')) spec.weights = optMap.get('weights');
-
-  if (optMap.has('noconstant')) {
-    spec.formula = formula ? formula + ' - 1' : '';
-  }
 
   // ---- 面板选项 ----
 

@@ -39,6 +39,19 @@ end
     @test missing_col.code === :unknown_variable
 end
 
+@testset "无截距 OLS 链路" begin
+    ok = fit(OLSModel, "y ~ 0 + x1 + x2", DEMO_CSV)
+    @test ok isa OLSFitResult
+    @test glance(ok).model === :ols
+    @test glance(ok).nobs == 7
+    @test glance(ok).dof == 5
+    @test length(tidy(ok).rows) == 2
+    @test all(row -> row.name != Symbol("(Intercept)"), tidy(ok).rows)
+    @test [row.name for row in tidy(ok).rows] == [:x1, :x2]
+    @test coef_row(ok, :x1).estimate ≈ 3.170526558359258
+    @test coef_row(ok, :x2).estimate ≈ 1.3463532665053577
+end
+
 @testset "WLS 基础链路" begin
     weighted = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; weights=:x1)
     @test weighted isa OLSFitResult

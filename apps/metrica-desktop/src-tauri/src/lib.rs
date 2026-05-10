@@ -206,6 +206,82 @@ struct NSSize {
     height: f64,
 }
 
+/// 在 macOS 上安装最小但标准的应用菜单。
+/// 重点是补齐 Edit 菜单，让 WebView 内文本编辑能走 responder chain，
+/// 从而恢复 Command+C / Command+V / Command+X / Command+A 等快捷键。
+#[cfg(target_os = "macos")]
+fn macos_install_app_menu() {
+    use objc::{class, msg_send, sel, sel_impl};
+    use objc::runtime::{Object, Sel};
+    use std::ffi::CString;
+
+    const NS_COMMAND_KEY_MASK: usize = 1 << 20;
+    const NS_SHIFT_KEY_MASK: usize = 1 << 17;
+
+    fn nsstring(value: &str) -> *mut Object {
+        let cstr = CString::new(value).expect("菜单标题不能包含 NUL");
+        unsafe { msg_send![class!(NSString), stringWithUTF8String: cstr.as_ptr()] }
+    }
+
+    fn menu_item(title: &str, action: Sel, key: &str, modifiers: usize) -> *mut Object {
+        unsafe {
+            let item: *mut Object = msg_send![class!(NSMenuItem), alloc];
+            let item: *mut Object = msg_send![
+                item,
+                initWithTitle: nsstring(title)
+                action: action
+                keyEquivalent: nsstring(key)
+            ];
+            let _: () = msg_send![item, setKeyEquivalentModifierMask: modifiers];
+            item
+        }
+    }
+
+    unsafe {
+        let app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
+        let main_menu: *mut Object = msg_send![class!(NSMenu), new];
+
+        let null_sel: Sel = std::mem::zeroed();
+
+        // 应用菜单：至少提供 About 和 Quit，保证菜单栏结构完整。
+        let app_root: *mut Object = msg_send![class!(NSMenuItem), new];
+        let _: () = msg_send![main_menu, addItem: app_root];
+        let app_menu: *mut Object = msg_send![class!(NSMenu), new];
+        let about_item = menu_item("About Metrica", sel!(orderFrontStandardAboutPanel:), "", 0);
+        let _: () = msg_send![app_menu, addItem: about_item];
+        let separator: *mut Object = msg_send![class!(NSMenuItem), separatorItem];
+        let _: () = msg_send![app_menu, addItem: separator];
+        let quit_item = menu_item("Quit Metrica", sel!(terminate:), "q", NS_COMMAND_KEY_MASK);
+        let _: () = msg_send![app_menu, addItem: quit_item];
+        let _: () = msg_send![app_root, setSubmenu: app_menu];
+
+        // Edit 菜单：把标准编辑 selector 接回 first responder chain。
+        let edit_root = menu_item("Edit", null_sel, "", 0);
+        let _: () = msg_send![main_menu, addItem: edit_root];
+        let edit_menu: *mut Object = msg_send![class!(NSMenu), new];
+        let undo_item = menu_item("Undo", sel!(undo:), "z", NS_COMMAND_KEY_MASK);
+        let redo_item = menu_item("Redo", sel!(redo:), "Z", NS_COMMAND_KEY_MASK | NS_SHIFT_KEY_MASK);
+        let cut_item = menu_item("Cut", sel!(cut:), "x", NS_COMMAND_KEY_MASK);
+        let copy_item = menu_item("Copy", sel!(copy:), "c", NS_COMMAND_KEY_MASK);
+        let paste_item = menu_item("Paste", sel!(paste:), "v", NS_COMMAND_KEY_MASK);
+        let select_all_item = menu_item("Select All", sel!(selectAll:), "a", NS_COMMAND_KEY_MASK);
+        let separator: *mut Object = msg_send![class!(NSMenuItem), separatorItem];
+        let _: () = msg_send![edit_menu, addItem: undo_item];
+        let _: () = msg_send![edit_menu, addItem: redo_item];
+        let _: () = msg_send![edit_menu, addItem: separator];
+        let _: () = msg_send![edit_menu, addItem: cut_item];
+        let _: () = msg_send![edit_menu, addItem: copy_item];
+        let _: () = msg_send![edit_menu, addItem: paste_item];
+        let _: () = msg_send![edit_menu, addItem: select_all_item];
+        let _: () = msg_send![edit_root, setSubmenu: edit_menu];
+
+        let _: () = msg_send![app, setMainMenu: main_menu];
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn macos_install_app_menu() {}
+
 #[cfg(not(target_os = "macos"))]
 fn macos_set_app_icon() {
     // 非 macOS 平台不做额外处理，tao 的 with_window_icon 已足够。
@@ -256,6 +332,8 @@ pub fn run() {
 
     // macOS 需要通过 NSApp 设置 Dock 图标
     macos_set_app_icon();
+    // macOS 需要原生菜单才能让标准编辑快捷键进入 responder chain。
+    macos_install_app_menu();
 
     let window = window_builder.build(&event_loop).expect("创建窗口失败");
 

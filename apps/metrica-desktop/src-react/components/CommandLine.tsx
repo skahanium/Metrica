@@ -191,6 +191,20 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   const updateCompletions = useCallback(
     (value: string, cursorPos: number) => {
       const ctx = getContext(value, cursorPos);
+      const trimmedCursorPos = value.slice(0, cursorPos).replace(/\s+$/, '').length;
+      const trailingWhitespace = cursorPos > 0 && /\s/.test(value[cursorPos - 1]);
+
+      if (
+        trailingWhitespace &&
+        trimmedCursorPos > 0 &&
+        !isRecognizedToken(value, trimmedCursorPos, columns)
+      ) {
+        setCorrection(null);
+        setGhostText(null);
+        setCompletions([], ctx);
+        return;
+      }
+
       const partial = getPartial(value, cursorPos);
       const usedVariables = getUsedVariableNames(value, cursorPos, columns);
 
@@ -266,21 +280,18 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
       beforeCursor.lastIndexOf('(')
     );
     const partialStart = lastDelim + 1;
-    const nextChar = afterCursor[0] || '';
-    const shouldAddSpace = ![' ', '\t', '\n', ',', ')'].includes(nextChar);
-    const spaceAfter = shouldAddSpace ? ' ' : '';
-    const newInput = beforeCursor.slice(0, partialStart) + item.text + spaceAfter + afterCursor;
-    const newCursor = partialStart + item.text.length + spaceAfter.length;
+    const newInput = beforeCursor.slice(0, partialStart) + item.text + afterCursor;
+    const newCursor = partialStart + item.text.length;
     setInput(newInput, newCursor);
     hideCompletions();
-    updateCompletions(newInput, newCursor);
+    setGhostText(null);
     window.requestAnimationFrame(() => {
       const el = inputRef.current?.input as HTMLInputElement | undefined;
       el?.setSelectionRange(newCursor, newCursor);
       ensureCaretVisible(newInput, newCursor);
       updateCompletionBox(newInput, newCursor);
     });
-  }, [ensureCaretVisible, hideCompletions, input, setInput, updateCompletionBox, updateCompletions]);
+  }, [ensureCaretVisible, hideCompletions, input, setGhostText, setInput, updateCompletionBox]);
 
   const applyManualEdit = useCallback((e: React.KeyboardEvent): boolean => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.nativeEvent.isComposing) return false;
