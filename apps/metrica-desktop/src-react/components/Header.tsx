@@ -1,26 +1,33 @@
-import { Button, Space, Typography } from 'antd';
-import { FolderOpenOutlined, RedoOutlined, SaveOutlined } from '@ant-design/icons';
+import { Dropdown, Space, Typography, Button } from 'antd';
+import {
+  ProjectOutlined,
+  DatabaseOutlined,
+  ExportOutlined,
+  FolderOpenOutlined,
+  SaveOutlined,
+  FileAddOutlined,
+  ImportOutlined,
+  TableOutlined,
+  HistoryOutlined,
+  SwapOutlined,
+  FileTextOutlined,
+  DownloadOutlined,
+} from '@ant-design/icons';
 import { useAppStore } from '../stores/appStore';
 import { useDatasetStore } from '../stores/datasetStore';
-import { useModelStore } from '../stores/modelStore';
 import { useProjectStore } from '../stores/projectStore';
-import { listRuns, loadProject, rerunTask, saveProject, inferWorkingDir } from '../services/runtimeClient';
+import { saveProject, loadProject, listRuns, inferWorkingDir } from '../services/runtimeClient';
+import { pickCsvFile } from '../services/nativeHost';
+import type { MenuProps } from 'antd';
 
 const { Title } = Typography;
 
-interface HeaderProps {
-  teachingEnabled: boolean;
-  onToggleTeaching: () => void;
-}
-
-export function Header({ teachingEnabled, onToggleTeaching }: HeaderProps) {
-  const { setError, setLoading } = useAppStore();
-  const { sourcePath, activePath, summary, setSourceAndActivePath } = useDatasetStore();
-  const isDerived = sourcePath !== activePath;
-  const { buildModelSpec, applyModelSpec, setLastResult } = useModelStore();
+export function Header() {
+  const { setError, setLoading, setDataFullscreen, setDataHistoryVisible } = useAppStore();
+  const { sourcePath, activePath, summary, setSourceAndActivePath, setSummary } = useDatasetStore();
   const {
     projectPath, manifest, runHistory, setProjectPath, setManifest, setRunHistory,
-    rememberProject, resetProject, setDirty,
+    rememberProject, resetProject, setDirty, recentProjects,
   } = useProjectStore();
 
   const buildManifest = () => {
@@ -36,9 +43,9 @@ export function Header({ teachingEnabled, onToggleTeaching }: HeaderProps) {
         updated_at: now,
         source_dataset: sourcePath,
         active_dataset: activePath,
-        saved_model_specs: [buildModelSpec()],
+        saved_model_specs: [],
         last_run_id: runHistory[0]?.run_id ?? null,
-        ui_state: { is_derived: isDerived, ncols: summary?.columns?.length ?? 0 },
+        ui_state: { is_derived: sourcePath !== activePath, ncols: summary?.columns?.length ?? 0 },
         data_lineage: {
           source_dataset: sourcePath,
           active_dataset: activePath,
@@ -72,8 +79,8 @@ export function Header({ teachingEnabled, onToggleTeaching }: HeaderProps) {
     }
   };
 
-  const handleOpenProject = async () => {
-    const hint = projectPath || (activePath ? `${activePath.slice(0, activePath.lastIndexOf('/')) || '.'}/.metrica/project.json` : '');
+  const handleOpenProject = async (path?: string) => {
+    const hint = path || projectPath || (activePath ? `${activePath.slice(0, activePath.lastIndexOf('/')) || '.'}/.metrica/project.json` : '');
     const input = globalThis.prompt?.('请输入项目文件路径（默认使用当前项目路径）', hint) ?? hint;
     if (!input) return;
     const workingDir = input.endsWith('/.metrica/project.json') ? input.slice(0, input.length - '/.metrica/project.json'.length) : input.slice(0, input.lastIndexOf('/.metrica/project.json'));
@@ -85,16 +92,6 @@ export function Header({ teachingEnabled, onToggleTeaching }: HeaderProps) {
       setManifest(result.manifest);
       setRunHistory(runs);
       setSourceAndActivePath(result.manifest.source_dataset, result.manifest.active_dataset);
-      if (result.manifest.saved_model_specs[0]) {
-        applyModelSpec(result.manifest.saved_model_specs[0]);
-      }
-      const latestFit = runs.find(
-        (run): run is import('../types/protocol').FitModelRunRecord =>
-          run.action === 'fit_model' && !!run.result_summary,
-      );
-      if (latestFit?.result_summary) {
-        setLastResult(latestFit.result_summary);
-      }
       rememberProject(result.project_path);
       setDirty(false);
       setError(null);
@@ -105,40 +102,77 @@ export function Header({ teachingEnabled, onToggleTeaching }: HeaderProps) {
     }
   };
 
-  const handleRerun = async () => {
-    if (!runHistory.length || !activePath) {
-      setError('暂无可重跑的运行记录');
-      return;
-    }
-    const workingDir = inferWorkingDir(activePath);
+  const handleImportCsv = async () => {
+    setError(null);
     setLoading(true);
     try {
-      const result = await rerunTask(runHistory[0].run_id, workingDir);
-      if (result.status === 'error') {
-        setError(result.messages.map((m) => m.text).join('; '));
-      } else if (result.result_payload && 'glance' in result.result_payload) {
-        setLastResult(result.result_payload);
-      }
-      if (result.run_record) {
-        useProjectStore.getState().appendRunRecord(result.run_record);
-      }
-      setError(null);
+      const result = await pickCsvFile();
+      if (result.cancelled || !result.path) return;
+      setSourceAndActivePath(result.path, result.path);
+      setSummary(null);
+      setDirty(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '重跑失败');
+      setError(e instanceof Error ? e.message : '导入 CSV 失败');
     } finally {
       setLoading(false);
     }
   };
 
+  // 项目菜单
+  const projectMenuItems: MenuProps['items'] = [
+    { key: 'new', icon: <FileAddOutlined />, label: '新建项目', onClick: resetProject },
+    { key: 'open', icon: <FolderOpenOutlined />, label: '打开项目', onClick: () => handleOpenProject() },
+    { key: 'save', icon: <SaveOutlined />, label: '保存项目', onClick: handleSaveProject },
+    { key: 'saveas', icon: <SaveOutlined />, label: '另存为...', disabled: true },
+    { type: 'divider' },
+    ...(recentProjects.length > 0 ? [
+      { key: 'recent-label', label: '最近项目', type: 'group' as const, children: recentProjects.slice(0, 5).map((p) => ({
+        key: `recent-${p}`,
+        label: p.split('/').pop() || p,
+        onClick: () => handleOpenProject(p),
+      })) },
+    ] : []),
+    { type: 'divider' },
+    { key: 'close', label: '关闭项目', onClick: resetProject },
+  ];
+
+  // 数据菜单
+  const dataMenuItems: MenuProps['items'] = [
+    { key: 'import', icon: <ImportOutlined />, label: '导入 CSV', onClick: handleImportCsv },
+    { key: 'viewall', icon: <TableOutlined />, label: '查看全部数据', onClick: () => setDataFullscreen(true), disabled: !summary },
+    { type: 'divider' },
+    { key: 'transform', icon: <SwapOutlined />, label: '数据变换', disabled: !summary },
+    { key: 'history', icon: <HistoryOutlined />, label: '数据历史', onClick: () => setDataHistoryVisible(true), disabled: !summary },
+  ];
+
+  // 导出菜单
+  const exportMenuItems: MenuProps['items'] = [
+    { key: 'script', icon: <FileTextOutlined />, label: '导出命令脚本', disabled: true },
+    { key: 'result', icon: <DownloadOutlined />, label: '导出当前结果', disabled: true },
+    { key: 'selected', icon: <DownloadOutlined />, label: '导出选中结果', disabled: true },
+    { type: 'divider' },
+    { key: 'report', icon: <FileTextOutlined />, label: '导出项目报告', disabled: true },
+    { key: 'csv', icon: <DownloadOutlined />, label: '导出活动数据 CSV', disabled: !summary },
+  ];
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 64, background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
-      <Title level={3} style={{ margin: 0, letterSpacing: 4, fontWeight: 700, color: '#8c8c8c' }}>METRICA</Title>
-      <Space>
-        <Button onClick={resetProject}>新建项目</Button>
-        <Button icon={<FolderOpenOutlined />} onClick={handleOpenProject}>打开项目</Button>
-        <Button icon={<SaveOutlined />} onClick={handleSaveProject}>保存项目</Button>
-        <Button icon={<RedoOutlined />} onClick={handleRerun}>重跑上次</Button>
-        <Button onClick={onToggleTeaching}>{teachingEnabled ? '教学开' : '教学关'}</Button>
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 24px', height: 64, background: '#fff', borderBottom: '1px solid #f0f0f0',
+    }}>
+      <Title level={3} style={{ margin: 0, letterSpacing: 4, fontWeight: 700, color: '#8c8c8c' }}>
+        METRICA
+      </Title>
+      <Space size="large">
+        <Dropdown menu={{ items: projectMenuItems }} trigger={['click']}>
+          <Button type="text" icon={<ProjectOutlined />}>项目</Button>
+        </Dropdown>
+        <Dropdown menu={{ items: dataMenuItems }} trigger={['click']}>
+          <Button type="text" icon={<DatabaseOutlined />}>数据</Button>
+        </Dropdown>
+        <Dropdown menu={{ items: exportMenuItems }} trigger={['click']}>
+          <Button type="text" icon={<ExportOutlined />}>导出</Button>
+        </Dropdown>
       </Space>
     </div>
   );

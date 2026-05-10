@@ -10,6 +10,8 @@ interface AppState {
   healthPollingId: ReturnType<typeof setInterval> | null;
   teachingEnabled: boolean;
   dataFullscreen: boolean;
+  trashVisible: boolean;
+  dataHistoryVisible: boolean;
   setActiveTab: (tab: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -18,6 +20,8 @@ interface AppState {
   stopHealthPolling: () => void;
   setTeachingEnabled: (v: boolean) => void;
   setDataFullscreen: (v: boolean) => void;
+  setTrashVisible: (v: boolean) => void;
+  setDataHistoryVisible: (v: boolean) => void;
 }
 
 const HEALTH_POLL_INTERVAL_MS = 30_000;
@@ -32,6 +36,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   healthPollingId: null,
   teachingEnabled: true,
   dataFullscreen: false,
+  trashVisible: false,
+  dataHistoryVisible: false,
 
   setActiveTab: (activeTab) => set({ activeTab }),
   setLoading: (isLoading) => set({ isLoading }),
@@ -39,6 +45,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setJuliaHealth: (juliaHealthy, restartCount) => set({ juliaHealthy, restartCount }),
   setTeachingEnabled: (teachingEnabled) => set({ teachingEnabled }),
   setDataFullscreen: (dataFullscreen) => set({ dataFullscreen }),
+  setTrashVisible: (trashVisible) => set({ trashVisible }),
+  setDataHistoryVisible: (dataHistoryVisible) => set({ dataHistoryVisible }),
 
   startHealthPolling: () => {
     const { healthPollingId } = get();

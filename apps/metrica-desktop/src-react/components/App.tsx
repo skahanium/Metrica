@@ -17,7 +17,7 @@ import * as api from '../services/runtimeClient';
 
 export function App() {
   const {
-    error, juliaHealthy, restartCount, teachingEnabled, dataFullscreen,
+    error, juliaHealthy, restartCount, dataFullscreen,
     startHealthPolling, stopHealthPolling, setError, setLoading,
   } = useAppStore();
   const setLastResult = useModelStore((s) => s.setLastResult);
@@ -180,10 +180,7 @@ export function App() {
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>
       <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ flexShrink: 0 }}>
-          <Header
-            teachingEnabled={teachingEnabled}
-            onToggleTeaching={() => useAppStore.getState().setTeachingEnabled(!teachingEnabled)}
-          />
+          <Header />
         </div>
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
           <div style={{ width: 280, flexShrink: 0, background: '#fafafa', overflow: 'hidden', borderRight: '1px solid #f0f0f0' }}>
