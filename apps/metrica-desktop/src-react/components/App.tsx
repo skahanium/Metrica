@@ -7,6 +7,8 @@ import { CommandLine } from './CommandLine';
 import type { CliFeedback } from './CommandLine';
 import { ResultFlow } from './ResultFlow';
 import { DataFullscreen } from './DataFullscreen';
+import { TrashPanel } from './TrashPanel';
+import { DataHistoryPanel } from './DataHistoryPanel';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
 import { useDatasetStore } from '../stores/datasetStore';
@@ -226,6 +228,9 @@ export function App() {
           </div>
         </div>
       </div>
+      {/* 模态面板 */}
+      <TrashPanel />
+      <DataHistoryPanel />
     </ConfigProvider>
   );
 }
