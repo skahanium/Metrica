@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getContext, getPartial, getCompletions, getCorrections, getGhostText } from '../services/autocomplete';
+import { getContext, getPartial, getCompletions, getCorrections, getGhostText, getUsedVariableNames } from '../services/autocomplete';
 import type { ColumnSummary } from '../types/protocol';
 
 const mockVars: ColumnSummary[] = [
@@ -77,6 +77,14 @@ describe('getCompletions', () => {
     const ctx = { kind: 'indepvar' as const };
     const c = getCompletions(ctx, mockVars, 'zzz');
     expect(c).toHaveLength(0);
+  });
+
+  it('filters variables already used in the command', () => {
+    const ctx = { kind: 'indepvar' as const };
+    const used = getUsedVariableNames('regress gdp ', 12, mockVars);
+    const c = getCompletions(ctx, mockVars, '', used);
+    expect(c.map(item => item.text)).not.toContain('gdp');
+    expect(c.map(item => item.text)).toContain('inflation');
   });
 
   it('returns option completions for regress', () => {

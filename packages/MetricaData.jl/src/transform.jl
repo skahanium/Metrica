@@ -1,4 +1,5 @@
 using DataFrames
+using Statistics
 
 const _ALLOWED_FUNCTIONS = Dict{Symbol, Function}(
     :log => log,
@@ -59,15 +60,16 @@ struct OpResult
     status::String          # "ok" | "error"
     df::DataFrame
     notes::String
+    warnings::Vector{Dict{String, Any}}
     error::Union{Nothing, Dict{String, Any}}
 end
 
-function OpResult(operation::String, df::DataFrame; notes::String = "")
-    return OpResult(operation, "ok", df, notes, nothing)
+function OpResult(operation::String, df::DataFrame; notes::String = "", warnings::Vector{Dict{String, Any}} = Dict{String, Any}[])
+    return OpResult(operation, "ok", df, notes, warnings, nothing)
 end
 
 function OpResult(operation::String, ::Nothing; error::Dict{String, Any})
-    return OpResult(operation, "error", DataFrame(), "", error)
+    return OpResult(operation, "error", DataFrame(), "", Dict{String, Any}[], error)
 end
 
 """
@@ -133,4 +135,78 @@ end
 function keep(df::DataFrame, cols::Vector{Symbol})
     df2 = df[:, cols]
     return OpResult("keep", df2, notes = "已保留 $(length(cols)) 列")
+end
+
+function _mode_value(values)
+    counts = Dict{Any, Int}()
+    for value in values
+        counts[value] = get(counts, value, 0) + 1
+    end
+    ordered = sort(collect(counts); by = item -> (-item[2], string(item[1])))
+    return first(first(ordered))
+end
+
+function _impute_strategy(values)
+    if all(value -> value isa Bool, values)
+        return "众数", _mode_value(values)
+    elseif all(value -> value isa AbstractFloat, values)
+        return "均值", mean(Float64.(values))
+    elseif all(value -> value isa Integer, values)
+        return "中位数", median(Float64.(values))
+    elseif all(value -> value isa Number, values)
+        return "中位数", median(Float64.(values))
+    else
+        return "众数", _mode_value(values)
+    end
+end
+
+function _typed_imputed_column(col, fill_value)
+    T = Union{Missing, typeof(fill_value)}
+    result = Vector{T}(undef, length(col))
+    for (i, value) in pairs(col)
+        result[i] = ismissing(value) ? fill_value : convert(typeof(fill_value), value)
+    end
+    return result
+end
+
+"""
+    impute_missing(df)
+
+对含缺失值的列执行自动插补：
+
+- 浮点连续列：均值
+- 整数 / 离散数值列：中位数
+- 字符串 / 布尔 / 分类列：众数
+"""
+function impute_missing(df::DataFrame)
+    df2 = copy(df)
+    applied = String[]
+    warnings = Dict{String, Any}[]
+
+    for name in names(df2)
+        col = df2[!, name]
+        missing_count = count(ismissing, col)
+        missing_count == 0 && continue
+
+        observed = collect(skipmissing(col))
+        if isempty(observed)
+            push!(warnings, Dict(
+                "title" => "列已跳过",
+                "detail" => "列 `$(name)` 全部为缺失值，无法自动插补。",
+            ))
+            continue
+        end
+
+        strategy, fill_value = _impute_strategy(observed)
+        df2[!, name] = _typed_imputed_column(col, fill_value)
+        push!(applied, "$(name)=$(strategy)")
+    end
+
+    notes = if isempty(applied)
+        "未发现需要插补的列。"
+    else
+        "已自动插补缺失值：" * join(applied, "；")
+    end
+
+    return OpResult("impute_missing", df2; notes, warnings)
 end

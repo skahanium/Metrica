@@ -94,6 +94,35 @@
 
 ## 请求示例
 
+### 数据检查请求
+
+`inspect_dataset` 可通过 `options.preview_rows` 请求返回指定数量的 `preview_rows`。桌面端“查看全部数据”会请求足够大的预览上限，用于在主面板展示完整小型数据集；Runtime 只透传该参数，实际取行由 Julia 数据检查函数完成。
+
+```json
+{
+  "task_id": "uuid-inspect",
+  "action": "inspect_dataset",
+  "project_context": {
+    "project_id": "proj_001",
+    "working_dir": "/path/to/project"
+  },
+  "dataset_ref": {
+    "source": "file",
+    "path": "/path/to/data.csv",
+    "format": "csv"
+  },
+  "model_spec": {
+    "model_type": "ols",
+    "formula": "y ~ x1"
+  },
+  "options": {
+    "drop_missing": false,
+    "return_augment": false,
+    "preview_rows": 1000000
+  }
+}
+```
+
 ### OLS / WLS 请求
 
 ```json

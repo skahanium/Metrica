@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   buildFitModelRequest, buildLoadProjectRequest, buildRerunTaskRequest,
   buildSaveProjectRequest, buildTransformRequest, listRuns, transformDataset, transformTask,
-  saveProject, loadProject, rerunTask,
+  saveProject, loadProject, rerunTask, inspectDataset,
 } from '../services/runtimeClient';
 
 describe('buildFitModelRequest', () => {
@@ -150,6 +150,35 @@ describe('transformDataset', () => {
 
     expect(result.task_id).toBe('transform-task');
     expect(result.run_record?.run_id).toBe('run-1');
+  });
+});
+
+describe('inspectDataset', () => {
+  it('requests enough preview rows for the full data view', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        task_id: 'inspect-test',
+        status: 'success',
+        messages: [],
+        result_payload: {
+          dataset_summary: { row_count: 8, column_count: 3 },
+          columns: [{ name: 'y', type: 'Int64' }],
+          preview_rows: Array.from({ length: 8 }, (_, idx) => ({ y: idx + 1 })),
+        },
+      }),
+    });
+
+    const result = await inspectDataset(
+      '/tmp/source.csv',
+      '/tmp',
+      'http://runtime.test',
+      fetchImpl as unknown as typeof fetch,
+    );
+    const requestBody = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
+
+    expect(requestBody.options.preview_rows).toBeGreaterThanOrEqual(1_000_000);
+    expect(result.preview).toHaveLength(8);
   });
 });
 

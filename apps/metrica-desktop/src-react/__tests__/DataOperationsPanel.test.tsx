@@ -15,6 +15,7 @@ describe('DataOperationsPanel', () => {
     useTransformStore.setState({
       operations: [],
       history: [],
+      resultItems: [],
       lastTransformResult: null,
       isTransforming: false,
     });
@@ -38,21 +39,37 @@ describe('DataOperationsPanel', () => {
     useTransformStore.setState({
       operations: [{ op: 'filter', args: { condition: 'year >= 2020' } }],
     });
-    const fetchImpl = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        task_id: 'transform-ok',
-        status: 'success',
-        messages: [],
-        result_payload: {
-          operation: 'chain',
-          status: 'ok',
-          result: { nrows: 1, ncols: 2, notes: 'ok', dataset_path: '/tmp/.metrica/derived/transform-ok.csv' },
-          preview: { columns: ['year'], rows: [{ year: 2020 }] },
-          warnings: [],
-        },
-      }),
-    });
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          task_id: 'transform-ok',
+          status: 'success',
+          messages: [],
+          result_payload: {
+            operation: 'chain',
+            status: 'ok',
+            result: { nrows: 1, ncols: 2, notes: 'ok', dataset_path: '/tmp/.metrica/derived/transform-ok.csv' },
+            preview: { columns: ['year'], rows: [{ year: 2020 }] },
+            warnings: [],
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          task_id: 'inspect-derived',
+          status: 'success',
+          messages: [],
+          result_payload: {
+            nrows: 1,
+            ncols: 2,
+            columns: [{ name: 'year', type: 'Int64' }],
+            preview: [{ year: 2020 }],
+          },
+        }),
+      });
     vi.stubGlobal('fetch', fetchImpl);
 
     render(<DataOperationsPanel />);
@@ -63,5 +80,17 @@ describe('DataOperationsPanel', () => {
     });
     expect(useDatasetStore.getState().isDerived()).toBe(true);
     expect(useTransformStore.getState().history.length).toBe(1);
+    expect(useTransformStore.getState().resultItems[0].source).toBe('ui');
+  });
+
+  it('adds impute_missing operation without extra args', () => {
+    render(<DataOperationsPanel />);
+
+    fireEvent.mouseDown(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByText('自动插补缺失值 impute missing'));
+    fireEvent.click(screen.getByText('添加'));
+
+    expect(screen.getByText(/impute_missing/)).toBeDefined();
+    expect(screen.getByText(/\{\}/)).toBeDefined();
   });
 });

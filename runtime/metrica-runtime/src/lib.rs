@@ -269,6 +269,12 @@ pub struct ModelSpec {
 pub struct RequestOptions {
     pub drop_missing: bool,
     pub return_augment: bool,
+    #[serde(default = "default_inspect_preview_rows")]
+    pub preview_rows: usize,
+}
+
+fn default_inspect_preview_rows() -> usize {
+    5
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -525,6 +531,7 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
         options: RequestOptions {
             drop_missing: true,
             return_augment: false,
+            preview_rows: default_inspect_preview_rows(),
         },
     }
 }

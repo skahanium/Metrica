@@ -239,6 +239,7 @@ Runtime 通过 axum HTTP 框架 + 持久化 Julia 进程执行真实模型任务
 
 - `inspect_dataset`
   - `dataset_ref.path` 指向本地 CSV
+  - `options.preview_rows` 可请求数据检查返回更多预览行；桌面端全量数据视图用该字段加载完整小型数据集
   - 返回 `dataset_summary`、`columns`、`preview_rows` 与可选 `warnings`
 
 - `dataset_ref.path` 指向本地 CSV

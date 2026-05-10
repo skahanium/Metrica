@@ -1,0 +1,63 @@
+<h2>DAG抽象变形设计方案</h2>
+<p class="subtitle">三种不同的DAG抽象变形风格</p>
+
+<div class="cards">
+  <div class="card" data-choice="design1" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:120px;height:120px;margin:20px auto;position:relative;">
+        <!-- 节点 -->
+        <div style="position:absolute;top:10px;left:30px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:50px;left:10px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:50px;left:60px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:90px;left:35px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <!-- 边 -->
+        <div style="position:absolute;top:30px;left:40px;width:2px;height:20px;background:#718096;transform:rotate(-30deg);"></div>
+        <div style="position:absolute;top:30px;left:50px;width:2px;height:20px;background:#718096;transform:rotate(30deg);"></div>
+        <div style="position:absolute;top:70px;left:30px;width:30px;height:2px;background:#718096;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案A：经典四节点</h3>
+      <p>标准DAG结构，四节点菱形布局，边为直线</p>
+    </div>
+  </div>
+  
+  <div class="card" data-choice="design2" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:120px;height:120px;margin:20px auto;position:relative;">
+        <!-- 节点 -->
+        <div style="position:absolute;top:20px;left:20px;width:24px;height:24px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:20px;left:70px;width:24px;height:24px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:70px;left:45px;width:24px;height:24px;background:#4a5568;border-radius:50%;"></div>
+        <!-- 边 -->
+        <div style="position:absolute;top:32px;left:44px;width:26px;height:2px;background:#718096;transform:rotate(45deg);"></div>
+        <div style="position:absolute;top:32px;left:70px;width:2px;height:38px;background:#718096;transform:rotate(-15deg);"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案B：三角汇聚</h3>
+      <p>三节点三角布局，体现因果汇聚关系</p>
+    </div>
+  </div>
+  
+  <div class="card" data-choice="design3" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:120px;height:120px;margin:20px auto;position:relative;">
+        <!-- 节点 -->
+        <div style="position:absolute;top:15px;left:50px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:50px;left:20px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:50px;left:80px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:85px;left:50px;width:20px;height:20px;background:#4a5568;border-radius:50%;"></div>
+        <!-- 边 -->
+        <div style="position:absolute;top:35px;left:55px;width:2px;height:15px;background:#718096;transform:rotate(-60deg);"></div>
+        <div style="position:absolute;top:35px;left:65px;width:2px;height:15px;background:#718096;transform:rotate(60deg);"></div>
+        <div style="position:absolute;top:70px;left:40px;width:40px;height:2px;background:#718096;"></div>
+        <div style="position:absolute;top:70px;left:55px;width:2px;height:15px;background:#718096;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案C：钻石链式</h3>
+      <p>四节点钻石布局，体现链式因果关系</p>
+    </div>
+  </div>
+</div>

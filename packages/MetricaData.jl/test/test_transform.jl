@@ -33,6 +33,51 @@ end
     @test names(result.df) == ["x"]
 end
 
+@testset "impute_missing uses mean median and mode" begin
+    df = DataFrame(
+        xf = Union{Missing, Float64}[1.0, missing, 3.0],
+        xi = Union{Missing, Int}[1, missing, 5],
+        xs = Union{Missing, String}["a", missing, "a"],
+        xb = Union{Missing, Bool}[true, missing, true],
+    )
+    result = impute_missing(df)
+
+    @test result.status == "ok"
+    @test result.df.xf[2] == 2.0
+    @test result.df.xi[2] == 3.0
+    @test result.df.xs[2] == "a"
+    @test result.df.xb[2] == true
+    @test occursin("xf=均值", result.notes)
+    @test occursin("xi=中位数", result.notes)
+    @test occursin("xs=众数", result.notes)
+end
+
+@testset "impute_missing skips all-missing columns with warning" begin
+    df = DataFrame(
+        x = Union{Missing, Int}[missing, missing],
+        y = Union{Missing, Float64}[1.0, missing],
+    )
+    result = impute_missing(df)
+
+    @test result.status == "ok"
+    @test !isempty(result.warnings)
+    @test occursin("x", result.warnings[1]["detail"])
+    @test result.df.y[2] == 1.0
+end
+
+@testset "operate_chain impute_missing reports no-op note for complete data" begin
+    df = DataFrame(x = [1, 2], y = ["a", "b"])
+    result = operate_chain(
+        df,
+        Dict{String, Any}[
+            Dict("op" => "impute_missing", "args" => Dict{String, Any}()),
+        ],
+    )
+
+    @test result["status"] == "ok"
+    @test result["result"]["notes"] == "未发现需要插补的列。"
+end
+
 @testset "operate_chain success writes derived csv" begin
     df = DataFrame(x = [1, 2, 3], y = [4, 5, 6])
     output_path = tempname() * ".csv"

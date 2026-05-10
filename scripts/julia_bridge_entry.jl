@@ -19,7 +19,9 @@ request = JSON3.read(ARGS[1])
 action = String(request.action)
 dataset_path = String(request.dataset_ref.path)
 payload = if action == "inspect_dataset"
-    inspect_dataset(dataset_path)
+    options = get(request, :options, Dict{Symbol, Any}())
+    preview_rows = Int(get(options, :preview_rows, 5))
+    inspect_dataset(dataset_path; preview_limit=preview_rows)
 elseif action == "export_report"
     format = String(get(request, :format, "markdown"))
     run_record = get(request, :run_record, Dict{String, Any}())

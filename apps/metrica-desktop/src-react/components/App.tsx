@@ -1,15 +1,18 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { ConfigProvider, theme, Alert } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { CommandLine } from './CommandLine';
+import type { CliFeedback } from './CommandLine';
 import { ResultFlow } from './ResultFlow';
 import { DataFullscreen } from './DataFullscreen';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { parse, parseToModelSpec } from '../services/commandParser';
+import { isDataOperationVerb, parseToDataOp } from '../services/commandDataOps';
+import { executeDataOperations } from '../services/dataOperationExecutor';
 import * as api from '../services/runtimeClient';
 
 export function App() {
@@ -22,17 +25,25 @@ export function App() {
   const setSummary = useDatasetStore((s) => s.setSummary);
   const setSourceAndActivePath = useDatasetStore((s) => s.setSourceAndActivePath);
   const activePath = useDatasetStore((s) => s.activePath);
+  const [cliFeedback, setCliFeedback] = useState<CliFeedback | null>(null);
 
   useEffect(() => {
     startHealthPolling();
     return () => stopHealthPolling();
   }, [startHealthPolling, stopHealthPolling]);
 
-  const executeCommand = useCallback(async (input: string) => {
+  const showCliFeedback = useCallback((level: CliFeedback['level'], message: string) => {
+    setCliFeedback({ level, message });
+  }, []);
+
+  const executeCommand = useCallback((input: string): boolean | Promise<boolean> => {
     const parsed = parse(input);
     if (parsed.error) {
-      setError(parsed.error);
-      return;
+      const message = parsed.error.startsWith('未知命令:')
+        ? `${parsed.error.replace(/^未知命令:\s*/, '未知命令：')}。请从补全列表选择可用命令。`
+        : parsed.error;
+      showCliFeedback('error', message);
+      return false;
     }
 
     const verb = parsed.verb;
@@ -44,93 +55,126 @@ export function App() {
         useDatasetStore.getState().setSourceAndActivePath('', '');
         useDatasetStore.getState().setSummary(null);
         setError(null);
-        return;
+        setCliFeedback(null);
+        return true;
       }
       const filePath = raw.replace(/^["']|["']$/g, '');
-      if (!filePath) { setError('请指定数据文件路径'); return; }
-      setLoading(true);
-      try {
-        const result = await api.inspectDataset(filePath);
-        setSourceAndActivePath(filePath, filePath);
-        setSummary(result);
-        setError(null);
-      } catch (e: any) {
-        setError(e.message || '数据加载失败');
-      } finally {
-        setLoading(false);
+      if (!filePath) {
+        showCliFeedback('warning', 'use 命令需要指定数据文件路径');
+        return false;
       }
-      return;
+      return (async () => {
+        setLoading(true);
+        try {
+          const result = await api.inspectDataset(filePath);
+          setSourceAndActivePath(filePath, filePath);
+          setSummary(result);
+          setError(null);
+          setCliFeedback(null);
+        } catch (e: any) {
+          setError(e.message || '数据加载失败');
+        } finally {
+          setLoading(false);
+        }
+        return true;
+      })();
     }
 
     // --- guard: need dataset ---
     if (!activePath) {
-      setError('请先使用 use 命令加载数据集');
-      return;
+      showCliFeedback('warning', '请先加载数据集，再执行模型或数据操作命令');
+      return false;
+    }
+
+    if (isDataOperationVerb(verb)) {
+      const opResult = parseToDataOp(parsed);
+      if ('error' in opResult) {
+        showCliFeedback('warning', opResult.error);
+        return false;
+      }
+      return (async () => {
+        try {
+          await executeDataOperations({
+            operations: [opResult],
+            commandLabel: input,
+            source: 'cli',
+          });
+          setCliFeedback(null);
+        } catch {
+          // executeDataOperations 已经写入结构化错误状态。
+        }
+        return true;
+      })();
     }
 
     // --- modeling commands ---
     const modelSpecResult = parseToModelSpec(parsed);
     if (!('error' in modelSpecResult)) {
-      setLoading(true);
-      try {
-        const result = await api.fitModel({
-          datasetPath: activePath,
-          formula: modelSpecResult.formula || '',
-          modelType: modelSpecResult.model_type,
-          vcovType: (modelSpecResult.vcov as any)?.type || 'classical',
-          weightsColumn: modelSpecResult.weights || modelSpecResult.weights_column || '',
-          clusterColumn: modelSpecResult.cluster_column || '',
-          panelId: modelSpecResult.panel_id || '',
-          panelTime: modelSpecResult.panel_time || '',
-          panelMethod: modelSpecResult.panel_method || '',
-          instruments: Array.isArray(modelSpecResult.instruments)
-            ? modelSpecResult.instruments.join(',')
-            : (modelSpecResult.instruments || ''),
-          endogColumns: Array.isArray(modelSpecResult.endog_columns)
-            ? modelSpecResult.endog_columns.join(',')
-            : (modelSpecResult.endog_columns || ''),
-          treatmentColumn: modelSpecResult.treatment_column || modelSpecResult.treated_column || '',
-          postColumn: modelSpecResult.post_column || '',
-          eventTimeColumn: modelSpecResult.event_time_column || '',
-          outcomeColumn: modelSpecResult.outcome_column || '',
-          orderP: modelSpecResult.order?.[0],
-          orderD: modelSpecResult.order?.[1],
-          orderQ: modelSpecResult.order?.[2],
-          strataColumn: modelSpecResult.strata_column || '',
-          psuColumn: modelSpecResult.psu_column || '',
-          fpcColumn: modelSpecResult.fpc_column || '',
-        });
-        const payload = (result as any).result_payload;
-        if (payload && payload.glance) {
-          setLastResult(payload);
-          addToHistory({
-            id: crypto.randomUUID(),
-            label: input,
-            runId: (result as any).task_id || '',
-            modelType: modelSpecResult.model_type,
-            formula: modelSpecResult.formula || '',
+      return (async () => {
+        setLoading(true);
+        try {
+          const result = await api.fitModel({
             datasetPath: activePath,
-            result: payload,
-            createdAt: new Date().toISOString(),
-            command: input,
+            formula: modelSpecResult.formula || '',
+            modelType: modelSpecResult.model_type,
+            vcovType: (modelSpecResult.vcov as any)?.type || 'classical',
+            weightsColumn: modelSpecResult.weights || modelSpecResult.weights_column || '',
+            clusterColumn: modelSpecResult.cluster_column || '',
+            panelId: modelSpecResult.panel_id || '',
+            panelTime: modelSpecResult.panel_time || '',
+            panelMethod: modelSpecResult.panel_method || '',
+            instruments: Array.isArray(modelSpecResult.instruments)
+              ? modelSpecResult.instruments.join(',')
+              : (modelSpecResult.instruments || ''),
+            endogColumns: Array.isArray(modelSpecResult.endog_columns)
+              ? modelSpecResult.endog_columns.join(',')
+              : (modelSpecResult.endog_columns || ''),
+            treatmentColumn: modelSpecResult.treatment_column || modelSpecResult.treated_column || '',
+            postColumn: modelSpecResult.post_column || '',
+            eventTimeColumn: modelSpecResult.event_time_column || '',
+            outcomeColumn: modelSpecResult.outcome_column || '',
+            orderP: modelSpecResult.order?.[0],
+            orderD: modelSpecResult.order?.[1],
+            orderQ: modelSpecResult.order?.[2],
+            strataColumn: modelSpecResult.strata_column || '',
+            psuColumn: modelSpecResult.psu_column || '',
+            fpcColumn: modelSpecResult.fpc_column || '',
           });
-          setError(null);
-        } else {
-          setError('模型返回结果异常');
+          const payload = (result as any).result_payload;
+          if (payload && payload.glance) {
+            setLastResult(payload);
+            addToHistory({
+              id: crypto.randomUUID(),
+              label: input,
+              runId: (result as any).task_id || '',
+              modelType: modelSpecResult.model_type,
+              formula: modelSpecResult.formula || '',
+              datasetPath: activePath,
+              result: payload,
+              createdAt: new Date().toISOString(),
+              command: input,
+            });
+            setError(null);
+            setCliFeedback(null);
+          } else {
+            setError('模型返回结果异常');
+          }
+        } catch (e: any) {
+          setError(e.message || '模型拟合失败');
+        } finally {
+          setLoading(false);
         }
-      } catch (e: any) {
-        setError(e.message || '模型拟合失败');
-      } finally {
-        setLoading(false);
-      }
-      return;
+        return true;
+      })();
     }
 
     // parseToModelSpec returned error
     if ('error' in modelSpecResult) {
-      setError(modelSpecResult.error);
+      showCliFeedback('warning', modelSpecResult.error);
+      return false;
     }
-  }, [activePath, setLoading, setError, setLastResult, addToHistory, setSummary, setSourceAndActivePath]);
+    return true;
+  }, [activePath, setLoading, setError, setLastResult, addToHistory, setSummary, setSourceAndActivePath, showCliFeedback]);
 
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>
@@ -172,11 +216,15 @@ export function App() {
                 style={{ flexShrink: 0, margin: '8px 16px 0' }}
               />
             )}
-            <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: dataFullscreen ? 'hidden' : 'auto', minHeight: 0, display: 'flex' }}>
               {dataFullscreen ? <DataFullscreen /> : <ResultFlow onRerun={executeCommand} />}
             </div>
             <div style={{ flexShrink: 0 }}>
-              <CommandLine onExecute={executeCommand} />
+              <CommandLine
+                onExecute={executeCommand}
+                feedback={cliFeedback}
+                onClearFeedback={() => setCliFeedback(null)}
+              />
             </div>
           </div>
         </div>

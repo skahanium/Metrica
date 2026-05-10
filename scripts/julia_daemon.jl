@@ -61,7 +61,8 @@ function handle_request(req::Dict{String, Any})
         action = req["action"]
         params = req["params"]
         if action == "inspect_dataset"
-            payload = inspect_dataset(params["dataset_path"])
+            preview_rows = Int(get(params, "preview_rows", 5))
+            payload = inspect_dataset(params["dataset_path"]; preview_limit=preview_rows)
         elseif action == "transform"
             dataset_path = params["dataset_path"]
             operations = JSON3.read(params["operations"], Vector{Dict{String, Any}})

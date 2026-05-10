@@ -22,7 +22,7 @@ function result_to_dict(result::OpResult; preview_rows::Int = 10)
     else
         d["error"] = result.error
     end
-    d["warnings"] = []
+    d["warnings"] = result.warnings
     return d
 end
 
@@ -62,6 +62,8 @@ function operate(df::DataFrame, op::Dict{String, Any})
         return reshape_wide(df, Symbol.(args["id_cols"]), Symbol(args["time_col"]), Symbol.(args["value_cols"]))
     elseif op_type == "collapse"
         return collapse(df, Symbol.(args["by"]), String.(args["stats"]), Symbol.(args["value_cols"]))
+    elseif op_type == "impute_missing"
+        return impute_missing(df)
     else
         return OpResult(op_type, nothing, error = Dict("message" => "Unknown operation: $op_type"))
     end

@@ -97,11 +97,25 @@ const grammars: CommandGrammar[] = [
 
   // ===== Data transform commands =====
   {
+    verb: 'filter',
+    description: '按条件筛选观测',
+    category: 'data',
+    syntax: [
+      { kind: 'indepvar', label: '条件表达式', required: true, multiple: true },
+    ],
+  },
+  {
+    verb: 'impute_missing',
+    description: '自动插补缺失值',
+    category: 'data',
+    syntax: [],
+  },
+  {
     verb: 'generate',
     description: '生成新变量',
     category: 'data',
     syntax: [
-      { kind: 'indepvar', label: '表达式（newvar = expr）', required: true, multiple: false },
+      { kind: 'indepvar', label: '表达式（newvar = expr）', required: true, multiple: true },
     ],
   },
   {
@@ -109,7 +123,18 @@ const grammars: CommandGrammar[] = [
     description: '替换变量值',
     category: 'data',
     syntax: [
-      { kind: 'indepvar', label: '表达式（var = expr）', required: true, multiple: false },
+      { kind: 'indepvar', label: '变量', required: true, multiple: false },
+      { kind: 'comma', label: ',', required: true, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: true,
+        multiple: true,
+        children: {
+          value: { kind: 'option_value', label: '替换值表达式', required: true, multiple: false },
+          if: { kind: 'option_value', label: '条件表达式', required: true, multiple: false },
+        },
+      },
     ],
   },
   {
@@ -151,6 +176,17 @@ const grammars: CommandGrammar[] = [
     category: 'data',
     syntax: [
       { kind: 'indepvar', label: '合并文件路径', required: true, multiple: false },
+      { kind: 'comma', label: ',', required: true, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: true,
+        multiple: true,
+        children: {
+          on: { kind: 'option_value', label: '键列', required: true, multiple: false },
+          how: { kind: 'option_value', label: '合并方式', required: false, multiple: false, values: ['inner', 'left', 'right', 'outer'] },
+        },
+      },
     ],
   },
   {
@@ -160,6 +196,17 @@ const grammars: CommandGrammar[] = [
     syntax: [
       { kind: 'indepvar', label: '方向', required: true, multiple: false, values: ['long', 'wide'] },
       { kind: 'indepvar', label: '变量列表', required: true, multiple: true },
+      { kind: 'comma', label: ',', required: true, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: true,
+        multiple: true,
+        children: {
+          id: { kind: 'option_value', label: 'ID 列', required: true, multiple: false },
+          time: { kind: 'option_value', label: '时间列', required: true, multiple: false },
+        },
+      },
     ],
   },
   {
@@ -167,15 +214,16 @@ const grammars: CommandGrammar[] = [
     description: '数据聚合/折叠',
     category: 'data',
     syntax: [
-      { kind: 'indepvar', label: '聚合表达式', required: true, multiple: false },
-      { kind: 'comma', label: ',', required: false, multiple: false },
+      { kind: 'indepvar', label: '值变量列表', required: true, multiple: true },
+      { kind: 'comma', label: ',', required: true, multiple: false },
       {
         kind: 'option',
         label: '选项',
         required: false,
-        multiple: false,
+        multiple: true,
         children: {
-          by: { kind: 'option_value', label: 'by', required: true, multiple: false },
+          by: { kind: 'option_value', label: '分组变量', required: true, multiple: false },
+          stats: { kind: 'option_value', label: '统计量', required: true, multiple: false, values: ['mean', 'sum', 'sd', 'min', 'max', 'count'] },
         },
       },
     ],

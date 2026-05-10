@@ -5,6 +5,7 @@ import type {
 } from '../types/protocol';
 
 const DEFAULT_BASE = 'http://127.0.0.1:47821';
+const FULL_DATA_PREVIEW_ROWS = 1_000_000;
 
 function createTaskId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -169,7 +170,7 @@ export async function inspectDataset(
     project_context: { project_id: projectId, working_dir: workingDir },
     dataset_ref: { source: 'file', path: datasetPath, format: 'csv' },
     model_spec: { model_type: 'ols', formula: 'y ~ x1' },
-    options: { drop_missing: false, return_augment: false },
+    options: { drop_missing: false, return_augment: false, preview_rows: FULL_DATA_PREVIEW_ROWS },
   });
   const res = await fetchImpl(`${baseUrl}/inspect_dataset`, {
     method: 'POST',

@@ -1,0 +1,66 @@
+<h2>M+DAG结合设计方案</h2>
+<p class="subtitle">将字母M与DAG元素融合</p>
+
+<div class="cards">
+  <div class="card" data-choice="design1" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:120px;height:120px;margin:20px auto;position:relative;">
+        <!-- M的两个竖笔 -->
+        <div style="position:absolute;top:20px;left:20px;width:8px;height:80px;background:#4a5568;"></div>
+        <div style="position:absolute;top:20px;left:92px;width:8px;height:80px;background:#4a5568;"></div>
+        <!-- M的中间部分用DAG节点代替 -->
+        <div style="position:absolute;top:30px;left:50px;width:16px;height:16px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:60px;left:40px;width:16px;height:16px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:60px;left:65px;width:16px;height:16px;background:#4a5568;border-radius:50%;"></div>
+        <!-- 边 -->
+        <div style="position:absolute;top:46px;left:55px;width:2px;height:14px;background:#718096;transform:rotate(-30deg);"></div>
+        <div style="position:absolute;top:46px;left:60px;width:2px;height:14px;background:#718096;transform:rotate(30deg);"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案A：M骨架+DAG节点</h3>
+      <p>M的轮廓保留，中间用DAG节点填充</p>
+    </div>
+  </div>
+  
+  <div class="card" data-choice="design2" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:120px;height:120px;margin:20px auto;position:relative;">
+        <!-- M的变形 - 用DAG边构成 -->
+        <div style="position:absolute;top:20px;left:25px;width:2px;height:60px;background:#4a5568;transform:rotate(15deg);"></div>
+        <div style="position:absolute;top:20px;left:45px;width:2px;height:40px;background:#4a5568;transform:rotate(-15deg);"></div>
+        <div style="position:absolute;top:20px;left:65px;width:2px;height:40px;background:#4a5568;transform:rotate(15deg);"></div>
+        <div style="position:absolute;top:20px;left:85px;width:2px;height:60px;background:#4a5568;transform:rotate(-15deg);"></div>
+        <!-- 节点 -->
+        <div style="position:absolute;top:15px;left:20px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:15px;left:85px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:75px;left:20px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:75px;left:85px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案B：M由DAG边构成</h3>
+      <p>M的笔画由DAG的边构成，节点作为端点</p>
+    </div>
+  </div>
+  
+  <div class="card" data-choice="design3" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="width:120px;height:120px;margin:20px auto;position:relative;">
+        <!-- M的抽象变形 -->
+        <div style="position:absolute;top:20px;left:30px;width:60px;height:60px;border:3px solid #4a5568;border-radius:50%;clip-path:polygon(50% 0%, 0% 100%, 100% 100%);"></div>
+        <!-- 内部DAG -->
+        <div style="position:absolute;top:35px;left:45px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:55px;left:35px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+        <div style="position:absolute;top:55px;left:60px;width:12px;height:12px;background:#4a5568;border-radius:50%;"></div>
+        <!-- 边 -->
+        <div style="position:absolute;top:47px;left:48px;width:2px;height:8px;background:#718096;transform:rotate(-30deg);"></div>
+        <div style="position:absolute;top:47px;left:55px;width:2px;height:8px;background:#718096;transform:rotate(30deg);"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案C：M轮廓+内部DAG</h3>
+      <p>M作为外框，内部放置简化的DAG图</p>
+    </div>
+  </div>
+</div>

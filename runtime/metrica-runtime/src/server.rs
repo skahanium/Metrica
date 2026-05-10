@@ -224,6 +224,7 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
         "vcov": vcov,
         "weights": request.model_spec.weights,
         "return_augment": request.options.return_augment,
+        "preview_rows": request.options.preview_rows,
     });
 
     if let Some(ref col) = request.model_spec.cluster_column { params["cluster_column"] = json!(col); }

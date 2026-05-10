@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { Button, Card, Form, Input, Select, Space, Typography, List, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import type { DataOp, DataOpKind } from '../types/protocol';
-import { transformTask, inferWorkingDir } from '../services/runtimeClient';
 import { useDatasetStore } from '../stores/datasetStore';
-import { useProjectStore } from '../stores/projectStore';
 import { useTransformStore } from '../stores/transformStore';
 import { useAppStore } from '../stores/appStore';
+import { executeDataOperations } from '../services/dataOperationExecutor';
 
 const OP_OPTIONS: Array<{ value: DataOpKind; label: string }> = [
   { value: 'filter', label: '筛选 filter' },
   { value: 'generate', label: '生成变量 generate' },
+  { value: 'impute_missing', label: '自动插补缺失值 impute missing' },
   { value: 'replace', label: '替换 replace' },
   { value: 'rename', label: '重命名 rename' },
   { value: 'drop', label: '删除列 drop' },
@@ -27,6 +27,7 @@ function splitList(value = ''): string[] {
 }
 
 function buildArgs(kind: DataOpKind, values: Record<string, string>) {
+  if (kind === 'impute_missing') return {};
   if (kind === 'filter') return { condition: values.condition };
   if (kind === 'generate') return { name: values.name, expr: values.expr };
   if (kind === 'replace') return { col: values.col, condition: values.condition, value: values.value };
@@ -41,9 +42,8 @@ function buildArgs(kind: DataOpKind, values: Record<string, string>) {
 export function DataOperationsPanel() {
   const [form] = Form.useForm();
   const [kind, setKind] = useState<DataOpKind>('filter');
-  const { activePath, setActivePath } = useDatasetStore();
-  const { appendRunRecord, setDirty } = useProjectStore();
-  const { operations, addOperation, removeOperation, clearOperations, appendHistory, setLastTransformResult, isTransforming, setTransforming } = useTransformStore();
+  const { activePath } = useDatasetStore();
+  const { operations, addOperation, removeOperation, clearOperations, isTransforming } = useTransformStore();
   const { setError } = useAppStore();
 
   const handleAdd = () => {
@@ -56,36 +56,14 @@ export function DataOperationsPanel() {
   const handleRun = async () => {
     if (!activePath) { setError('请先选择数据集'); return; }
     if (!operations.length) { setError('请先添加至少一个数据操作'); return; }
-    setTransforming(true);
-    setError(null);
     try {
-      const workingDir = inferWorkingDir(activePath);
-      const task = await transformTask({ datasetPath: activePath, operations, workingDir, previewRows: 10, persistOutput: true });
-      const result = task.result_payload;
-      if (!result) {
-        throw new Error(task.messages?.map((m) => m.text).join('; ') || '数据操作失败');
-      }
-      setLastTransformResult(result);
-      if (result.status === 'error') {
-        setError(result.error?.message ?? '数据操作失败');
-      } else {
-        appendHistory(result.operations ?? [result]);
-        // 记录谱系操作
-        const { appendLineageOperations, updateLineageRowCounts } = useProjectStore.getState();
-        appendLineageOperations(operations);
-        if (result.result) {
-          updateLineageRowCounts(0, result.result.nrows);
-        }
-        if (result.result?.dataset_path) setActivePath(result.result.dataset_path);
-        if (task.run_record) {
-          appendRunRecord(task.run_record);
-        }
-        setDirty(true);
-      }
+      await executeDataOperations({
+        operations,
+        commandLabel: `ui transform ${operations.map((op) => op.op).join(' -> ')}`,
+        source: 'ui',
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : '数据操作失败');
-    } finally {
-      setTransforming(false);
     }
   };
 
@@ -96,6 +74,11 @@ export function DataOperationsPanel() {
           <Form.Item label="操作">
             <Select value={kind} onChange={setKind} options={OP_OPTIONS} style={{ width: 180 }} />
           </Form.Item>
+          {(kind === 'impute_missing') && (
+            <Typography.Text type="secondary">
+              自动对所有存在缺失值的列执行均值 / 中位数 / 众数插补
+            </Typography.Text>
+          )}
           {(kind === 'filter') && <Form.Item label="条件" name="condition"><Input placeholder="year >= 2015" style={{ width: 180 }} /></Form.Item>}
           {(kind === 'generate') && <><Form.Item label="变量" name="name"><Input placeholder="log_gdp" style={{ width: 120 }} /></Form.Item><Form.Item label="表达式" name="expr"><Input placeholder="log(gdp)" style={{ width: 180 }} /></Form.Item></>}
           {(kind === 'replace') && <><Form.Item label="列" name="col"><Input style={{ width: 100 }} /></Form.Item><Form.Item label="条件" name="condition"><Input style={{ width: 160 }} /></Form.Item><Form.Item label="值" name="value"><Input placeholder={'"new"'} style={{ width: 100 }} /></Form.Item></>}

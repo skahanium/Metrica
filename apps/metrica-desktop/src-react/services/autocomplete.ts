@@ -72,12 +72,42 @@ export function getPartial(input: string, cursorPos: number): string {
   return beforeCursor.slice(start + 1).trim();
 }
 
+function variableNameSet(variables: ColumnSummary[]): Set<string> {
+  return new Set(variables.map(v => v.name));
+}
+
+export function getUsedVariableNames(
+  input: string,
+  cursorPos: number,
+  variables: ColumnSummary[],
+): Set<string> {
+  const names = variableNameSet(variables);
+  const beforeCursor = input.slice(0, cursorPos);
+  const partial = getPartial(input, cursorPos);
+  const tokenPattern = /[A-Za-z_][A-Za-z0-9_]*/g;
+  const used = new Set<string>();
+
+  for (const match of beforeCursor.matchAll(tokenPattern)) {
+    const token = match[0];
+    const tokenEnd = (match.index ?? 0) + token.length;
+    if (partial && tokenEnd === cursorPos && token === partial) {
+      continue;
+    }
+    if (names.has(token)) {
+      used.add(token);
+    }
+  }
+
+  return used;
+}
+
 // --- Completion Generator ---
 
 export function getCompletions(
   context: AutocompleteContext,
   variables: ColumnSummary[],
   partial: string,
+  excludedVariables: Set<string> = new Set(),
 ): CompletionItem[] {
   const lowerPartial = partial.toLowerCase();
 
@@ -99,6 +129,7 @@ export function getCompletions(
 
     case 'depvar':
       return variables
+        .filter(v => !excludedVariables.has(v.name))
         .filter(v => v.name.toLowerCase().startsWith(lowerPartial))
         .map(v => ({
           text: v.name,
@@ -112,6 +143,7 @@ export function getCompletions(
 
     case 'indepvar':
       return variables
+        .filter(v => !excludedVariables.has(v.name))
         .filter(v => v.name.toLowerCase().startsWith(lowerPartial))
         .map(v => ({
           text: v.name,
@@ -161,6 +193,7 @@ export function getCompletions(
       // Variable-type option values (cluster, id, time, strata, psu, fpc, endogenous, instruments)
       const categoricalFirst = ['cluster', 'id', 'strata', 'psu', 'fpc'].includes(optName || '');
       return variables
+        .filter(v => !excludedVariables.has(v.name))
         .filter(v => v.name.toLowerCase().startsWith(lowerPartial))
         .map(v => ({
           text: v.name,
@@ -232,11 +265,12 @@ export function getGhostText(
   variables: ColumnSummary[],
   input: string,
   cursorPos: number,
+  excludedVariables: Set<string> = new Set(),
 ): string | null {
   const partial = getPartial(input, cursorPos);
   if (partial.length === 0) return null;
 
-  const completions = getCompletions(context, variables, partial);
+  const completions = getCompletions(context, variables, partial, excludedVariables);
   if (completions.length === 0) return null;
 
   const top = completions[0];

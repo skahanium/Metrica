@@ -221,11 +221,11 @@ export interface ModelSpec {
 
 export interface FitModelRequest {
   task_id: string;
-  action: 'fit_model';
+  action: 'fit_model' | 'inspect_dataset';
   project_context: { project_id: string; working_dir: string };
   dataset_ref: { source: string; path: string; format: string };
   model_spec: ModelSpec;
-  options: { drop_missing: boolean; return_augment: boolean };
+  options: { drop_missing: boolean; return_augment: boolean; preview_rows?: number };
 }
 
 export interface TaskResponse {
@@ -305,7 +305,8 @@ export function isFitModelRun(run: RunRecord): run is FitModelRunRecord {
 
 export type DataOpKind =
   | 'filter' | 'generate' | 'replace' | 'rename' | 'drop' | 'keep'
-  | 'sort' | 'merge' | 'reshape_long' | 'reshape_wide' | 'collapse';
+  | 'sort' | 'merge' | 'reshape_long' | 'reshape_wide' | 'collapse'
+  | 'impute_missing';
 
 export interface DataOp {
   op: DataOpKind;

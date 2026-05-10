@@ -2,7 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { Empty } from 'antd';
 import { useModelStore } from '../stores/modelStore';
 import { useAppStore } from '../stores/appStore';
+import { useTransformStore } from '../stores/transformStore';
 import { ResultBlock } from './ResultBlock';
+import { TransformResultBlock } from './TransformResultBlock';
 
 interface ResultFlowProps {
   onRerun: (command: string) => void;
@@ -11,16 +13,21 @@ interface ResultFlowProps {
 export const ResultFlow: React.FC<ResultFlowProps> = ({ onRerun }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelHistory = useModelStore((s) => s.modelHistory);
+  const transformItems = useTransformStore((s) => s.resultItems);
   const teachingEnabled = useAppStore((s) => s.teachingEnabled);
+  const flowItems = [
+    ...modelHistory.map((item) => ({ kind: 'model' as const, createdAt: item.createdAt, item })),
+    ...transformItems.map((item) => ({ kind: 'transform' as const, createdAt: item.createdAt, item })),
+  ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 
   // Auto-scroll to bottom when new results appear
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [modelHistory.length]);
+  }, [flowItems.length]);
 
-  if (modelHistory.length === 0) {
+  if (flowItems.length === 0) {
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Empty description="尚无分析结果。在命令行输入 use 加载数据，然后输入 regress 等命令开始分析。" />
@@ -30,8 +37,19 @@ export const ResultFlow: React.FC<ResultFlowProps> = ({ onRerun }) => {
 
   return (
     <div ref={containerRef} style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-      {modelHistory.map((item) =>
-        item.result ? (
+      {flowItems.map(({ kind, item }) => {
+        if (kind === 'transform') {
+          return (
+            <TransformResultBlock
+              key={item.id}
+              command={item.command}
+              source={item.source}
+              result={item.result}
+              onRerun={onRerun}
+            />
+          );
+        }
+        return item.result ? (
           <ResultBlock
             key={item.id}
             command={item.command || item.formula || item.label || ''}
@@ -39,8 +57,8 @@ export const ResultFlow: React.FC<ResultFlowProps> = ({ onRerun }) => {
             teachingEnabled={teachingEnabled}
             onRerun={onRerun}
           />
-        ) : null
-      )}
+        ) : null;
+      })}
     </div>
   );
 };
