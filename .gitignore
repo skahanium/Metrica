@@ -122,6 +122,12 @@ lcov.info
 *.gcda
 *.gcno
 
+# --- AI 工具本机配置 ---
+.claude/settings.local.json
+.claude/launch.json
+.codex/
+.opencode/
+
 # --- 杂项 ---
 *.orig
 *.rej
