@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Space, Typography } from 'antd';
 import { ReloadOutlined, CopyOutlined } from '@ant-design/icons';
 import { TeachingLayer } from './TeachingLayer';
@@ -24,7 +24,8 @@ interface ResultBlockProps {
   onRerun: (command: string) => void;
 }
 
-export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, teachingEnabled, onRerun }) => {
+export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, teachingEnabled: _teachingEnabled, onRerun }) => {
+  const [showTeaching, setShowTeaching] = useState(false);
   const modelType = result.glance?.model;
   const isDiscrete = ['logit', 'probit', 'poisson', 'ordered_logit', 'multinomial_logit', 'negbin'].includes(modelType || '');
   const isSurvey = typeof modelType === 'string' && modelType.startsWith('survey_');
@@ -41,11 +42,18 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, teach
         <Space>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => onRerun(command)} />
           <Button size="small" icon={<CopyOutlined />} onClick={handleCopy} />
+          <Button
+            size="small"
+            type={showTeaching ? 'primary' : 'default'}
+            onClick={() => setShowTeaching(!showTeaching)}
+          >
+            教学
+          </Button>
         </Space>
       </div>
 
-      {/* Teaching layer - reads from result prop directly */}
-      {teachingEnabled && <TeachingLayer result={result} />}
+      {/* Teaching layer - 按钮切换，局部状态控制 */}
+      {showTeaching && <TeachingLayer result={result} />}
 
       {/* Model content — 所有子组件通过 props 接收 result */}
       {result.glance && <GlanceTable result={result} />}
