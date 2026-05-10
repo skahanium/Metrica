@@ -142,7 +142,7 @@ function _mode_value(values)
     for value in values
         counts[value] = get(counts, value, 0) + 1
     end
-    ordered = sort(collect(counts); by = item -> (-item[2], string(item[1])))
+    ordered = Base.sort(collect(counts); by = item -> (-item[2], string(item[1])))
     return first(first(ordered))
 end
 

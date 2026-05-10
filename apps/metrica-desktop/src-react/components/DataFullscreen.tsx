@@ -32,6 +32,9 @@ export const DataFullscreen: React.FC = () => {
   const summary = useDatasetStore((s) => s.summary);
   const activePath = useDatasetStore((s) => s.activePath);
   const setSummary = useDatasetStore((s) => s.setSummary);
+  const browseColumns = useDatasetStore((s) => s.browseColumns);
+  const browseReadonly = useDatasetStore((s) => s.browseReadonly);
+  const clearBrowseContext = useDatasetStore((s) => s.clearBrowseContext);
   const setDataFullscreen = useAppStore((s) => s.setDataFullscreen);
   const [selectedColIndex, setSelectedColIndex] = useState<number | null>(null);
   const [isLoadingFullRows, setIsLoadingFullRows] = useState(false);
@@ -65,6 +68,13 @@ export const DataFullscreen: React.FC = () => {
     };
   }, [activePath, setSummary, summary]);
 
+  const visibleColumns = useMemo(() => {
+    if (!summary?.columns) return [];
+    if (!browseColumns || browseColumns.length === 0) return summary.columns;
+    const allowed = new Set(browseColumns);
+    return summary.columns.filter((col) => allowed.has(col.name));
+  }, [browseColumns, summary?.columns]);
+
   const columnDefs: ColDef[] = useMemo(() => {
     if (!summary?.columns) return [];
     return [
@@ -78,7 +88,7 @@ export const DataFullscreen: React.FC = () => {
         filter: false,
         cellClass: 'metrica-row-index',
       },
-      ...summary.columns.map((col, idx) => ({
+      ...visibleColumns.map((col, idx) => ({
         field: `col_${idx}`,
         headerName: col.name,
         sortable: true,
@@ -91,11 +101,11 @@ export const DataFullscreen: React.FC = () => {
         valueFormatter: (params: { value: unknown }) => missingLike(params.value) ? '缺失' : String(params.value),
       })),
     ];
-  }, [summary, showFilters]);
+  }, [showFilters, summary?.columns, visibleColumns]);
 
   const rowData = useMemo(() => {
     if (!summary?.preview) return [];
-    const cols = summary.columns;
+    const cols = visibleColumns;
     return summary.preview.map((row, i) => {
       const obj: Record<string, unknown> = { _idx: i + 1 };
       const rowRecord = row as Record<string, unknown>;
@@ -104,15 +114,15 @@ export const DataFullscreen: React.FC = () => {
       });
       return obj;
     });
-  }, [summary]);
+  }, [summary, visibleColumns]);
 
   if (!summary) return <Empty description="未加载数据" />;
 
-  const selectedCol = selectedColIndex !== null && selectedColIndex < summary.columns.length
-    ? summary.columns[selectedColIndex]
+  const selectedCol = selectedColIndex !== null && selectedColIndex < visibleColumns.length
+    ? visibleColumns[selectedColIndex]
     : null;
 
-  const missingCols = summary.columns.filter((col) => (col.missing_count ?? col.missing ?? 0) > 0).length;
+  const missingCols = visibleColumns.filter((col) => (col.missing_count ?? col.missing ?? 0) > 0).length;
   const loadedText = rowData.length === summary.nrows
     ? `${rowData.length} 行全部载入`
     : `${rowData.length}/${summary.nrows} 行已载入`;
@@ -122,7 +132,7 @@ export const DataFullscreen: React.FC = () => {
       message.warning('当前没有可导出的数据');
       return;
     }
-    const columns = summary.columns.map((col) => col.name);
+    const columns = visibleColumns.map((col) => col.name);
     const csv = buildCsv(columns, summary.preview);
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
     downloadText(csv, `metrica_data_${timestamp}.csv`, 'text/csv;charset=utf-8');
@@ -180,8 +190,12 @@ export const DataFullscreen: React.FC = () => {
         backdropFilter: 'blur(12px)',
       }}>
         <Space size={14}>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => setDataFullscreen(false)}>返回结果</Button>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => {
+            clearBrowseContext();
+            setDataFullscreen(false);
+          }}>返回结果</Button>
           <Text strong style={{ fontSize: 18 }}>{summary.nrows} obs x {summary.ncols} vars</Text>
+          {browseReadonly ? <Tag color="cyan">browse 只读模式</Tag> : null}
           <Tag color={rowData.length === summary.nrows ? 'blue' : 'gold'}>{isLoadingFullRows ? '正在载入全部行' : loadedText}</Tag>
           <Tag color={missingCols > 0 ? 'orange' : 'default'}>{missingCols > 0 ? `${missingCols} 列有缺失` : '无缺失列'}</Tag>
           {fullRowsError ? <Tag color="red">{fullRowsError}</Tag> : null}
@@ -194,7 +208,9 @@ export const DataFullscreen: React.FC = () => {
           >
             筛选
           </Button>
-          <Button icon={<SwapOutlined />} onClick={() => setTransformOpen(true)}>变换</Button>
+          {!browseReadonly ? (
+            <Button icon={<SwapOutlined />} onClick={() => setTransformOpen(true)}>变换</Button>
+          ) : null}
           <Button icon={<ExportOutlined />} onClick={handleExportCsv}>导出</Button>
         </Space>
       </div>
@@ -207,7 +223,7 @@ export const DataFullscreen: React.FC = () => {
         borderBottom: '1px solid #e2e8f0',
         background: '#f8fafc',
       }}>
-        {summary.columns.map((col, idx) => {
+        {visibleColumns.map((col, idx) => {
           const missing = col.missing_count ?? col.missing ?? 0;
           const active = selectedColIndex === idx;
           return (

@@ -12,6 +12,7 @@ import { DataHistoryPanel } from './DataHistoryPanel';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
 import { useModelStore } from '../stores/modelStore';
 import { useDatasetStore } from '../stores/datasetStore';
+import { useMessageStore } from '../stores/messageStore';
 import { parse, parseToModelSpec } from '../services/commandParser';
 import { isDataOperationVerb, parseToDataOp } from '../services/commandDataOps';
 import { executeDataOperations } from '../services/dataOperationExecutor';
@@ -20,12 +21,15 @@ import * as api from '../services/runtimeClient';
 export function App() {
   const {
     error, juliaHealthy, restartCount, dataFullscreen,
-    startHealthPolling, stopHealthPolling, setError, setLoading,
+    startHealthPolling, stopHealthPolling, setError, setLoading, setDataFullscreen,
   } = useAppStore();
   const setLastResult = useModelStore((s) => s.setLastResult);
   const addToHistory = useModelStore((s) => s.addToHistory);
+  const addMessage = useMessageStore((s) => s.addMessage);
   const setSummary = useDatasetStore((s) => s.setSummary);
   const setSourceAndActivePath = useDatasetStore((s) => s.setSourceAndActivePath);
+  const setBrowseContext = useDatasetStore((s) => s.setBrowseContext);
+  const clearBrowseContext = useDatasetStore((s) => s.clearBrowseContext);
   const activePath = useDatasetStore((s) => s.activePath);
   const [cliFeedback, setCliFeedback] = useState<CliFeedback | null>(null);
 
@@ -56,6 +60,8 @@ export function App() {
       if (raw === 'clear') {
         useDatasetStore.getState().setSourceAndActivePath('', '');
         useDatasetStore.getState().setSummary(null);
+        clearBrowseContext();
+        setDataFullscreen(false);
         setError(null);
         setCliFeedback(null);
         return true;
@@ -71,6 +77,8 @@ export function App() {
           const result = await api.inspectDataset(filePath);
           setSourceAndActivePath(filePath, filePath);
           setSummary(result);
+          clearBrowseContext();
+          setDataFullscreen(false);
           setError(null);
           setCliFeedback(null);
         } catch (e: any) {
@@ -86,6 +94,37 @@ export function App() {
     if (!activePath) {
       showCliFeedback('warning', '请先加载数据集，再执行模型或数据操作命令');
       return false;
+    }
+
+    // --- data viewing commands ---
+    if (verb === 'describe' || verb === 'browse' || verb === 'summarize' || verb === 'tabulate') {
+      return (async () => {
+        setLoading(true);
+        try {
+          const result = await api.runDataCommand({
+            datasetPath: activePath,
+            command: {
+              kind: verb,
+              variables: parsed.positionals.length > 0 ? parsed.positionals : undefined,
+            },
+          });
+          if (result.kind === 'browse') {
+            setBrowseContext(result.columns.map((column) => column.name), result.readonly);
+            setDataFullscreen(true);
+          } else {
+            clearBrowseContext();
+            addMessage({ kind: 'data', command: input, data_result: result });
+          }
+          setError(null);
+          setCliFeedback(null);
+        } catch (e: any) {
+          showCliFeedback('warning', e.message || '数据命令执行失败');
+          return false;
+        } finally {
+          setLoading(false);
+        }
+        return true;
+      })();
     }
 
     if (isDataOperationVerb(verb)) {
@@ -156,6 +195,12 @@ export function App() {
               createdAt: new Date().toISOString(),
               command: input,
             });
+            // 添加到消息流
+            addMessage({
+              kind: 'result',
+              command: input,
+              result: payload,
+            });
             setError(null);
             setCliFeedback(null);
           } else {
@@ -176,7 +221,7 @@ export function App() {
       return false;
     }
     return true;
-  }, [activePath, setLoading, setError, setLastResult, addToHistory, setSummary, setSourceAndActivePath, showCliFeedback]);
+  }, [activePath, setLoading, setError, setLastResult, addToHistory, addMessage, setSummary, setSourceAndActivePath, setBrowseContext, clearBrowseContext, setDataFullscreen, showCliFeedback]);
 
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>

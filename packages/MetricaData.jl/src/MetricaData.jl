@@ -6,12 +6,14 @@ include("transform.jl")
 include("reshape.jl")
 include("combine.jl")
 include("join.jl")
+include("query.jl")
 include("serialize.jl")
 
 export generate, replace, rename, drop, keep
 export filter, sort
 export merge, reshape_long, reshape_wide, collapse
 export impute_missing
+export inspect_dataset, describe_dataset, summarize_dataset, tabulate_dataset, browse_dataset
 export result_to_dict, operate, operate_chain
 
 end # module MetricaData

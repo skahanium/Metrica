@@ -122,6 +122,13 @@
 | 项目 | `save "project.metrica"`, `load "project.metrica"`, `runs`, `rerun 3` |
 | 导出 | `export markdown`, `export csv`, `export report` |
 
+### 数据查看命令的当前实现约束
+
+- `describe`：结果流展示数据集规模与变量元数据，不伪造 Stata 的 label / format / value label 列。
+- `summarize`：结果流展示 `Obs / Mean / Std. dev. / Min / Max`，字符串变量保留行但数值统计为空。
+- `tabulate`：当前只支持单变量 one-way 频数表，默认排除缺失值并返回累计百分比。
+- `browse`：不在结果流里渲染“预览卡片”，而是切换到只读数据全屏视图，并按 varlist 过滤列。
+
 ### 自动补全：基于语法树的上下文补全
 
 补全不是按"命令→语法→变量→选项"的顺序猜阶段——用户会随时跳跃修改
@@ -365,11 +372,12 @@ xtreg ─ 因变量(必填,1) ─ 自变量*(零或多) ─ [,] ── 选项*(�
 
 1. `> use "data/GDP.csv"` → 加载数据，侧边栏显示变量列表，主内容区显示数据全屏视图
 2. 浏览数据视图，查看各列统计，右键删除不需要的列
-3. `> describe` → 结果流显示所有变量的描述性统计
-4. `> regress gdp inflation year, robust` → 结果流显示回归结果 + 教学层解释
-5. 点击残差直方图 → 展开为大图查看
-6. `> ovtest` → 对上一模型执行 RESET 检验，结果追加到流
-7. `> export markdown` → 导出完整分析报告
+3. `> describe` → 结果流显示数据集规模与变量元数据
+4. `> browse inflation year` → 切换到只读数据全屏视图，并仅显示 `inflation` 与 `year`
+5. `> regress gdp inflation year, robust` → 结果流显示回归结果 + 教学层解释
+6. 点击残差直方图 → 展开为大图查看
+7. `> ovtest` → 对上一模型执行 RESET 检验，结果追加到流
+8. `> export markdown` → 导出完整分析报告
 
 ## 验证计划
 
@@ -384,4 +392,4 @@ xtreg ─ 因变量(必填,1) ─ 自变量*(零或多) ─ [,] ── 选项*(�
 6. **数据全屏视图**：启动 dev server，加载数据集，验证表格渲染、排序、筛选、
    列选择、列信息卡片
 7. **结果流**：执行回归，验证结果块渲染、教学层开关、图表展开/收起
-8. **端到端**：完整走通 `use → browse → regress → test → export` 流程
+8. **端到端**：完整走通 `use → describe → browse → regress → test → export` 流程

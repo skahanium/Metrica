@@ -5,10 +5,9 @@
 # 输出：单行 JSON 到 stdout，由 Runtime 解析为 JuliaEnvelope。
 # ==============================================================================
 
-pushfirst!(LOAD_PATH, joinpath(String(ARGS[2]), "packages"))
-
 using JSON3
 using MetricaBase
+using MetricaData
 using MetricaLinear
 using MetricaOutput
 
@@ -21,7 +20,35 @@ dataset_path = String(request.dataset_ref.path)
 payload = if action == "inspect_dataset"
     options = get(request, :options, Dict{Symbol, Any}())
     preview_rows = Int(get(options, :preview_rows, 5))
-    inspect_dataset(dataset_path; preview_limit=preview_rows)
+    MetricaLinear.inspect_dataset(dataset_path; preview_limit=preview_rows)
+elseif action == "query_dataset"
+    command = get(request, :command, Dict{Symbol, Any}())
+    kind = String(get(command, :kind, ""))
+    raw_variables = get(command, :variables, nothing)
+    variables = isnothing(raw_variables) ? nothing : String.(collect(raw_variables))
+    raw_limit = get(command, :limit, nothing)
+    limit = isnothing(raw_limit) ? 200 : Int(raw_limit)
+
+    if kind == "describe"
+        MetricaData.describe_dataset(dataset_path; variables = variables)
+    elseif kind == "summarize"
+        MetricaData.summarize_dataset(dataset_path; variables = variables)
+    elseif kind == "tabulate"
+        variable = isnothing(variables) || isempty(variables) ? "" : first(variables)
+        MetricaData.tabulate_dataset(dataset_path; variable = variable, max_levels = limit)
+    elseif kind == "browse"
+        MetricaData.browse_dataset(dataset_path; variables = variables)
+    else
+        Dict(
+            "status" => "error",
+            "messages" => Any[Dict(
+                "level" => "error",
+                "code" => "unsupported_data_command",
+                "text" => "不支持的数据查看命令：$(kind)",
+                "hint" => "当前仅支持 describe、browse、summarize、tabulate。",
+            )],
+        )
+    end
 elseif action == "export_report"
     format = String(get(request, :format, "markdown"))
     run_record = get(request, :run_record, Dict{String, Any}())

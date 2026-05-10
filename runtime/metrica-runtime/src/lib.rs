@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 
 pub use server::default_bind_addr;
 pub use julia_bridge::execute_fit_model;
+pub use julia_bridge::execute_query_dataset;
 pub use julia_session::JuliaSession;
 pub use server::{build_router, serve as serve_axum, AppState};
 
@@ -135,6 +136,7 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
 pub mod actions {
     pub const FIT_MODEL: &str = "fit_model";
     pub const INSPECT_DATASET: &str = "inspect_dataset";
+    pub const QUERY_DATASET: &str = "query_dataset";
     pub const TRANSFORM: &str = "transform";
     pub const EXPORT_REPORT: &str = "export_report";
     pub const SAVE_PROJECT: &str = "save_project";
@@ -285,6 +287,24 @@ pub struct TaskRequest {
     pub dataset_ref: DatasetRef,
     pub model_spec: ModelSpec,
     pub options: RequestOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataCommand {
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variables: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataCommandRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    pub dataset_ref: DatasetRef,
+    pub command: DataCommand,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -536,6 +556,27 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
     }
 }
 
+fn sample_data_command_request_base(kind: &str, task_id: &str) -> DataCommandRequest {
+    DataCommandRequest {
+        task_id: task_id.to_string(),
+        action: actions::QUERY_DATASET.to_string(),
+        project_context: ProjectContext {
+            project_id: "alpha-demo".to_string(),
+            working_dir: default_demo_dir(),
+        },
+        dataset_ref: DatasetRef {
+            source: "file".to_string(),
+            path: default_demo_csv(),
+            format: "csv".to_string(),
+        },
+        command: DataCommand {
+            kind: kind.to_string(),
+            variables: Some(vec!["x1".to_string()]),
+            limit: None,
+        },
+    }
+}
+
 pub fn sample_fit_model_request() -> TaskRequest {
     sample_request_base("fit_model", "uuid")
 }
@@ -579,6 +620,16 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         fpc_column: None,
     };
     request.options.return_augment = true;
+    request
+}
+
+pub fn sample_query_dataset_request(kind: &str) -> DataCommandRequest {
+    let mut request = sample_data_command_request_base(kind, "query-uuid");
+    if kind == "describe" || kind == "summarize" {
+        request.command.variables = Some(vec!["y".to_string(), "x1".to_string()]);
+    } else if kind == "browse" {
+        request.command.variables = Some(vec!["y".to_string()]);
+    }
     request
 }
 
@@ -642,7 +693,7 @@ pub fn health_summary() -> HealthSummary {
     HealthSummary {
         service: "metrica-runtime".to_string(),
         status: "ready".to_string(),
-        supported_actions: vec!["inspect_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task"],
+        supported_actions: vec!["inspect_dataset", "query_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task"],
     }
 }
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
+  buildDataCommandRequest,
   buildFitModelRequest, buildLoadProjectRequest, buildRerunTaskRequest,
   buildSaveProjectRequest, buildTransformRequest, listRuns, transformDataset, transformTask,
-  saveProject, loadProject, rerunTask, inspectDataset,
+  saveProject, loadProject, rerunTask, inspectDataset, runDataCommand,
 } from '../services/runtimeClient';
 
 describe('buildFitModelRequest', () => {
@@ -179,6 +180,81 @@ describe('inspectDataset', () => {
 
     expect(requestBody.options.preview_rows).toBeGreaterThanOrEqual(1_000_000);
     expect(result.preview).toHaveLength(8);
+  });
+});
+
+describe('queryDataset', () => {
+  it('builds a dedicated query_dataset request', () => {
+    const request = buildDataCommandRequest({
+      datasetPath: '/tmp/source.csv',
+      command: {
+        kind: 'summarize',
+        variables: ['y', 'x1'],
+      },
+    });
+
+    expect(request.action).toBe('query_dataset');
+    expect(request.dataset_ref.path).toBe('/tmp/source.csv');
+    expect(request.command.kind).toBe('summarize');
+    expect(request.command.variables).toEqual(['y', 'x1']);
+  });
+
+  it('normalizes describe payloads from runtime', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        task_id: 'query-test',
+        status: 'success',
+        messages: [],
+        result_payload: {
+          kind: 'describe',
+          dataset_summary: { row_count: 8, column_count: 2 },
+          variables: [{ name: 'y', inferred_type: 'Float64', missing_count: 0 }],
+        },
+      }),
+    });
+
+    const result = await runDataCommand(
+      {
+        datasetPath: '/tmp/source.csv',
+        command: { kind: 'describe', variables: ['y'] },
+      },
+      'http://runtime.test',
+      fetchImpl as unknown as typeof fetch,
+    );
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://runtime.test/query_dataset',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(result.kind).toBe('describe');
+    expect(result.dataset_summary.row_count).toBe(8);
+  });
+
+  it('rejects legacy model payloads returned from query_dataset', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        task_id: 'query-legacy',
+        status: 'success',
+        messages: [],
+        result_payload: {
+          glance: { model: 'describe', nobs: 8, dof: 0, metrics: {} },
+          tidy: [],
+          diagnostics: {},
+          warnings: [],
+        },
+      }),
+    });
+
+    await expect(runDataCommand(
+      {
+        datasetPath: '/tmp/source.csv',
+        command: { kind: 'describe' },
+      },
+      'http://runtime.test',
+      fetchImpl as unknown as typeof fetch,
+    )).rejects.toThrow(/旧版模型结果/);
   });
 });
 

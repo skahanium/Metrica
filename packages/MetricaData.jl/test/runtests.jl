@@ -3,6 +3,9 @@ using DataFrames
 using Test
 
 @testset "MetricaData.jl" begin
+    @testset "query" begin
+        include("test_query.jl")
+    end
     @testset "transform" begin
         include("test_transform.jl")
     end

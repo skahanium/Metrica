@@ -12,6 +12,8 @@ interface DatasetState {
   selectedVariable: string | null;
   dataHistory: DataHistoryNode[];
   currentHistoryIndex: number;
+  browseColumns: string[] | null;
+  browseReadonly: boolean;
 
   // 现有方法
   isDerived: () => boolean;
@@ -28,6 +30,8 @@ interface DatasetState {
   addDataHistoryNode: (node: DataHistoryNode) => void;
   restoreToHistoryIndex: (index: number) => void;
   getVariableByName: (name: string) => ColumnSummary | undefined;
+  setBrowseContext: (columns: string[] | null, readonly: boolean) => void;
+  clearBrowseContext: () => void;
 }
 
 export const useDatasetStore = create<DatasetState>((set, get) => ({
@@ -41,6 +45,8 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
   selectedVariable: null,
   dataHistory: [],
   currentHistoryIndex: -1,
+  browseColumns: null,
+  browseReadonly: false,
 
   // 现有方法（保持不变）
   isDerived: () => get().sourcePath !== get().activePath,
@@ -95,4 +101,14 @@ export const useDatasetStore = create<DatasetState>((set, get) => ({
     const { summary } = get();
     return summary?.columns.find((col) => col.name === name);
   },
+
+  setBrowseContext: (columns, readonly) => set({
+    browseColumns: columns,
+    browseReadonly: readonly,
+  }),
+
+  clearBrowseContext: () => set({
+    browseColumns: null,
+    browseReadonly: false,
+  }),
 }));

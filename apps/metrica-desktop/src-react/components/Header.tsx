@@ -16,7 +16,7 @@ import {
 import { useAppStore } from '../stores/appStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useProjectStore } from '../stores/projectStore';
-import { saveProject, loadProject, listRuns, inferWorkingDir } from '../services/runtimeClient';
+import { saveProject, loadProject, listRuns, inferWorkingDir, inspectDataset } from '../services/runtimeClient';
 import { pickCsvFile } from '../services/nativeHost';
 import type { MenuProps } from 'antd';
 
@@ -24,7 +24,7 @@ const { Title } = Typography;
 
 export function Header() {
   const { setError, setLoading, setDataFullscreen, setDataHistoryVisible } = useAppStore();
-  const { sourcePath, activePath, summary, setSourceAndActivePath, setSummary } = useDatasetStore();
+  const { sourcePath, activePath, summary, setSourceAndActivePath, setSummary, clearBrowseContext } = useDatasetStore();
   const {
     projectPath, manifest, runHistory, setProjectPath, setManifest, setRunHistory,
     rememberProject, resetProject, setDirty, recentProjects,
@@ -92,6 +92,8 @@ export function Header() {
       setManifest(result.manifest);
       setRunHistory(runs);
       setSourceAndActivePath(result.manifest.source_dataset, result.manifest.active_dataset);
+      clearBrowseContext();
+      setDataFullscreen(false);
       rememberProject(result.project_path);
       setDirty(false);
       setError(null);
@@ -110,7 +112,13 @@ export function Header() {
       if (result.cancelled || !result.path) return;
       setSourceAndActivePath(result.path, result.path);
       setSummary(null);
+      clearBrowseContext();
+      setDataFullscreen(false);
       setDirty(true);
+      // 加载数据摘要
+      const workingDir = inferWorkingDir(result.path);
+      const summary = await inspectDataset(result.path, workingDir);
+      setSummary(summary);
     } catch (e) {
       setError(e instanceof Error ? e.message : '导入 CSV 失败');
     } finally {

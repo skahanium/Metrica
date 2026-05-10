@@ -180,17 +180,5 @@ function result_to_payload(result::GLSFitResult; include_augment::Bool=true)
 end
 
 function inspect_dataset(path::AbstractString; preview_limit::Integer=5)
-    dataset = load_dataset(path)
-    dataset isa MetricaBase.ModelError && return error_to_payload(dataset)
-
-    return Dict(
-        "status" => "success",
-        "messages" => Any[],
-        "result_payload" => Dict(
-            "dataset_summary" => dataset_summary_dict(dataset),
-            "columns" => columns_summary(dataset),
-            "preview_rows" => preview_rows(dataset; limit = Int(preview_limit)),
-            "warnings" => Any[],
-        ),
-    )
+    return MetricaData.inspect_dataset(path; preview_limit = preview_limit)
 end

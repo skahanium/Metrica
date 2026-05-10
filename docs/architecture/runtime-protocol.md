@@ -5,6 +5,7 @@
 ### 第一阶段动作（S1/S2）
 
 - `inspect_dataset`
+- `query_dataset`
 - `fit_model`
 - `transform`
 
@@ -28,6 +29,8 @@
 - 默认绑定：`127.0.0.1:47821`
 - `POST /inspect_dataset`
 - `OPTIONS /inspect_dataset`
+- `POST /query_dataset`
+- `OPTIONS /query_dataset`
 - `POST /fit_model`
 - `OPTIONS /fit_model`
 - `POST /transform`
@@ -50,6 +53,7 @@
 │              axum HTTP 服务                   │
 │  POST /fit_model     → 转发到 Julia 会话     │
 │  POST /inspect_dataset → 转发到 Julia 会话   │
+│  POST /query_dataset → 转发到 Julia 会话     │
 │  POST /transform     → 转发到 Julia 会话      │
 │  GET  /health        → 返回会话状态          │
 └──────────────────┬───────────────────────────┘
@@ -75,6 +79,8 @@
 // 请求（Runtime → Julia stdin，每行一个 JSON）
 {"id": "req-001", "action": "fit_model", "params": {"dataset_path": "data/demo.csv", "formula": "y ~ x1 + x2", "model_type": "ols", "vcov": "classical"}}
 
+{"id": "req-002", "action": "query_dataset", "params": {"dataset_path": "data/demo.csv", "kind": "summarize", "variables": ["y", "x1"], "limit": 200}}
+
 // 响应（Julia stdout → Runtime，每行一个 JSON）
 {"id": "req-001", "status": "success", "payload": {"glance": {...}, "tidy": [...], "warnings": [...]}}
 
@@ -91,6 +97,7 @@
 2. **会话持久化**：数据集加载后留在 Julia 内存中。第二次拟合不同公式不需要重新读取 CSV。
 3. **超时**：Julia 通信使用读线程 + channel 实现真实超时。超时后 kill 进程并返回错误。[计划] 取消信号和进度条尚未实现。
 4. **崩溃恢复**：Julia 进程意外退出时，Runtime 自动重启并通知前端"Julia 环境已重置"。
+5. **只读数据命令独立通道**：`describe`、`browse`、`summarize`、`tabulate` 统一走 `query_dataset`，不复用 `fit_model`，也不写模型运行记录。
 
 ## 请求示例
 
@@ -119,6 +126,36 @@
     "drop_missing": false,
     "return_augment": false,
     "preview_rows": 1000000
+  }
+}
+```
+
+### 数据查看请求
+
+`query_dataset` 专门承载 Stata 风格只读数据命令。当前只支持四类核心命令：
+
+- `describe`：返回数据集规模与变量元数据列表
+- `summarize`：返回每变量 `Obs / Mean / Std. dev. / Min / Max`
+- `tabulate`：返回单变量频数、百分比与累计百分比
+- `browse`：只返回只读浏览配置，不伪造统计结果
+
+```json
+{
+  "task_id": "uuid-query",
+  "action": "query_dataset",
+  "project_context": {
+    "project_id": "proj_001",
+    "working_dir": "/path/to/project"
+  },
+  "dataset_ref": {
+    "source": "file",
+    "path": "data/demo.csv",
+    "format": "csv"
+  },
+  "command": {
+    "kind": "summarize",
+    "variables": ["y", "x1"],
+    "limit": 200
   }
 }
 ```
@@ -296,6 +333,32 @@
         },
         "warnings": []
       }
+    ]
+  }
+}
+```
+
+### 数据查看成功响应示例
+
+```json
+{
+  "task_id": "uuid-query",
+  "status": "success",
+  "messages": [],
+  "artifacts": [],
+  "result_payload": {
+    "kind": "tabulate",
+    "dataset_summary": {
+      "row_count": 128,
+      "column_count": 6
+    },
+    "variable": "region",
+    "total": 128,
+    "missing_count": 0,
+    "truncated": false,
+    "rows": [
+      { "value": "east", "count": 40, "pct": 31.25, "cum_pct": 31.25 },
+      { "value": "west", "count": 88, "pct": 68.75, "cum_pct": 100.0 }
     ]
   }
 }

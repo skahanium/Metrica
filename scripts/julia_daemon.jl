@@ -6,7 +6,7 @@
 #       --startup-file=no --color=no scripts/julia_daemon.jl
 #
 # 协议（每行一个完整 JSON 对象）：
-#   stdin:  {"id":"<请求标识>","action":"fit_model|inspect_dataset|transform|shutdown","params":{...}}
+#   stdin:  {"id":"<请求标识>","action":"fit_model|inspect_dataset|query_dataset|transform|shutdown","params":{...}}
 #   stdout: {"id":"<匹配请求标识>","status":"success|error","payload":{...}}
 #   stdout: {"type":"ready"}  （启动就绪信号）
 #   stdout: {"type":"error","text":"..."}  （非请求关联错误，如 JSON 解析失败）
@@ -62,7 +62,34 @@ function handle_request(req::Dict{String, Any})
         params = req["params"]
         if action == "inspect_dataset"
             preview_rows = Int(get(params, "preview_rows", 5))
-            payload = inspect_dataset(params["dataset_path"]; preview_limit=preview_rows)
+            payload = MetricaLinear.inspect_dataset(params["dataset_path"]; preview_limit=preview_rows)
+        elseif action == "query_dataset"
+            kind = String(get(params, "kind", ""))
+            raw_variables = get(params, "variables", nothing)
+            variables = isnothing(raw_variables) ? nothing : String.(collect(raw_variables))
+            raw_limit = get(params, "limit", nothing)
+            limit = isnothing(raw_limit) ? 200 : Int(raw_limit)
+
+            if kind == "describe"
+                payload = MetricaData.describe_dataset(params["dataset_path"]; variables = variables)
+            elseif kind == "summarize"
+                payload = MetricaData.summarize_dataset(params["dataset_path"]; variables = variables)
+            elseif kind == "tabulate"
+                variable = isnothing(variables) || isempty(variables) ? "" : first(variables)
+                payload = MetricaData.tabulate_dataset(params["dataset_path"]; variable = variable, max_levels = limit)
+            elseif kind == "browse"
+                payload = MetricaData.browse_dataset(params["dataset_path"]; variables = variables)
+            else
+                payload = Dict(
+                    "status" => "error",
+                    "messages" => Any[Dict(
+                        "level" => "error",
+                        "code" => "unsupported_data_command",
+                        "text" => "不支持的数据查看命令：$(kind)",
+                        "hint" => "当前仅支持 describe、browse、summarize、tabulate。",
+                    )],
+                )
+            end
         elseif action == "transform"
             dataset_path = params["dataset_path"]
             operations = JSON3.read(params["operations"], Vector{Dict{String, Any}})
@@ -217,7 +244,7 @@ function handle_request(req::Dict{String, Any})
                     "level" => "error",
                     "code" => "UNKNOWN_ACTION",
                     "text" => "守护进程不支持的动作：$action",
-                    "hint" => "当前支持 fit_model、inspect_dataset、transform 与 export_report。",
+                    "hint" => "当前支持 fit_model、inspect_dataset、query_dataset、transform 与 export_report。",
                 )],
             )
         end

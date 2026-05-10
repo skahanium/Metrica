@@ -1,9 +1,10 @@
 //! Alpha 垂直切片：真实 Julia 桥与最小 HTTP 传输测试。
 
 use metrica_runtime::{
-    execute_fit_model, repo_root,
+    execute_fit_model, execute_query_dataset, repo_root,
     server::build_router,
     sample_fit_model_request, sample_inspect_dataset_request, sample_panel_fit_model_request,
+    sample_query_dataset_request,
     AppState, JuliaSession,
 };
 
@@ -211,6 +212,60 @@ fn inspect_dataset_accepts_paths_relative_to_project_context() {
     assert!(payload.get("dataset_summary").is_some());
     assert!(payload.get("columns").is_some());
     assert!(payload.get("preview_rows").is_some());
+}
+
+#[test]
+fn query_dataset_returns_describe_payload_shape() {
+    let request = sample_query_dataset_request("describe");
+    let response = execute_query_dataset(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert_eq!(
+        payload.get("kind").and_then(|value| value.as_str()),
+        Some("describe")
+    );
+    assert!(payload.get("dataset_summary").is_some());
+    assert!(payload.get("variables").is_some());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn query_dataset_endpoint_returns_tabulate_payload() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+
+    let body = serde_json::json!({
+        "task_id": "query-tabulate",
+        "action": "query_dataset",
+        "project_context": {
+            "project_id": "alpha-demo",
+            "working_dir": concat!(env!("CARGO_MANIFEST_DIR"), "/../..")
+        },
+        "dataset_ref": {
+            "source": "file",
+            "path": "apps/metrica-desktop/data/demo.csv",
+            "format": "csv"
+        },
+        "command": {
+            "kind": "tabulate",
+            "variables": ["x1"]
+        }
+    });
+
+    let response = client
+        .post(format!("http://{addr}/query_dataset"))
+        .json(&body)
+        .send()
+        .await
+        .expect("query dataset response");
+
+    assert!(response.status().is_success());
+    let json: serde_json::Value = response.json().await.expect("query dataset json");
+    let payload = json.get("result_payload").expect("result payload");
+    assert_eq!(payload.get("kind").and_then(|value| value.as_str()), Some("tabulate"));
+    assert!(payload.get("rows").and_then(|value| value.as_array()).is_some());
+
+    server.abort();
 }
 
 #[tokio::test(flavor = "multi_thread")]

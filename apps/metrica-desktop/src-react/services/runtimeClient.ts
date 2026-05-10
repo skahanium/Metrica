@@ -1,4 +1,5 @@
 import type {
+  DataCommandRequest, DataCommandResult,
   DataOp, FitModelRequest, TaskResponse, DatasetSummary, TransformRequest, TransformResult,
   TransformTaskResponse, SaveProjectRequest, ProjectManifest, LoadProjectRequest, ListRunsRequest,
   RerunTaskRequest, RunRecord,
@@ -6,6 +7,12 @@ import type {
 
 const DEFAULT_BASE = 'http://127.0.0.1:47821';
 const FULL_DATA_PREVIEW_ROWS = 1_000_000;
+
+function isDataCommandResult(payload: unknown): payload is DataCommandResult {
+  if (!payload || typeof payload !== 'object') return false;
+  const kind = (payload as { kind?: unknown }).kind;
+  return kind === 'describe' || kind === 'summarize' || kind === 'tabulate' || kind === 'browse';
+}
 
 function createTaskId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -227,6 +234,54 @@ export async function transformDataset(
   if (!json.result_payload) {
     const message = json.messages?.map((m) => m.text).join('; ') || 'Transform returned no payload';
     throw new Error(message);
+  }
+  return json.result_payload;
+}
+
+export interface RunDataCommandParams {
+  datasetPath: string;
+  command: import('../types/protocol').DataCommand;
+  workingDir?: string;
+  projectId?: string;
+}
+
+export function buildDataCommandRequest(params: RunDataCommandParams): DataCommandRequest {
+  const {
+    datasetPath,
+    command,
+    workingDir = inferWorkingDir(datasetPath),
+    projectId = 'alpha-demo',
+  } = params;
+
+  return {
+    task_id: createTaskId(),
+    action: 'query_dataset',
+    project_context: { project_id: projectId, working_dir: workingDir },
+    dataset_ref: { source: 'file', path: datasetPath, format: 'csv' },
+    command,
+  };
+}
+
+export async function runDataCommand(
+  params: RunDataCommandParams,
+  baseUrl: string = DEFAULT_BASE,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DataCommandResult> {
+  const body = JSON.stringify(buildDataCommandRequest(params));
+  const res = await fetchImpl(`${baseUrl}/query_dataset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+  if (!res.ok) throw new Error(`Runtime error: ${res.status}`);
+  const json = await res.json();
+  const messages = Array.isArray(json.messages) ? json.messages : [];
+  if (json.status !== 'success') {
+    const text = messages.map((message: { text?: string }) => message.text).filter(Boolean).join('; ');
+    throw new Error(text || '数据命令执行失败');
+  }
+  if (!isDataCommandResult(json.result_payload)) {
+    throw new Error('运行时返回了旧版模型结果；describe、browse、summarize、tabulate 必须走独立数据命令通道。请重启桌面端与 runtime 后重试。');
   }
   return json.result_payload;
 }

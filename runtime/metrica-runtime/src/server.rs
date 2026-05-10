@@ -11,10 +11,10 @@ use serde_json::json;
 use tokio::sync::{mpsc, oneshot};
 use tower_http::cors::CorsLayer;
 
-use crate::julia_bridge::execute_fit_model;
+use crate::julia_bridge::{execute_fit_model, execute_query_dataset};
 use crate::julia_session::JuliaSession;
 use crate::{
-    health_summary, ExportReportRequest, JuliaResponse, ListRunsRequest, LoadProjectRequest, Message,
+    health_summary, DataCommandRequest, ExportReportRequest, JuliaResponse, ListRunsRequest, LoadProjectRequest, Message,
     ProjectManifest, RerunTaskRequest, RunRecord, SaveProjectRequest, TaskRequest, TaskResponse,
     TransformTaskRequest, ValidationError,
     validate_model_request,
@@ -58,6 +58,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(health_handler))
         .route("/fit_model", post(fit_model_handler))
         .route("/inspect_dataset", post(inspect_dataset_handler))
+        .route("/query_dataset", post(query_dataset_handler))
         .route("/transform", post(transform_handler))
         .route("/save_project", post(save_project_handler))
         .route("/load_project", post(load_project_handler))
@@ -78,7 +79,7 @@ async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
         "service": "metrica-runtime",
         "status": if julia_healthy { "ready" } else { "degraded" },
         "julia_healthy": julia_healthy,
-        "supported_actions": ["inspect_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task", "export_report"],
+        "supported_actions": ["inspect_dataset", "query_dataset", "fit_model", "transform", "save_project", "load_project", "list_runs", "rerun_task", "export_report"],
     }))
 }
 
@@ -96,6 +97,14 @@ async fn inspect_dataset_handler(
     body: String,
 ) -> impl IntoResponse {
     handle_model_request(state, body, actions::INSPECT_DATASET).await
+}
+
+/// POST /query_dataset — 执行 describe/browse/summarize/tabulate 等只读数据命令。
+async fn query_dataset_handler(
+    State(state): State<AppState>,
+    body: String,
+) -> impl IntoResponse {
+    handle_query_dataset_request(state, body).await
 }
 
 // === Transform 辅助函数 =======================================================
@@ -341,6 +350,80 @@ async fn handle_model_request(
 
             let status_code = if status == "success" { StatusCode::OK } else { StatusCode::OK };
             (status_code, [("Content-Type", "application/json")], serde_json::to_string(&task_response).unwrap_or_default()).into_response()
+        }
+        Ok(Err(err)) => json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_JULIA_EXECUTION_FAILED", err,
+            Some("请检查 Julia 环境、依赖安装与请求参数。".to_string()),
+        ),
+        Err(send_err) => json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_INTERNAL_ERROR",
+            send_err,
+            Some("请重试或联系管理员。".to_string()),
+        ),
+    }
+}
+
+async fn handle_query_dataset_request(
+    state: AppState,
+    body: String,
+) -> axum::response::Response {
+    let request: DataCommandRequest = match serde_json::from_str(&body) {
+        Ok(req) => req,
+        Err(err) => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                "unknown".to_string(),
+                "RUNTIME_INVALID_JSON",
+                format!("请求 JSON 解析失败: {err}"),
+                Some("请确认 /query_dataset 请求符合协议。".to_string()),
+            );
+        }
+    };
+
+    if request.action != actions::QUERY_DATASET {
+        return json_error_response(
+            StatusCode::BAD_REQUEST,
+            request.task_id,
+            "RUNTIME_UNSUPPORTED_ACTION",
+            format!("端点 query_dataset 不支持动作 `{}`。", request.action),
+            Some("请将 action 设为 `query_dataset`。".to_string()),
+        );
+    }
+
+    if let Err(err) = sanitize_id(&request.task_id) {
+        return json_error_response(
+            StatusCode::BAD_REQUEST, request.task_id, "RUNTIME_INVALID_TASK_ID", err, None,
+        );
+    }
+
+    let working_dir = resolve_working_dir(&request.project_context.working_dir);
+    let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
+    let params = json!({
+        "dataset_path": dataset_path,
+        "kind": request.command.kind,
+        "variables": request.command.variables,
+        "limit": request.command.limit,
+    });
+
+    let result = dispatch_via_channel(&state.cmd_tx, actions::QUERY_DATASET, params).await;
+
+    match result {
+        Ok(Ok(julia_response)) => {
+            let status = julia_response.get("status").and_then(|v| v.as_str()).unwrap_or("error").to_string();
+            let messages: Vec<Message> = julia_response.get("messages").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+            let result_payload = julia_response.get("result_payload").cloned();
+            let artifacts = if status == "success" { Some(vec![]) } else { None };
+
+            let task_response = TaskResponse {
+                task_id: request.task_id,
+                status,
+                messages,
+                artifacts,
+                run_record: None,
+                result_payload,
+            };
+
+            (StatusCode::OK, [("Content-Type", "application/json")], serde_json::to_string(&task_response).unwrap_or_default()).into_response()
         }
         Ok(Err(err)) => json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR, request.task_id, "RUNTIME_JULIA_EXECUTION_FAILED", err,
@@ -988,6 +1071,7 @@ pub fn build_oneshot_router() -> Router {
         .route("/health", get(oneshot_health_handler))
         .route("/fit_model", post(oneshot_fit_model_handler))
         .route("/inspect_dataset", post(oneshot_inspect_handler))
+        .route("/query_dataset", post(oneshot_query_dataset_handler))
         .route("/save_project", post(save_project_handler))
         .route("/load_project", post(load_project_handler))
         .route("/list_runs", post(list_runs_handler))
@@ -1004,6 +1088,35 @@ async fn oneshot_fit_model_handler(body: String) -> impl IntoResponse {
 
 async fn oneshot_inspect_handler(body: String) -> impl IntoResponse {
     oneshot_handle(body).await
+}
+
+async fn oneshot_query_dataset_handler(body: String) -> impl IntoResponse {
+    let request: DataCommandRequest = match serde_json::from_str(&body) {
+        Ok(req) => req,
+        Err(err) => {
+            return json_error_response(
+                StatusCode::BAD_REQUEST,
+                "unknown".to_string(),
+                "RUNTIME_INVALID_JSON",
+                format!("请求 JSON 解析失败: {err}"),
+                Some("请确认请求体符合 runtime-protocol。".to_string()),
+            );
+        }
+    };
+
+    match execute_query_dataset(&request) {
+        Ok(response) => {
+            let body = serde_json::to_string(&response).unwrap_or_default();
+            (StatusCode::OK, [("Content-Type", "application/json")], body).into_response()
+        }
+        Err(err) => json_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            request.task_id,
+            "RUNTIME_INTERNAL_ERROR",
+            err,
+            Some("请重试或联系管理员。".to_string()),
+        ),
+    }
 }
 
 async fn oneshot_handle(body: String) -> axum::response::Response {

@@ -214,14 +214,84 @@ export interface DataHistoryNode {
   created_at: string;
 }
 
-// ---- 消息流 ----
+// ---- 数据查看命令 ----
+
+export type DataCommandKind = 'describe' | 'browse' | 'summarize' | 'tabulate';
+
+export interface DataCommandSummary {
+  row_count: number;
+  column_count: number;
+}
+
+export interface DescribeVariable {
+  name: string;
+  inferred_type?: string;
+  missing_count?: number;
+  non_missing_count?: number;
+}
+
+export interface SummarizeVariable {
+  name: string;
+  inferred_type?: string;
+  obs: number;
+  mean: number | null;
+  std_dev: number | null;
+  min: number | null;
+  max: number | null;
+}
+
+export interface TabulateRow {
+  value: string;
+  count: number;
+  pct: number;
+  cum_pct: number;
+}
+
+export interface DescribeResult {
+  kind: 'describe';
+  dataset_summary: DataCommandSummary;
+  variables: DescribeVariable[];
+}
+
+export interface SummarizeResult {
+  kind: 'summarize';
+  dataset_summary: DataCommandSummary;
+  variables: SummarizeVariable[];
+}
+
+export interface TabulateResult {
+  kind: 'tabulate';
+  dataset_summary: DataCommandSummary;
+  variable: string;
+  total: number;
+  missing_count: number;
+  truncated: boolean;
+  rows: TabulateRow[];
+}
+
+export interface BrowseResult {
+  kind: 'browse';
+  readonly: boolean;
+  dataset_summary: DataCommandSummary;
+  columns: DescribeVariable[];
+}
+
+export type DataCommandResult = DescribeResult | SummarizeResult | TabulateResult | BrowseResult;
+export type DataResult = DescribeResult | SummarizeResult | TabulateResult;
+
+export interface DataCommand {
+  kind: DataCommandKind;
+  variables?: string[];
+  limit?: number;
+}
 
 export interface MessageItem {
   id: string;
-  kind: 'command' | 'result' | 'transform';
+  kind: 'command' | 'result' | 'transform' | 'data';
   command?: string;
   result?: ModelResult;
   transform_result?: TransformResult;
+  data_result?: DataResult;
   created_at: string;
   is_deleted: boolean;
   deleted_at?: string;
@@ -275,6 +345,14 @@ export interface FitModelRequest {
   dataset_ref: { source: string; path: string; format: string };
   model_spec: ModelSpec;
   options: { drop_missing: boolean; return_augment: boolean; preview_rows?: number };
+}
+
+export interface DataCommandRequest {
+  task_id: string;
+  action: 'query_dataset';
+  project_context: { project_id: string; working_dir: string };
+  dataset_ref: { source: string; path: string; format: string };
+  command: DataCommand;
 }
 
 export interface TaskResponse {
