@@ -1,10 +1,10 @@
 import React, { useRef, useEffect } from 'react';
 import { Empty } from 'antd';
-import { useModelStore } from '../stores/modelStore';
+import { useMessageStore } from '../stores/messageStore';
 import { useAppStore } from '../stores/appStore';
-import { useTransformStore } from '../stores/transformStore';
 import { ResultBlock } from './ResultBlock';
 import { TransformResultBlock } from './TransformResultBlock';
+import { MessageToolbar } from './MessageToolbar';
 
 interface ResultFlowProps {
   onRerun: (command: string) => void;
@@ -12,53 +12,59 @@ interface ResultFlowProps {
 
 export const ResultFlow: React.FC<ResultFlowProps> = ({ onRerun }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const modelHistory = useModelStore((s) => s.modelHistory);
-  const transformItems = useTransformStore((s) => s.resultItems);
+  const messages = useMessageStore((s) => s.messages);
+  const selectedIds = useMessageStore((s) => s.selectedIds);
+  const toggleSelection = useMessageStore((s) => s.toggleSelection);
   const teachingEnabled = useAppStore((s) => s.teachingEnabled);
-  const flowItems = [
-    ...modelHistory.map((item) => ({ kind: 'model' as const, createdAt: item.createdAt, item })),
-    ...transformItems.map((item) => ({ kind: 'transform' as const, createdAt: item.createdAt, item })),
-  ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 
-  // Auto-scroll to bottom when new results appear
+  const sortedMessages = [...messages].sort(
+    (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)
+  );
+
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [flowItems.length]);
-
-  if (flowItems.length === 0) {
-    return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Empty description="尚无分析结果。在命令行输入 use 加载数据，然后输入 regress 等命令开始分析。" />
-      </div>
-    );
-  }
+  }, [sortedMessages.length]);
 
   return (
-    <div ref={containerRef} style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-      {flowItems.map(({ kind, item }) => {
-        if (kind === 'transform') {
-          return (
-            <TransformResultBlock
-              key={item.id}
-              command={item.command}
-              source={item.source}
-              result={item.result}
-              onRerun={onRerun}
-            />
-          );
-        }
-        return item.result ? (
-          <ResultBlock
-            key={item.id}
-            command={item.command || item.formula || item.label || ''}
-            result={item.result}
-            teachingEnabled={teachingEnabled}
-            onRerun={onRerun}
-          />
-        ) : null;
-      })}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <MessageToolbar />
+      <div ref={containerRef} style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        {sortedMessages.length === 0 ? (
+          <Empty description="尚无分析结果。在命令行输入 use 加载数据，然后输入 regress 等命令开始分析。" />
+        ) : (
+          sortedMessages.map((msg) => (
+            <div
+              key={msg.id}
+              onClick={() => toggleSelection(msg.id)}
+              style={{
+                marginBottom: 12,
+                borderRadius: 8,
+                border: selectedIds.has(msg.id) ? '2px solid #1677ff' : '1px solid #f0f0f0',
+                transition: 'border 0.2s',
+                cursor: 'pointer',
+              }}
+            >
+              {msg.kind === 'transform' && msg.transform_result ? (
+                <TransformResultBlock
+                  command={msg.command || ''}
+                  source="cli"
+                  result={msg.transform_result}
+                  onRerun={onRerun}
+                />
+              ) : msg.result ? (
+                <ResultBlock
+                  command={msg.command || ''}
+                  result={msg.result}
+                  teachingEnabled={teachingEnabled}
+                  onRerun={onRerun}
+                />
+              ) : null}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
