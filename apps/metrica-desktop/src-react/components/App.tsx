@@ -1,8 +1,6 @@
 import { useEffect, useCallback, useState } from 'react';
-import { ConfigProvider, theme, Alert } from 'antd';
+import { ConfigProvider, theme, Alert, Typography } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
 import { CommandLine } from './CommandLine';
 import type { CliFeedback } from './CommandLine';
 import { ResultFlow } from './ResultFlow';
@@ -10,26 +8,23 @@ import { DataFullscreen } from './DataFullscreen';
 import { TrashPanel } from './TrashPanel';
 import { DataHistoryPanel } from './DataHistoryPanel';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
-import { useModelStore } from '../stores/modelStore';
 import { useDatasetStore } from '../stores/datasetStore';
-import { useMessageStore } from '../stores/messageStore';
-import { parse, parseToModelSpec } from '../services/commandParser';
-import { isDataOperationVerb, parseToDataOp } from '../services/commandDataOps';
-import { executeDataOperations } from '../services/dataOperationExecutor';
-import * as api from '../services/runtimeClient';
+import { parse } from '../services/commandParser';
+import {
+  handleUse, handleProject, handleTrash, handleDatahistory, handleSave,
+  handleDataView, handleDataOp, handleModel,
+  handleDiagnostic, handlePostest,
+  requiresActiveDataset, isDiagnosticVerb, isPostestVerb,
+} from '../services/commandExecutor';
+import { isDataOperationVerb } from '../services/commandDataOps';
+
+const { Text } = Typography;
 
 export function App() {
   const {
     error, juliaHealthy, restartCount, dataFullscreen,
-    startHealthPolling, stopHealthPolling, setError, setLoading, setDataFullscreen,
+    startHealthPolling, stopHealthPolling, setError,
   } = useAppStore();
-  const setLastResult = useModelStore((s) => s.setLastResult);
-  const addToHistory = useModelStore((s) => s.addToHistory);
-  const addMessage = useMessageStore((s) => s.addMessage);
-  const setSummary = useDatasetStore((s) => s.setSummary);
-  const setSourceAndActivePath = useDatasetStore((s) => s.setSourceAndActivePath);
-  const setBrowseContext = useDatasetStore((s) => s.setBrowseContext);
-  const clearBrowseContext = useDatasetStore((s) => s.clearBrowseContext);
   const activePath = useDatasetStore((s) => s.activePath);
   const [cliFeedback, setCliFeedback] = useState<CliFeedback | null>(null);
 
@@ -45,235 +40,81 @@ export function App() {
   const executeCommand = useCallback((input: string): boolean | Promise<boolean> => {
     const parsed = parse(input);
     if (parsed.error) {
-      const message = parsed.error.startsWith('未知命令:')
+      const msg = parsed.error.startsWith('未知命令:')
         ? `${parsed.error.replace(/^未知命令:\s*/, '未知命令：')}。请从补全列表选择可用命令。`
         : parsed.error;
-      showCliFeedback('error', message);
+      showCliFeedback('error', msg);
       return false;
     }
 
-    const verb = parsed.verb;
+    const { verb } = parsed;
 
-    // --- use "path" ---
-    if (verb === 'use') {
-      const raw = parsed.positionals[0] || '';
-      if (raw === 'clear') {
-        useDatasetStore.getState().setSourceAndActivePath('', '');
-        useDatasetStore.getState().setSummary(null);
-        clearBrowseContext();
-        setDataFullscreen(false);
-        setError(null);
-        setCliFeedback(null);
-        return true;
-      }
-      const filePath = raw.replace(/^["']|["']$/g, '');
-      if (!filePath) {
-        showCliFeedback('warning', 'use 命令需要指定数据文件路径');
-        return false;
-      }
-      return (async () => {
-        setLoading(true);
-        try {
-          const result = await api.inspectDataset(filePath);
-          setSourceAndActivePath(filePath, filePath);
-          setSummary(result);
-          clearBrowseContext();
-          setDataFullscreen(false);
-          setError(null);
-          setCliFeedback(null);
-        } catch (e: any) {
-          setError(e.message || '数据加载失败');
-        } finally {
-          setLoading(false);
-        }
-        return true;
-      })();
-    }
-
-    // --- guard: need dataset ---
-    if (!activePath) {
-      showCliFeedback('warning', '请先加载数据集，再执行模型或数据操作命令');
-      return false;
-    }
-
-    // --- data viewing commands ---
-    if (verb === 'describe' || verb === 'browse' || verb === 'summarize' || verb === 'tabulate') {
-      return (async () => {
-        setLoading(true);
-        try {
-          const result = await api.runDataCommand({
-            datasetPath: activePath,
-            command: {
-              kind: verb,
-              variables: parsed.positionals.length > 0 ? parsed.positionals : undefined,
-            },
-          });
-          if (result.kind === 'browse') {
-            setBrowseContext(result.columns.map((column) => column.name), result.readonly);
-            setDataFullscreen(true);
-          } else {
-            clearBrowseContext();
-            addMessage({ kind: 'data', command: input, data_result: result });
-          }
-          setError(null);
-          setCliFeedback(null);
-        } catch (e: any) {
-          showCliFeedback('warning', e.message || '数据命令执行失败');
+    // 命令路由表
+    switch (verb) {
+      case 'use': return handleUse(parsed, input, showCliFeedback);
+      case 'project': return handleProject(parsed, input, showCliFeedback);
+      case 'trash': return handleTrash(parsed, input, showCliFeedback);
+      case 'datahistory': return handleDatahistory(parsed, input, showCliFeedback);
+      case 'save': return handleSave(parsed, input, showCliFeedback);
+      default: {
+        if (!activePath && requiresActiveDataset(verb)) {
+          showCliFeedback('warning', '请先加载数据集，再执行模型或数据操作命令');
           return false;
-        } finally {
-          setLoading(false);
         }
-        return true;
-      })();
-    }
-
-    if (isDataOperationVerb(verb)) {
-      const opResult = parseToDataOp(parsed);
-      if ('error' in opResult) {
-        showCliFeedback('warning', opResult.error);
-        return false;
+        if (verb === 'describe' || verb === 'browse' || verb === 'summarize' || verb === 'tabulate') {
+          return handleDataView(parsed, input, showCliFeedback);
+        }
+        if (isDiagnosticVerb(verb)) return handleDiagnostic(parsed, input, showCliFeedback);
+        if (isPostestVerb(verb)) return handlePostest(parsed, input, showCliFeedback);
+        if (isDataOperationVerb(verb)) return handleDataOp(parsed, input, showCliFeedback);
+        // fallthrough to model
+        return handleModel(parsed, input, showCliFeedback);
       }
-      return (async () => {
-        try {
-          await executeDataOperations({
-            operations: [opResult],
-            commandLabel: input,
-            source: 'cli',
-          });
-          setCliFeedback(null);
-        } catch {
-          // executeDataOperations 已经写入结构化错误状态。
-        }
-        return true;
-      })();
     }
-
-    // --- modeling commands ---
-    const modelSpecResult = parseToModelSpec(parsed);
-    if (!('error' in modelSpecResult)) {
-      return (async () => {
-        setLoading(true);
-        try {
-          const result = await api.fitModel({
-            datasetPath: activePath,
-            formula: modelSpecResult.formula || '',
-            modelType: modelSpecResult.model_type,
-            vcovType: (modelSpecResult.vcov as any)?.type || 'classical',
-            weightsColumn: modelSpecResult.weights || modelSpecResult.weights_column || '',
-            clusterColumn: modelSpecResult.cluster_column || '',
-            panelId: modelSpecResult.panel_id || '',
-            panelTime: modelSpecResult.panel_time || '',
-            panelMethod: modelSpecResult.panel_method || '',
-            instruments: Array.isArray(modelSpecResult.instruments)
-              ? modelSpecResult.instruments.join(',')
-              : (modelSpecResult.instruments || ''),
-            endogColumns: Array.isArray(modelSpecResult.endog_columns)
-              ? modelSpecResult.endog_columns.join(',')
-              : (modelSpecResult.endog_columns || ''),
-            treatmentColumn: modelSpecResult.treatment_column || modelSpecResult.treated_column || '',
-            postColumn: modelSpecResult.post_column || '',
-            eventTimeColumn: modelSpecResult.event_time_column || '',
-            outcomeColumn: modelSpecResult.outcome_column || '',
-            orderP: modelSpecResult.order?.[0],
-            orderD: modelSpecResult.order?.[1],
-            orderQ: modelSpecResult.order?.[2],
-            strataColumn: modelSpecResult.strata_column || '',
-            psuColumn: modelSpecResult.psu_column || '',
-            fpcColumn: modelSpecResult.fpc_column || '',
-          });
-          const payload = (result as any).result_payload;
-          if (payload && payload.glance) {
-            setLastResult(payload);
-            addToHistory({
-              id: crypto.randomUUID(),
-              label: input,
-              runId: (result as any).task_id || '',
-              modelType: modelSpecResult.model_type,
-              formula: modelSpecResult.formula || '',
-              datasetPath: activePath,
-              result: payload,
-              createdAt: new Date().toISOString(),
-              command: input,
-            });
-            // 添加到消息流
-            addMessage({
-              kind: 'result',
-              command: input,
-              result: payload,
-            });
-            setError(null);
-            setCliFeedback(null);
-          } else {
-            setError('模型返回结果异常');
-          }
-        } catch (e: any) {
-          setError(e.message || '模型拟合失败');
-        } finally {
-          setLoading(false);
-        }
-        return true;
-      })();
-    }
-
-    // parseToModelSpec returned error
-    if ('error' in modelSpecResult) {
-      showCliFeedback('warning', modelSpecResult.error);
-      return false;
-    }
-    return true;
-  }, [activePath, setLoading, setError, setLastResult, addToHistory, addMessage, setSummary, setSourceAndActivePath, setBrowseContext, clearBrowseContext, setDataFullscreen, showCliFeedback]);
+  }, [activePath, showCliFeedback]);
 
   return (
     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }} locale={zhCN}>
       <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flexShrink: 0 }}>
-          <Header />
+        {/* 品牌条 */}
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          padding: '0 24px', height: 48, background: '#fff',
+          borderBottom: '1px solid #f0f0f0', flexShrink: 0,
+        }}>
+          <Text style={{ letterSpacing: 4, fontWeight: 700, color: '#8c8c8c', fontSize: 18 }}>
+            METRICA
+          </Text>
         </div>
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-          <div style={{ width: 280, flexShrink: 0, background: '#fafafa', overflow: 'hidden', borderRight: '1px solid #f0f0f0' }}>
-            <Sidebar />
+
+        {/* 主面板：消息流 + CLI */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minHeight: 0 }}>
+          {error && (
+            <Alert type="error" message={error} closable onClose={() => setError(null)}
+              showIcon style={{ flexShrink: 0, margin: '8px 16px 0' }} />
+          )}
+          {!juliaHealthy && restartCount < MAX_RESTARTS && (
+            <Alert type="warning"
+              message={`Julia 计算引擎不可用（已自动重启 ${restartCount} 次）。运行时正在尝试自动恢复，请稍候重试。`}
+              showIcon style={{ flexShrink: 0, margin: '8px 16px 0' }} />
+          )}
+          {!juliaHealthy && restartCount >= MAX_RESTARTS && (
+            <Alert type="error"
+              message={`Julia 计算引擎已崩溃 ${MAX_RESTARTS} 次，已达最大重启次数。请检查 Julia 环境后刷新页面。`}
+              showIcon style={{ flexShrink: 0, margin: '8px 16px 0' }} />
+          )}
+          <div style={{ flex: 1, overflow: dataFullscreen ? 'hidden' : 'auto', minHeight: 0 }}>
+            {dataFullscreen ? <DataFullscreen /> : <ResultFlow />}
           </div>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0 }}>
-            {error && (
-              <Alert
-                type="error"
-                message={error}
-                closable
-                onClose={() => setError(null)}
-                showIcon
-                style={{ flexShrink: 0, margin: '8px 16px 0' }}
-              />
-            )}
-            {!juliaHealthy && restartCount < MAX_RESTARTS && (
-              <Alert
-                type="warning"
-                message={`Julia 计算引擎不可用（已自动重启 ${restartCount} 次）。运行时正在尝试自动恢复，请稍候重试。`}
-                showIcon
-                style={{ flexShrink: 0, margin: '8px 16px 0' }}
-              />
-            )}
-            {!juliaHealthy && restartCount >= MAX_RESTARTS && (
-              <Alert
-                type="error"
-                message={`Julia 计算引擎已崩溃 ${MAX_RESTARTS} 次，已达最大重启次数。请检查 Julia 环境后刷新页面。`}
-                showIcon
-                style={{ flexShrink: 0, margin: '8px 16px 0' }}
-              />
-            )}
-            <div style={{ flex: 1, overflow: dataFullscreen ? 'hidden' : 'auto', minHeight: 0, display: 'flex' }}>
-              {dataFullscreen ? <DataFullscreen /> : <ResultFlow onRerun={executeCommand} />}
-            </div>
-            <div style={{ flexShrink: 0 }}>
-              <CommandLine
-                onExecute={executeCommand}
-                feedback={cliFeedback}
-                onClearFeedback={() => setCliFeedback(null)}
-              />
-            </div>
+          <div style={{ flexShrink: 0 }}>
+            <CommandLine
+              onExecute={executeCommand}
+              feedback={cliFeedback}
+              onClearFeedback={() => setCliFeedback(null)}
+            />
           </div>
         </div>
       </div>
-      {/* 模态面板 */}
       <TrashPanel />
       <DataHistoryPanel />
     </ConfigProvider>

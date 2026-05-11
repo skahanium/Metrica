@@ -15,15 +15,17 @@ export const DataResultBlock: React.FC<DataResultBlockProps> = ({ command, resul
     const dataSource = result.variables.map((col: DescribeVariable, idx) => ({
       key: idx,
       name: col.name,
-      inferred_type: col.inferred_type || 'unknown',
-      missing_count: col.missing_count || 0,
-      non_missing_count: col.non_missing_count || 0,
+      dtype: col.dtype || col.inferred_type || 'unknown',
+      missing_count: col.missing_count ?? 0,
+      unique_count: col.unique_count ?? 0,
+      label: col.label || col.name,
     }));
 
     const columns = [
-      { title: '变量名', dataIndex: 'name', key: 'name', width: 150 },
-      { title: '推断类型', dataIndex: 'inferred_type', key: 'inferred_type', width: 100 },
-      { title: '非缺失', dataIndex: 'non_missing_count', key: 'non_missing_count', width: 100 },
+      { title: '变量名', dataIndex: 'name', key: 'name', width: 140 },
+      { title: '类型', dataIndex: 'dtype', key: 'dtype', width: 90 },
+      { title: '标签', dataIndex: 'label', key: 'label', width: 140, ellipsis: true },
+      { title: '唯一值', dataIndex: 'unique_count', key: 'unique_count', width: 80 },
       {
         title: '缺失值', dataIndex: 'missing_count', key: 'missing_count', width: 80,
         render: (val: number) => val > 0 ? <Tag color="gold">{val}</Tag> : <Text type="secondary">0</Text>,
@@ -48,25 +50,31 @@ export const DataResultBlock: React.FC<DataResultBlockProps> = ({ command, resul
 
   const renderSummarize = () => {
     if (result.kind !== 'summarize') return null;
+    const formatNum = (v: number | null) => v === null ? <Text type="secondary">NA</Text> : v.toFixed(4);
     const dataSource = result.variables.map((stat: SummarizeVariable, idx) => ({
       key: idx,
       name: stat.name,
-      inferred_type: stat.inferred_type || 'unknown',
+      dtype: stat.dtype || stat.inferred_type || '',
       obs: stat.obs,
       mean: stat.mean,
       std_dev: stat.std_dev,
       min: stat.min,
       max: stat.max,
+      p25: stat.p25 ?? null,
+      p50: stat.p50 ?? null,
+      p75: stat.p75 ?? null,
     }));
 
     const columns = [
-      { title: '变量名', dataIndex: 'name', key: 'name', width: 150 },
-      { title: '类型', dataIndex: 'inferred_type', key: 'inferred_type', width: 120 },
-      { title: 'Obs', dataIndex: 'obs', key: 'obs', width: 80 },
-      { title: 'Mean', dataIndex: 'mean', key: 'mean', width: 100, render: (value: number | null) => value === null ? <Text type="secondary">NA</Text> : value.toFixed(4) },
-      { title: 'Std. dev.', dataIndex: 'std_dev', key: 'std_dev', width: 110, render: (value: number | null) => value === null ? <Text type="secondary">NA</Text> : value.toFixed(4) },
-      { title: 'Min', dataIndex: 'min', key: 'min', width: 100, render: (value: number | null) => value === null ? <Text type="secondary">NA</Text> : value.toFixed(4) },
-      { title: 'Max', dataIndex: 'max', key: 'max', width: 100, render: (value: number | null) => value === null ? <Text type="secondary">NA</Text> : value.toFixed(4) },
+      { title: '变量名', dataIndex: 'name', key: 'name', width: 120 },
+      { title: 'N', dataIndex: 'obs', key: 'obs', width: 70 },
+      { title: 'Mean', dataIndex: 'mean', key: 'mean', width: 90, render: formatNum },
+      { title: 'SD', dataIndex: 'std_dev', key: 'std_dev', width: 90, render: formatNum },
+      { title: 'Min', dataIndex: 'min', key: 'min', width: 90, render: formatNum },
+      { title: 'P25', dataIndex: 'p25', key: 'p25', width: 90, render: formatNum },
+      { title: 'P50', dataIndex: 'p50', key: 'p50', width: 90, render: formatNum },
+      { title: 'P75', dataIndex: 'p75', key: 'p75', width: 90, render: formatNum },
+      { title: 'Max', dataIndex: 'max', key: 'max', width: 90, render: formatNum },
     ];
 
     return (

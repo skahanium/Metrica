@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react';
-import { Input } from 'antd';
+import { createPortal } from 'react-dom';
 import { useCommandStore } from '../stores/commandStore';
 import { useDatasetStore } from '../stores/datasetStore';
-import { getContext, getCompletions, getCorrections, getGhostText, getPartial, getUsedVariableNames } from '../services/autocomplete';
+import { getContext, getCompletions, getCorrections, getGhostText, getPartial, getUsedVariableNames, getMissingRequiredOptions } from '../services/autocomplete';
 import { COMMAND_LIST } from '../services/commandGrammar';
 import type { ColumnSummary } from '../types/protocol';
 
@@ -83,7 +83,7 @@ export interface CliFeedback {
 }
 
 export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = null, onClearFeedback }) => {
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const caretTextRef = useRef<HTMLSpanElement>(null);
@@ -123,7 +123,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     }
 
     const shellWidth = shellRef.current?.clientWidth || 900;
-    const inputEl = inputRef.current?.input as HTMLInputElement | undefined;
+    const inputEl = inputRef.current;
     const paddingRight = COMPLETION_EDGE_PADDING;
 
     let caretLeft = 42 + value.slice(0, anchorPos).length * 8.4;
@@ -234,7 +234,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     [columns, setCompletions, setGhostText, setCorrection]
   );
 
-  const measureInputTextWidth = useCallback((inputEl: HTMLInputElement, text: string): number => {
+  const measureInputTextWidth = useCallback((inputEl: HTMLTextAreaElement, text: string): number => {
     const style = window.getComputedStyle(inputEl);
     let textWidth = text.length * 8.4;
     if (measureRef.current) {
@@ -250,7 +250,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   }, []);
 
   const ensureCaretVisible = useCallback((value: string, nextCursor: number) => {
-    const inputEl = inputRef.current?.input as HTMLInputElement | undefined;
+    const inputEl = inputRef.current;
     if (!inputEl) return;
 
     const style = window.getComputedStyle(inputEl);
@@ -271,7 +271,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   }, [measureInputTextWidth]);
 
   const applyCompletion = useCallback((item: { text: string; kind: string }) => {
-    const selStart = inputRef.current?.input?.selectionStart ?? input.length;
+    const selStart = inputRef.current?.selectionStart ?? input.length;
     const beforeCursor = input.slice(0, selStart);
     const afterCursor = input.slice(selStart);
     const lastDelim = Math.max(
@@ -286,7 +286,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     hideCompletions();
     setGhostText(null);
     window.requestAnimationFrame(() => {
-      const el = inputRef.current?.input as HTMLInputElement | undefined;
+      const el = inputRef.current;
       el?.setSelectionRange(newCursor, newCursor);
       ensureCaretVisible(newInput, newCursor);
       updateCompletionBox(newInput, newCursor);
@@ -300,7 +300,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     const editsText = insertsText || EDITING_CONTROL_KEYS.has(e.key);
     if (!editsText) return false;
 
-    const inputEl = inputRef.current?.input as HTMLInputElement | undefined;
+    const inputEl = inputRef.current;
     const value = inputEl?.value ?? input;
     const start = inputEl?.selectionStart ?? cursorPos;
     const end = inputEl?.selectionEnd ?? start;
@@ -334,7 +334,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     updateCompletionBox(nextValue, nextCursor);
     updateCompletions(nextValue, nextCursor);
     window.requestAnimationFrame(() => {
-      const el = inputRef.current?.input as HTMLInputElement | undefined;
+      const el = inputRef.current;
       el?.setSelectionRange(nextCursor, nextCursor);
       ensureCaretVisible(nextValue, nextCursor);
       updateCompletionBox(nextValue, nextCursor);
@@ -343,7 +343,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   }, [cursorPos, ensureCaretVisible, input, setInput, updateCompletionBox, updateCompletions]);
 
   const syncCaretFromDom = useCallback(() => {
-    const inputEl = inputRef.current?.input as HTMLInputElement | undefined;
+    const inputEl = inputRef.current;
     const value = inputEl?.value ?? input;
     const pos = inputEl?.selectionStart ?? value.length;
     updateCompletionBox(value, pos);
@@ -352,7 +352,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     }
   }, [input, setInput, updateCompletionBox]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     const pos = e.target.selectionStart ?? value.length;
     setInput(value, pos);
@@ -384,8 +384,9 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
         return;
       }
       finishSubmit(result as void | boolean, trimmed);
-    } catch {
+    } catch (e: unknown) {
       // 执行入口自身抛错时保留输入，方便用户修正或重试。
+      console.error('命令执行异常:', e);
     }
   }, [finishSubmit, onExecute]);
 
@@ -482,7 +483,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     if (!showCompletions) return undefined;
     let frame = 0;
     const syncFrame = () => {
-      const inputEl = inputRef.current?.input as HTMLInputElement | undefined;
+      const inputEl = inputRef.current;
       if (inputEl) {
         const value = inputEl.value;
         const pos = inputEl.selectionStart ?? value.length;
@@ -495,7 +496,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   }, [showCompletions, updateCompletionBox]);
 
   useEffect(() => {
-    const inputEl = inputRef.current?.input as HTMLInputElement | undefined;
+    const inputEl = inputRef.current;
     if (!inputEl) return undefined;
     const sync = () => {
       const value = inputEl.value;
@@ -516,28 +517,39 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
 
   // Compute ghost text display: the full input + ghost suffix
   const ghostDisplay = ghostText && !showCompletions ? input + ghostText : null;
-  const completionAnchorText = input.slice(0, getCompletionAnchorPos(input, cursorPos, columns));
   const anchorOffset = Math.min(
     Math.max(14, completionBox.anchorX - completionBox.left),
     Math.max(14, completionBox.width - 14),
   );
   const compactCompletion = completionBox.width < 420 || completionBox.placement === 'compact';
-  const completionDropdown = showCompletions && completions.length > 0 ? (
+  const missingOptions = showCompletions ? getMissingRequiredOptions(input) : [];
+  const commandPreview = showCompletions ? input.trim() : '';
+
+  // Portal-based dropdown: escapes parent overflow clipping
+  const [shellRect, setShellRect] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    if (showCompletions && shellRef.current) {
+      setShellRect(shellRef.current.getBoundingClientRect());
+    }
+  }, [showCompletions, input]);
+
+  const completionDropdown = showCompletions && (completions.length > 0 || missingOptions.length > 0)
+    ? createPortal(
     <div
       data-testid="completion-menu"
       style={{
-        position: 'absolute',
-        bottom: 44,
-        left: `var(--completion-left, ${completionBox.left}px)`,
-        width: `var(--completion-width, ${completionBox.width}px)`,
-        maxWidth: `calc(100% - 32px)`,
+        position: 'fixed',
+        bottom: shellRect ? `${window.innerHeight - shellRect.top + 8}px` : 'auto',
+        left: shellRect ? `${Math.max(16, completionBox.left + (shellRect?.left ?? 0))}px` : '16px',
+        width: shellRect ? `${completionBox.width}px` : 'auto',
+        maxWidth: `calc(100vw - 32px)`,
         background: '#fff',
         border: '1px solid #d7e3f2',
         borderRadius: 10,
-        maxHeight: 220,
+        maxHeight: 260,
         overflowX: 'hidden',
         overflowY: 'auto',
-        zIndex: 1000,
+        zIndex: 10000,
         boxShadow: '0 16px 38px rgba(15, 23, 42, 0.16)',
         pointerEvents: 'auto',
       }}
@@ -558,20 +570,15 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
           boxShadow: '8px 8px 18px rgba(15, 23, 42, 0.06)',
         }}
       />
-      <span
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: anchorOffset,
-          bottom: 0,
-          width: 2,
-          height: 10,
-          transform: 'translateX(-50%)',
-          background: '#1677ff',
-          borderRadius: 2,
-          opacity: completionBox.placement === 'flip' || completionBox.placement === 'compact' ? 0.9 : 0,
-        }}
-      />
+      {commandPreview && (
+        <div style={{
+          padding: '6px 14px', fontSize: 11, color: '#8c8c8c',
+          borderBottom: '1px solid #f0f0f0', fontFamily: 'monospace',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          命令预览：<span style={{ color: '#1677ff' }}>{commandPreview}</span>
+        </div>
+      )}
       {correction && (
         <div style={{ padding: '4px 12px', fontSize: 12, color: '#999', borderBottom: '1px solid #f0f0f0' }}>
           未找到。你的意思是？
@@ -616,7 +623,16 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
           )}
         </div>
       ))}
-    </div>
+      {missingOptions.length > 0 && (
+        <div style={{
+          padding: '6px 14px', fontSize: 11, color: '#faad14',
+          borderTop: '1px solid #f0f0f0', background: '#fffbe6',
+        }}>
+          还需填写：{missingOptions.map(o => o.name).join('、')}
+        </div>
+      )}
+    </div>,
+    document.body,
   ) : null;
   const feedbackColors = feedback?.level === 'warning'
     ? {
@@ -637,10 +653,14 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
       data-testid="command-shell"
       style={{
         position: 'relative',
-        padding: '10px 16px 6px',
+        padding: '8px 16px 6px',
         borderTop: '1px solid #e8e8e8',
         background: '#fafafa',
         flexShrink: 0,
+        resize: 'vertical',
+        overflow: 'hidden',
+        minHeight: 72,
+        maxHeight: 200,
       }}
       ref={shellRef}
     >
@@ -725,82 +745,62 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
         }}
       />
 
-      {/* Command input with ghost text */}
-      <div style={{ position: 'relative' }}>
+      {/* Command input with ghost text (rendered inside the same container as textarea for alignment) */}
+      {ghostDisplay && (
         <div
           aria-hidden="true"
           style={{
             position: 'absolute',
-            left: 0,
-            top: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            paddingLeft: 26,
+            left: 16,
+            right: 16,
+            top: 8,
             pointerEvents: 'none',
-            zIndex: 3,
+            zIndex: 1,
             fontFamily: 'monospace',
             fontSize: 14,
-            fontWeight: 400,
-            lineHeight: '32px',
-            whiteSpace: 'pre',
+            lineHeight: '22px',
+            paddingLeft: 17,
+            paddingTop: 5,
+            display: 'flex',
+            overflow: 'hidden',
           }}
         >
-          <span ref={caretTextRef} style={{ visibility: 'hidden' }}>
-            {completionAnchorText}
+          <span style={{ visibility: 'hidden' }}>{input}</span>
+          <span style={{ color: '#bfbfbf' }}>{ghostText}</span>
+        </div>
+      )}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start' }}>
+          <span style={{
+            color: '#1677ff', fontWeight: 600, fontFamily: 'monospace', fontSize: 14,
+            lineHeight: '22px', paddingTop: 5, paddingRight: 6, userSelect: 'none',
+          }}>
+            &gt;
           </span>
-          <span
-            data-testid="completion-anchor"
+          <textarea
+            ref={inputRef as React.Ref<HTMLTextAreaElement>}
+            placeholder="输入命令... (regress / summarize / describe / ...)"
+            value={input}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleCursorMove}
+            onClick={handleCursorMove}
+            onSelect={handleCursorMove}
+            onBlur={() => setTimeout(hideCompletions, 200)}
+            rows={2}
             style={{
-              position: 'relative',
-              display: 'inline-block',
-              width: 0,
-              height: 0,
-              visibility: 'visible',
+              flex: 1,
+              fontFamily: 'monospace',
+              fontSize: 14,
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              resize: 'none',
+              lineHeight: '22px',
+              padding: '5px 0',
+              color: 'rgba(0,0,0,0.88)',
             }}
           />
         </div>
-        {ghostDisplay && (
-          <div
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              paddingLeft: 26, // align with text inside Input (prefix width)
-              pointerEvents: 'none',
-              zIndex: 1,
-              fontFamily: 'monospace',
-              fontSize: 14,
-            }}
-          >
-            <span style={{ visibility: 'hidden' }}>{input}</span>
-            <span style={{ color: '#bfbfbf' }}>{ghostText}</span>
-          </div>
-        )}
-        <Input
-          ref={inputRef}
-          prefix={
-            <span style={{ color: '#1677ff', fontWeight: 600, fontFamily: 'monospace' }}>
-              &gt;
-            </span>
-          }
-          placeholder="输入命令... (regress / summarize / describe / ...)"
-          value={input}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onKeyUp={handleCursorMove}
-          onClick={handleCursorMove}
-          onSelect={handleCursorMove}
-          onBlur={() => setTimeout(hideCompletions, 200)}
-          variant="borderless"
-          style={{ fontFamily: 'monospace', fontSize: 14 }}
-        />
-      </div>
 
       {/* Hint bar */}
       <div

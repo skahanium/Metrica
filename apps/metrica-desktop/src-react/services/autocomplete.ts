@@ -258,6 +258,50 @@ export function getCorrections(
     }));
 }
 
+// --- Missing Required Options ---
+
+export interface MissingOption {
+  name: string;
+  label: string;
+}
+
+export function getMissingRequiredOptions(
+  input: string,
+): MissingOption[] {
+  const tokens = input.trim().split(/\s+/);
+  const verb = tokens[0]?.toLowerCase() || '';
+  const grammar = getGrammar(verb);
+  if (!grammar) return [];
+
+  const optNode = grammar.syntax.find(n => n.kind === 'option');
+  if (!optNode?.children) return [];
+
+  const hasComma = input.includes(',');
+  if (!hasComma) {
+    // All options are missing — show all required ones
+    return Object.entries(optNode.children)
+      .filter(([_, node]) => node.required)
+      .map(([name, node]) => ({ name, label: node.label }));
+  }
+
+  // Check which required options are already present
+  const afterComma = input.slice(input.indexOf(',') + 1);
+  const presentOptions = new Set<string>();
+  for (const match of afterComma.matchAll(/(\w+)\(/g)) {
+    presentOptions.add(match[1].toLowerCase());
+  }
+  for (const match of afterComma.matchAll(/\b(\w+)\b/g)) {
+    const opt = match[1].toLowerCase();
+    if (optNode.children[opt]) {
+      presentOptions.add(opt);
+    }
+  }
+
+  return Object.entries(optNode.children)
+    .filter(([name, node]) => node.required && !presentOptions.has(name))
+    .map(([name, node]) => ({ name, label: node.label }));
+}
+
 // --- Ghost Text ---
 
 export function getGhostText(

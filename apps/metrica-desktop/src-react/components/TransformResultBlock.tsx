@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Button, Space, Table, Tag, Typography } from 'antd';
-import { CopyOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CopyOutlined } from '@ant-design/icons';
 import type { TransformResult } from '../types/protocol';
 
 const { Text } = Typography;
@@ -9,10 +9,9 @@ interface TransformResultBlockProps {
   command: string;
   source: 'cli' | 'ui';
   result: TransformResult;
-  onRerun: (command: string) => void;
 }
 
-export const TransformResultBlock: React.FC<TransformResultBlockProps> = ({ command, source, result, onRerun }) => {
+export const TransformResultBlock: React.FC<TransformResultBlockProps> = ({ command, source, result }) => {
   const rows = result.preview?.rows ?? [];
   const columns = result.preview?.columns ?? (rows[0] ? Object.keys(rows[0]) : []);
   const statusColor = result.status === 'error' ? 'red' : 'blue';
@@ -30,8 +29,7 @@ export const TransformResultBlock: React.FC<TransformResultBlockProps> = ({ comm
           <Text code style={{ fontSize: 13 }}>&gt; {command}</Text>
         </Space>
         <Space>
-          {source === 'cli' && <Button size="small" icon={<ReloadOutlined />} onClick={() => onRerun(command)} />}
-          <Button size="small" icon={<CopyOutlined />} onClick={handleCopy} />
+        <Button size="small" icon={<CopyOutlined />} onClick={handleCopy} />
         </Space>
       </div>
 

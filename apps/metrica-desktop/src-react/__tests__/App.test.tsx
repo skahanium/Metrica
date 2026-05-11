@@ -24,14 +24,6 @@ vi.mock('../services/runtimeClient', () => ({
   runDataCommand: (...args: unknown[]) => runtimeMocks.queryDataset(...args),
 }));
 
-vi.mock('../components/Header', () => ({
-  Header: () => <div data-testid="header" />,
-}));
-
-vi.mock('../components/Sidebar', () => ({
-  Sidebar: () => <div data-testid="sidebar" />,
-}));
-
 vi.mock('../components/ResultFlow', () => ({
   ResultFlow: () => <div data-testid="result-flow" />,
 }));

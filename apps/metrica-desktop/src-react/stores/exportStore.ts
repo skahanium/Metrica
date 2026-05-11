@@ -12,7 +12,6 @@ interface ExportState {
   exportHistory: ExportHistoryItem[];
   setIsExporting: (isExporting: boolean) => void;
   addExportHistory: (item: ExportHistoryItem) => void;
-  clearExportHistory: () => void;
 }
 
 export const useExportStore = create<ExportState>((set) => ({
@@ -20,9 +19,8 @@ export const useExportStore = create<ExportState>((set) => ({
   exportHistory: [],
   setIsExporting: (isExporting) => set({ isExporting }),
   addExportHistory: (item) => set((state) => ({
-    exportHistory: [item, ...state.exportHistory].slice(0, 50), // 保留最近 50 条
+    exportHistory: [item, ...state.exportHistory].slice(0, 50),
   })),
-  clearExportHistory: () => set({ exportHistory: [] }),
 }));
 
 /**

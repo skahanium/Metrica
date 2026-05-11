@@ -64,7 +64,7 @@ const grammars: CommandGrammar[] = [
   },
   {
     verb: 'describe',
-    description: '查看数据结构与类型',
+    description: '变量结构：名称、类型、缺失数、唯一值数、标签',
     category: 'data',
     syntax: [
       { kind: 'indepvar', label: '变量', required: false, multiple: true },
@@ -80,10 +80,20 @@ const grammars: CommandGrammar[] = [
   },
   {
     verb: 'summarize',
-    description: '描述性统计',
+    description: '描述统计：N、均值、标准差、最小值、P25、P50、P75、最大值',
     category: 'data',
     syntax: [
       { kind: 'indepvar', label: '变量', required: false, multiple: true },
+      { kind: 'comma', label: ',', required: false, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: false,
+        multiple: false,
+        children: {
+          detail: { kind: 'option_value', label: 'detail', required: false, multiple: false, values: ['true'] },
+        },
+      },
     ],
   },
   {
@@ -423,16 +433,38 @@ const grammars: CommandGrammar[] = [
 
   // ===== Project commands =====
   {
+    verb: 'project',
+    description: '项目管理（new / open / close）',
+    category: 'project',
+    syntax: [
+      { kind: 'indepvar', label: '操作', required: true, multiple: false, values: ['new', 'open', 'close'] },
+      { kind: 'indepvar', label: '路径', required: false, multiple: false },
+    ],
+  },
+  {
     verb: 'save',
     description: '保存项目',
     category: 'project',
-    syntax: [],
+    syntax: [
+      { kind: 'comma', label: ',', required: false, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: false,
+        multiple: false,
+        children: {
+          paradigm: { kind: 'option_value', label: '保存范式', required: false, multiple: false, values: ['commands_only', 'commands_and_results'] },
+        },
+      },
+    ],
   },
   {
     verb: 'load',
     description: '加载项目',
     category: 'project',
-    syntax: [],
+    syntax: [
+      { kind: 'indepvar', label: '项目路径', required: false, multiple: false },
+    ],
   },
   {
     verb: 'runs',
@@ -449,13 +481,36 @@ const grammars: CommandGrammar[] = [
     ],
   },
 
+  // ===== Data history command =====
+  {
+    verb: 'datahistory',
+    description: '查看数据历史或恢复节点',
+    category: 'data',
+    syntax: [
+      { kind: 'indepvar', label: '操作', required: false, multiple: false, values: ['list', 'restore'] },
+      { kind: 'indepvar', label: '状态 ID', required: false, multiple: false },
+    ],
+  },
+
+  // ===== Trash command =====
+  {
+    verb: 'trash',
+    description: '回收站管理（list / restore / clear）',
+    category: 'project',
+    syntax: [
+      { kind: 'indepvar', label: '操作', required: true, multiple: false, values: ['list', 'restore', 'clear'] },
+      { kind: 'indepvar', label: '消息 ID', required: false, multiple: false },
+    ],
+  },
+
   // ===== Export commands =====
   {
     verb: 'export',
     description: '导出结果',
     category: 'export',
     syntax: [
-      { kind: 'indepvar', label: '格式', required: true, multiple: false, values: ['markdown', 'csv', 'report'] },
+      { kind: 'indepvar', label: '格式', required: true, multiple: false, values: ['markdown', 'csv', 'report', 'script'] },
+      { kind: 'indepvar', label: '运行 ID', required: false, multiple: false },
     ],
   },
 ];

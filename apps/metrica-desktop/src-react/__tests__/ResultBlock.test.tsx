@@ -60,18 +60,16 @@ const mockSurveyResult: ModelResult = {
 };
 
 describe('ResultBlock', () => {
-  const onRerun = vi.fn();
-
   it('renders command text and OLS glance for ols model', () => {
     render(
-      <ResultBlock command="ols(y ~ x1)" result={mockOlsResult} teachingEnabled={false} onRerun={onRerun} />,
+      <ResultBlock command="ols(y ~ x1)" result={mockOlsResult} />,
     );
     expect(screen.getByText(/ols\(y ~ x1\)/)).toBeDefined();
   });
 
   it('renders DiscreteGlanceCards for logit model', () => {
     render(
-      <ResultBlock command="logit(y ~ x1)" result={mockLogitResult} teachingEnabled={false} onRerun={onRerun} />,
+      <ResultBlock command="logit(y ~ x1)" result={mockLogitResult} />,
     );
     // DiscreteGlanceCards 内容 — 通过 result prop 渲染
     expect(screen.getByText('模型摘要')).toBeDefined();
@@ -79,14 +77,14 @@ describe('ResultBlock', () => {
 
   it('renders DIDResultCards for did model', () => {
     render(
-      <ResultBlock command="did(y ~ treat)" result={mockDidResult} teachingEnabled={false} onRerun={onRerun} />,
+      <ResultBlock command="did(y ~ treat)" result={mockDidResult} />,
     );
     expect(screen.getByText('DID 处理效应')).toBeDefined();
   });
 
   it('renders SurveyDesignPanel for survey model', () => {
     render(
-      <ResultBlock command="survey_ols(y ~ x1)" result={mockSurveyResult} teachingEnabled={false} onRerun={onRerun} />,
+      <ResultBlock command="survey_ols(y ~ x1)" result={mockSurveyResult} />,
     );
     expect(screen.getByText('抽样设计概览')).toBeDefined();
   });
@@ -94,14 +92,14 @@ describe('ResultBlock', () => {
   it('passes result prop to sub-components, not global store', () => {
     // 两个不同结果渲染各自的历史块，不应互相干扰
     const { unmount } = render(
-      <ResultBlock command="cmd1" result={mockOlsResult} teachingEnabled={false} onRerun={onRerun} />,
+      <ResultBlock command="cmd1" result={mockOlsResult} />,
     );
     // OLS 结果不应包含 DID 内容
     expect(screen.queryByText('DID 处理效应')).toBeNull();
     unmount();
 
     render(
-      <ResultBlock command="cmd2" result={mockDidResult} teachingEnabled={false} onRerun={onRerun} />,
+      <ResultBlock command="cmd2" result={mockDidResult} />,
     );
     // DID 结果不应包含 DiscreteGlanceCards
     expect(screen.queryByText('模型摘要')).toBeNull();

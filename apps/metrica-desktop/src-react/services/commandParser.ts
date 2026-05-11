@@ -82,13 +82,24 @@ export function parse(input: string): ParsedCommand {
     return { verb: '', positionals: [], options: [], error: '空命令' };
   }
 
-  const verb = tokens[0].toLowerCase();
+  const rawVerb = tokens[0].toLowerCase();
+  // 命令别名
+  const aliasMap: Record<string, string> = {
+    import: 'use',
+    load: 'project',
+  };
+  const verb = aliasMap[rawVerb] || rawVerb;
+  // 别名命令在第二个 token 前插入子命令（import → use, load → project open）
+  const effectiveTokens = rawVerb === 'load'
+    ? ['project', 'open', ...tokens.slice(1)]
+    : tokens.map((t, i) => i === 0 ? verb : t);
+
   const grammar = getGrammar(verb);
   if (!grammar) {
-    return { verb, positionals: [], options: [], error: `未知命令: ${verb}` };
+    return { verb: rawVerb, positionals: [], options: [], error: `未知命令: ${rawVerb}` };
   }
 
-  const rest = tokens.slice(1);
+  const rest = effectiveTokens.slice(1);
   const commaIdx = rest.indexOf(',');
 
   // 逗号之前为位置参数

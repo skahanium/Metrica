@@ -290,21 +290,29 @@ fn macos_set_app_icon() {
 /// 通知已有实例激活窗口，返回 true 表示成功通知（应退出当前进程）。
 fn notify_existing_instance() -> bool {
     if let Ok(mut stream) = UnixStream::connect(LOCK_SOCKET_PATH) {
-        let _ = std::io::Write::write_all(&mut stream, b"activate");
-        true
-    } else {
-        false
+        // 尝试发送激活消息并等待短暂响应，以确认对方确实存活
+        stream.set_read_timeout(Some(std::time::Duration::from_millis(200))).ok();
+        if std::io::Write::write_all(&mut stream, b"activate").is_ok() {
+            // 尝试读取 ACK 确认
+            let mut buf = [0u8; 4];
+            if stream.read_exact(&mut buf).is_ok() && &buf == b"ack!" {
+                return true;
+            }
+            // 对方无响应 — 视为陈旧锁
+        }
     }
+    false
 }
 
 /// 尝试获取单实例锁。返回 Some(listener) 表示是首个实例，
 /// 返回 None 表示已有实例在运行。
 fn try_acquire_lock() -> Option<UnixListener> {
-    // 先尝试通知已有实例
+    // 先尝试通知已有实例（含活性检测）
     if notify_existing_instance() {
+        eprintln!("Metrica 已在运行，将已运行的实例前置。");
         return None;
     }
-    // 清理残留的 socket 文件
+    // 清理残留的 socket 文件（陈旧锁或首次启动）
     let _ = std::fs::remove_file(LOCK_SOCKET_PATH);
     // 尝试绑定
     UnixListener::bind(LOCK_SOCKET_PATH).ok()
@@ -337,13 +345,15 @@ pub fn run() {
 
     let window = window_builder.build(&event_loop).expect("创建窗口失败");
 
-    // 后台线程：监听激活请求（第二个实例启动时发送）
+    // 后台线程：监听激活请求（第二个实例启动时发送），回复 ACK 证明存活
     let event_loop_proxy = event_loop.create_proxy();
     thread::spawn(move || {
         let listener = lock;
         for mut stream in listener.incoming().flatten() {
             let mut buf = [0u8; 16];
             if matches!(stream.read(&mut buf), Ok(n) if n > 0) {
+                // 发送 ACK 确认存活，防止启动方误判陈旧锁
+                let _ = std::io::Write::write_all(&mut stream, b"ack!");
                 let _ = event_loop_proxy.send_event(());
             }
         }

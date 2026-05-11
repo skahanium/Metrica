@@ -1,6 +1,7 @@
 // ============================================================
 // 共享类型定义 — 协议层单一数据源
-// Julia / Rust / TypeScript 三层通过此文件约定字段名
+// Julia 端字段名为 name/stderror/pvalue，前端统一规范化为 term/std_error/p_value
+// normalizeTidyRow() 在 runtimeClient 或数据处理入口处执行转换
 // ============================================================
 
 // ---- 基础消息类型 ----
@@ -225,19 +226,26 @@ export interface DataCommandSummary {
 
 export interface DescribeVariable {
   name: string;
+  dtype: string;
+  missing_count: number;
+  unique_count: number;
+  label: string;
   inferred_type?: string;
-  missing_count?: number;
   non_missing_count?: number;
 }
 
 export interface SummarizeVariable {
   name: string;
-  inferred_type?: string;
+  dtype: string;
   obs: number;
   mean: number | null;
   std_dev: number | null;
   min: number | null;
   max: number | null;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  inferred_type?: string;
 }
 
 export interface TabulateRow {

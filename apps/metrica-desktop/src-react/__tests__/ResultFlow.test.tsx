@@ -11,7 +11,7 @@ vi.mock('./../components/MessageToolbar', () => ({
 describe('ResultFlow', () => {
   beforeEach(() => {
     useMessageStore.setState({ messages: [], trash: [], selectedIds: new Set(), selectionMode: 'none' });
-    useAppStore.setState({ teachingEnabled: true });
+    useAppStore.setState({ dataFullscreen: false, trashVisible: false, dataHistoryVisible: false });
   });
 
   it('renders structured data command results', () => {
@@ -23,29 +23,33 @@ describe('ResultFlow', () => {
         data_result: {
           kind: 'summarize',
           dataset_summary: { row_count: 2, column_count: 1 },
-          variables: [{ name: 'y', inferred_type: 'Float64', obs: 2, mean: 1.5, std_dev: 0.7, min: 1, max: 2 }],
+          variables: [{
+            name: 'y', dtype: 'Float64', inferred_type: 'Float64',
+            obs: 2, mean: 1.5, std_dev: 0.7, min: 1, max: 2,
+            p25: 1.25, p50: 1.5, p75: 1.75,
+          }],
         },
         created_at: '2026-05-10T00:00:00.000Z',
         is_deleted: false,
       }],
     });
 
-    render(<ResultFlow onRerun={() => undefined} />);
+    render(<ResultFlow />);
 
     expect(screen.getByText(/summarize y/)).toBeDefined();
-    expect(screen.getAllByText('Obs').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('N').length).toBeGreaterThan(0);
     expect(screen.getByText('1.5000')).toBeDefined();
   });
 
-  it('blocks legacy model-style payloads for data viewing commands', () => {
+  it('renders model results without legacy detection', () => {
     useMessageStore.setState({
       messages: [{
-        id: 'legacy-data-1',
+        id: 'model-1',
         kind: 'result',
-        command: 'describe',
+        command: 'regress y x1',
         result: {
-          glance: { model: 'describe', nobs: 8, dof: 0, metrics: {} },
-          tidy: [],
+          glance: { model: 'ols', nobs: 100, dof: 97, metrics: { r2: 0.75 } },
+          tidy: [{ term: 'x1', estimate: 2.5, std_error: 0.3, statistic: 8.33, p_value: 0.001 }],
           diagnostics: {},
           warnings: [],
         },
@@ -54,9 +58,8 @@ describe('ResultFlow', () => {
       }],
     });
 
-    render(<ResultFlow onRerun={() => undefined} />);
+    render(<ResultFlow />);
 
-    expect(screen.getByText('检测到旧版错误结果')).toBeDefined();
-    expect(screen.queryByText('模型')).toBeNull();
+    expect(screen.getByText(/regress y x1/)).toBeDefined();
   });
 });
