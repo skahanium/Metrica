@@ -23,6 +23,18 @@ fn julia_project_path() -> String {
         .to_string()
 }
 
+fn time_series_julia_project_path() -> String {
+    crate::repo_root()
+        .join("packages")
+        .join("MetricaTimeSeries.jl")
+        .to_string_lossy()
+        .to_string()
+}
+
+fn is_time_series_model(model_type: &str) -> bool {
+    matches!(model_type, "arima" | "var" | "unitroot" | "cointegration")
+}
+
 // resolve_working_dir 已由 lib.rs 提供（通过 crate import 引用）
 
 fn resolve_dataset_path_for_request(request: &TaskRequest) -> String {
@@ -31,6 +43,7 @@ fn resolve_dataset_path_for_request(request: &TaskRequest) -> String {
 }
 
 const JULIA_SCRIPT: &str = include_str!("../../../scripts/julia_bridge_entry.jl");
+const TIME_SERIES_JULIA_SCRIPT: &str = include_str!("../../../scripts/julia_time_series_bridge_entry.jl");
 
 #[derive(Debug, Deserialize)]
 struct JuliaEnvelope {
@@ -63,13 +76,23 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
             .to_string();
     runtime_request.dataset_ref.path = resolve_dataset_path_for_request(request);
 
-    let project_path = julia_project_path();
+    let use_time_series_bridge = is_time_series_model(&runtime_request.model_spec.model_type);
+    let project_path = if use_time_series_bridge {
+        time_series_julia_project_path()
+    } else {
+        julia_project_path()
+    };
+    let script = if use_time_series_bridge {
+        TIME_SERIES_JULIA_SCRIPT
+    } else {
+        JULIA_SCRIPT
+    };
     let output = Command::new("julia")
         .arg(format!("--project={project_path}"))
         .arg("--startup-file=no")
         .arg("--color=no")
         .arg("-e")
-        .arg(JULIA_SCRIPT)
+        .arg(script)
         .arg(
             serde_json::to_string(&runtime_request)
                 .map_err(|err| format!("序列化运行时请求失败: {err}"))?,

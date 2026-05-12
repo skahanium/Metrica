@@ -1,5 +1,6 @@
 using MetricaSurvey
 using MetricaBase
+import MetricaDiscrete: LogitModel, PoissonModel, LogitFitResult
 using Test
 using DataFrames
 using Distributions
@@ -161,6 +162,34 @@ end
     end
 end
 
+@testset "Survey OLS 权重对齐（缺失值）" begin
+    # 创建包含缺失值的数据
+    df = make_survey_data()
+    # 在 x1 中引入一些缺失值
+    df.x1_missing = allowmissing(df.x1)
+    df.x1_missing[1:10] .= missing  # 前10行有缺失值
+    
+    # 运行 Survey OLS
+    result = MetricaBase.fit(SurveyOLSModel, "y ~ x1_missing + x2", df; 
+        weights_column=:wt, strata_column=:stratum, psu_column=:psu)
+    
+    @test result isa SurveyOLSFitResult
+    
+    # 验证权重与保留的观测值对齐
+    # 预期：前10行被过滤掉，剩余190行
+    @test MetricaBase.nobs(result) == 190
+    
+    # 验证权重向量长度与观测数匹配
+    @test length(result.survey_se) == 3  # 3个系数
+    
+    # 验证权重列与过滤后的数据对齐
+    # 我们可以通过检查 design_effects 是否合理来间接验证
+    @test all(>(0), result.design_effects)
+    
+    # 验证 ols_result 内部的 design_matrix 行数与观测数匹配
+    @test size(result.ols_result.design_matrix, 1) == 190
+end
+
 # === Survey GLM =================================================================
 
 @testset "Survey Logit" begin
@@ -209,6 +238,69 @@ end
         @test result isa SurveyPoissonFitResult
         @test length(MetricaBase.coef(result)) == 3
     end
+end
+
+# === 加权 vs 未加权估计差异验证 =================================================
+
+@testset "加权 IRLS：加权与未加权估计不同" begin
+    # 构造极端权重数据：高权重组 y=1 居多，低权重组 y=0 居多
+    n = 400
+    Random.seed!(123)
+    x = randn(n)
+    # 生成 y 使得 x 的效应在加权前后有明显差异
+    prob = 1.0 ./ (1.0 .+ exp.(-(0.5 .+ 2.0 .* x)))
+    y = [rand() < p ? 1.0 : 0.0 for p in prob]
+
+    # 构造权重：x > 0 的观测权重为 10，x <= 0 的权重为 1
+    wt = [xi > 0 ? 10.0 : 1.0 for xi in x]
+
+    df_w = DataFrame(y=y, x=x, wt=wt)
+
+    # 未加权 Logit
+    unweighted = MetricaBase.fit(LogitModel, "y ~ x", df_w)
+    @test unweighted isa LogitFitResult
+
+    # Survey Logit（加权 IRLS）
+    weighted = MetricaBase.fit(SurveyLogitModel, "y ~ x", df_w; weights_column=:wt)
+    @test weighted isa SurveyLogitFitResult
+
+    uw_coefs = last.(MetricaBase.coef(unweighted))
+    w_coefs = MetricaBase.coef(weighted)
+
+    # 加权与未加权的系数应明显不同
+    @test !isapprox(uw_coefs, w_coefs; rtol=0.01)
+
+    # 加权 IRLS 的标准误应为正
+    @test all(>(0), MetricaBase.stderror(weighted))
+
+    # survey_vcov 应为正定对称矩阵
+    v = weighted.survey_vcov
+    @test size(v) == (2, 2)
+    @test v ≈ v'
+    @test all(diag(v) .>= 0)
+
+    # 设计效应应为正
+    @test all(>(0), weighted.design_effects)
+end
+
+@testset "加权 IRLS：Poisson 加权与未加权不同" begin
+    n = 300
+    Random.seed!(456)
+    x = randn(n)
+    λ = exp.(1.0 .+ 0.5 .* x)
+    y_count = [rand(Poisson(l)) for l in λ]
+    wt = [xi > 0 ? 5.0 : 1.0 for xi in x]
+
+    df_p = DataFrame(y_count=Float64.(y_count), x=x, wt=wt)
+
+    unweighted = MetricaBase.fit(PoissonModel, "y_count ~ x", df_p)
+    weighted = MetricaBase.fit(SurveyPoissonModel, "y_count ~ x", df_p; weights_column=:wt)
+
+    @test weighted isa SurveyPoissonFitResult
+    uw_coefs = last.(MetricaBase.coef(unweighted))
+    w_coefs = MetricaBase.coef(weighted)
+    @test !isapprox(uw_coefs, w_coefs; rtol=0.01)
+    @test all(>(0), MetricaBase.stderror(weighted))
 end
 
 # === Serialization ==============================================================

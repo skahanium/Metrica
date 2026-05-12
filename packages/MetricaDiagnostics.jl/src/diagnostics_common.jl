@@ -28,6 +28,7 @@ function diagnostics_to_dict(result)
         "durbin_watson" => Dict(
             "statistic" => dw.statistic,
             "pvalue" => dw.pvalue,
+            "warnings" => dw.warnings,
         ),
         "breusch_godfrey" => Dict(
             "statistic" => bg.statistic,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tokenize, parse, parseToModelSpec } from '../services/commandParser';
+import { tokenize, parse, parseToModelSpec, parseToDiagnosticSpec, isDiagnosticVerb } from '../services/commandParser';
 
 describe('tokenize', () => {
   it('splits by spaces', () => {
@@ -74,7 +74,7 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('ols');
       expect(spec.formula).toBe('gdp ~ inflation + year');
-      expect(spec.vcov).toEqual({ type: 'hc1' });
+      expect(spec.vcov).toEqual({ type: 'HC1' });
     }
   });
 
@@ -99,6 +99,19 @@ describe('parseToModelSpec', () => {
     }
   });
 
+  it('converts xtivreg to panel IV ModelSpec', () => {
+    const r = parse('xtivreg y x1 x2, id(firm) time(year) endogenous(x1) instruments(z1 z2) robust');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('panel_iv');
+      expect(spec.panel_id).toBe('firm');
+      expect(spec.panel_time).toBe('year');
+      expect(spec.endog_columns).toEqual(['x1']);
+      expect(spec.instruments).toEqual(['z1', 'z2']);
+      expect(spec.vcov).toEqual({ type: 'HC1' });
+    }
+  });
+
   it('converts did to DID ModelSpec', () => {
     const r = parse('did gdp, id(country) time(year) treat(reform) post(after2010)');
     const spec = parseToModelSpec(r);
@@ -116,7 +129,7 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('logit');
-      expect(spec.vcov).toEqual({ type: 'hc1' });
+      expect(spec.vcov).toEqual({ type: 'HC1' });
     }
   });
 
@@ -127,11 +140,45 @@ describe('parseToModelSpec', () => {
   });
 
   it('converts arima with order options', () => {
-    const r = parse('arima gdp, ar(1) i(1) ma(0)');
+    const r = parse('arima gdp, time(year) ar(1) i(1) ma(0)');
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('arima');
+      expect(spec.variable).toBe('gdp');
+      expect(spec.time_column).toBe('year');
       expect(spec.order).toEqual([1, 1, 0]);
+    }
+  });
+
+  it('converts var with variables and time column', () => {
+    const r = parse('var gdp inflation, time(year) lags(2)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('var');
+      expect(spec.variables).toEqual(['gdp', 'inflation']);
+      expect(spec.time_column).toBe('year');
+      expect(spec.lags).toBe(2);
+    }
+  });
+
+  it('converts ipw with propensity formula', () => {
+    const r = parse('ipw, treat(treated) outcome(y) propensity(treated ~ x1 + x2)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('ipw');
+      expect(spec.treatment_column).toBe('treated');
+      expect(spec.outcome_column).toBe('y');
+      expect(spec.propensity_formula).toBe('treated ~ x1 + x2');
+    }
+  });
+
+  it('converts aipw with propensity and outcome formulas', () => {
+    const r = parse('aipw, treat(treated) outcome(y) propensity(treated ~ x1 + x2) outcome_model(y ~ x1 + x2)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('aipw');
+      expect(spec.propensity_formula).toBe('treated ~ x1 + x2');
+      expect(spec.outcome_formula).toBe('y ~ x1 + x2');
     }
   });
 
@@ -164,10 +211,12 @@ describe('parseToModelSpec', () => {
   });
 
   it('converts dfuller with deterministic option', () => {
-    const r = parse('dfuller gdp, deterministic(trend)');
+    const r = parse('dfuller gdp, time(year) deterministic(trend)');
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('unitroot');
+      expect(spec.variable).toBe('gdp');
+      expect(spec.time_column).toBe('year');
       expect(spec.deterministic).toBe('trend');
     }
   });
@@ -185,5 +234,68 @@ describe('parseToModelSpec', () => {
     const parsed = parse('describe');
     const spec = parseToModelSpec(parsed);
     expect('error' in spec).toBe(true);
+  });
+});
+
+describe('isDiagnosticVerb', () => {
+  it('returns true for diagnostic verb', () => {
+    expect(isDiagnosticVerb('diagnostic')).toBe(true);
+  });
+
+  it('returns true for alias verbs', () => {
+    expect(isDiagnosticVerb('hettest')).toBe(true);
+    expect(isDiagnosticVerb('bgodfrey')).toBe(true);
+    expect(isDiagnosticVerb('dwstat')).toBe(true);
+    expect(isDiagnosticVerb('vif')).toBe(true);
+    expect(isDiagnosticVerb('ovtest')).toBe(true);
+  });
+
+  it('returns false for non-diagnostic verbs', () => {
+    expect(isDiagnosticVerb('regress')).toBe(false);
+    expect(isDiagnosticVerb('summarize')).toBe(false);
+  });
+});
+
+describe('parseToDiagnosticSpec', () => {
+  it('parses bp diagnostic', () => {
+    const parsed = parse('diagnostic bp');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toEqual({ test: 'bp' });
+  });
+
+  it('parses bg with lags', () => {
+    const parsed = parse('diagnostic bg, lags(3)');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toEqual({ test: 'bg', lags: 3 });
+  });
+
+  it('parses alias hettest as bp', () => {
+    const parsed = parse('hettest');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toEqual({ test: 'bp' });
+  });
+
+  it('parses bgodfrey alias with lags', () => {
+    const parsed = parse('bgodfrey, lags(4)');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toEqual({ test: 'bg', lags: 4 });
+  });
+
+  it('parses dwstat alias as dw', () => {
+    const parsed = parse('dwstat');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toEqual({ test: 'dw' });
+  });
+
+  it('returns error for unknown test', () => {
+    const parsed = parse('diagnostic unknown');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toHaveProperty('error');
+  });
+
+  it('propagates parse error', () => {
+    const parsed = parse('unknown_cmd x y');
+    const spec = parseToDiagnosticSpec(parsed);
+    expect(spec).toHaveProperty('error');
   });
 });

@@ -21,6 +21,24 @@ function ologit_loglikelihood(X, y::Vector{Int}, β::Vector{Float64}, τ::Vector
     return ll
 end
 
+function ologit_thresholds(γ::Vector{Float64})
+    τ = similar(γ)
+    τ[1] = γ[1]
+    for j in 2:length(γ)
+        τ[j] = τ[j - 1] + exp(γ[j])
+    end
+    return τ
+end
+
+function ologit_threshold_params(τ::Vector{Float64})
+    γ = similar(τ)
+    γ[1] = τ[1]
+    for j in 2:length(τ)
+        γ[j] = log(max(τ[j] - τ[j - 1], 1e-8))
+    end
+    return γ
+end
+
 function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, data;
                           vcov::Symbol=:classical, cluster_column::Union{Nothing,Symbol,String}=nothing)
     dataset = if data isa AbstractString
@@ -43,7 +61,11 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
     )
     prepared isa MetricaBase.ModelError && return prepared
 
-    (_, model_frame, _, X, y, _, _, n_total, n_effective) = prepared
+    (_, model_frame, _, X_raw, y, _, _, n_total, n_effective) = prepared
+    raw_coefficient_names = Symbol.(StatsModels.coefnames(model_frame))
+    keep_columns = findall(name -> name != Symbol("(Intercept)"), raw_coefficient_names)
+    X = Matrix{Float64}(X_raw[:, keep_columns])
+    coefficient_names = raw_coefficient_names[keep_columns]
     nobs = length(y)
     ncoef = size(X, 2)
     y_int = Int.(round.(y))
@@ -57,22 +79,27 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
     cat_to_idx = Dict(categories[i] => i for i in 1:J)
     y_idx = [cat_to_idx[yi] for yi in y_int]
 
-    err = MetricaLinear.validate_design(X, ncoef, nobs)
-    err isa MetricaBase.ModelError && return err
+    if ncoef > 0
+        err = MetricaLinear.validate_design(X, ncoef, nobs)
+        err isa MetricaBase.ModelError && return err
+    end
 
     ntau = J - 1
 
     # 初始值
-    β_init = X \ y
-    β_init = β_init ./ max(norm(β_init) / 0.5, 1.0)
+    β_init = ncoef == 0 ? Float64[] : X \ y
+    β_init = ncoef == 0 ? β_init : β_init ./ max(norm(β_init) / 0.5, 1.0)
     τ_init = quantile.(Normal(), (1:ntau) ./ J)
+    γ_init = ologit_threshold_params(Float64.(τ_init))
 
     # 负对数似然（转为最小化问题）
     function negll(θ)
-        -ologit_loglikelihood(X, y_idx, θ[1:ncoef], θ[(ncoef+1):end])
+        βθ = θ[1:ncoef]
+        τθ = ologit_thresholds(θ[(ncoef+1):end])
+        -ologit_loglikelihood(X, y_idx, βθ, τθ)
     end
 
-    θ_init = vcat(β_init, τ_init)
+    θ_init = vcat(β_init, γ_init)
 
     # 使用 Optim.jl L-BFGS 优化
     result = try
@@ -85,7 +112,7 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
     θ_opt = Optim.minimizer(result)
 
     β = θ_opt[1:ncoef]
-    τ = θ_opt[(ncoef+1):end]
+    τ = ologit_thresholds(θ_opt[(ncoef+1):end])
     n_total_params = ncoef + ntau
 
     ll_final = -Optim.minimum(result)
@@ -99,9 +126,9 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
             θ1 = copy(θ_opt); θ1[j] += ϵ; θ1[k] += ϵ
             θ2 = copy(θ_opt); θ2[j] += ϵ
             θ3 = copy(θ_opt); θ3[k] += ϵ
-            ll1 = ologit_loglikelihood(X, y_idx, θ1[1:ncoef], θ1[(ncoef+1):end])
-            ll2 = ologit_loglikelihood(X, y_idx, θ2[1:ncoef], θ2[(ncoef+1):end])
-            ll3 = ologit_loglikelihood(X, y_idx, θ3[1:ncoef], θ3[(ncoef+1):end])
+            ll1 = ologit_loglikelihood(X, y_idx, θ1[1:ncoef], ologit_thresholds(θ1[(ncoef+1):end]))
+            ll2 = ologit_loglikelihood(X, y_idx, θ2[1:ncoef], ologit_thresholds(θ2[(ncoef+1):end]))
+            ll3 = ologit_loglikelihood(X, y_idx, θ3[1:ncoef], ologit_thresholds(θ3[(ncoef+1):end]))
             h = (ll1 - ll2 - ll3 + ll0) / ϵ^2
             hess_final[j, k] = h
             hess_final[k, j] = h
@@ -115,7 +142,6 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
     end
     vcov_matrix = vcov_full[1:ncoef, 1:ncoef]
     se_values = sqrt.(max.(diag(vcov_matrix), 0.0))
-    coefficient_names = Symbol.(StatsModels.coefnames(model_frame))
 
     dof = nobs - n_total_params
     z_stats = β ./ se_values

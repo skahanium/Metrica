@@ -6,7 +6,6 @@ using HypothesisTests
 using LinearAlgebra
 using MetricaBase
 using Optim
-using StateSpaceModels
 using Statistics
 
 export AbstractTimeSeriesModel, AbstractTSFitResult,

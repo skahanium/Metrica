@@ -56,17 +56,14 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
     mean_var = mean(μ_init)
     α_init = max((residual_var - mean_var) / max(mean_var^2, 1e-10), 0.1)
 
-    # 步骤 3：网格搜索 α + IRLS 重新拟合 β
-    α_grid = [α_init * 0.1, α_init * 0.5, α_init, α_init * 2.0, α_init * 5.0, α_init * 10.0]
-    best_ll = -Inf
-    best_β = β_init
-    best_α = α_init
-
+    # 步骤 3：用 Optim.jl Brent 一维优化器估计 α（profile likelihood）
     total_iterations = 0
     irls_converged = false
-    for α_try in α_grid
+
+    function profile_negloglik(α_try::Float64)
+        α_try = max(α_try, 1e-6)
         β = copy(β_init)
-        for iter in 1:25
+        for iter in 1:50
             total_iterations += 1
             μ = max.(exp.(X * β), 1e-10)
             var_nb = μ .+ α_try .* μ.^2
@@ -76,24 +73,38 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
             zw = z .* sqrt.(w)
             β_new = Xw \ zw
             if norm(β_new - β) / (norm(β) + 1e-8) < 1e-8
-                β = β_new
                 irls_converged = true
                 break
             end
             β = β_new
         end
         μ_final = max.(exp.(X * β), 1e-10)
-        ll_try = nb_loglikelihood(y, μ_final, α_try)
-        if ll_try > best_ll
-            best_ll = ll_try
-            best_β = β
-            best_α = α_try
-        end
+        return -nb_loglikelihood(y, μ_final, α_try)
     end
 
-    coefficients = best_β
-    α = best_α
+    α_lo = max(α_init * 0.01, 1e-6)
+    α_hi = α_init * 20.0
+    opt_result = Optim.optimize(profile_negloglik, α_lo, α_hi, Optim.Brent())
+    α = max(Optim.minimizer(opt_result), 1e-6)
+
+    # 用最优 α 重新拟合 β
+    coefficients = copy(β_init)
+    for iter in 1:50
+        μ = max.(exp.(X * coefficients), 1e-10)
+        var_nb = μ .+ α .* μ.^2
+        w = μ.^2 ./ max.(var_nb, 1e-10)
+        z = log.(μ) .+ (y .- μ) ./ max.(μ, 1e-10)
+        Xw = X .* sqrt.(w)
+        zw = z .* sqrt.(w)
+        β_new = Xw \ zw
+        if norm(β_new - coefficients) / (norm(coefficients) + 1e-8) < 1e-8
+            coefficients = β_new
+            break
+        end
+        coefficients = β_new
+    end
     μ_final = max.(exp.(X * coefficients), 1e-10)
+    best_ll = nb_loglikelihood(y, μ_final, α)
 
     # VCov via Fisher info (simplified)
     w_final = μ_final ./ (1.0 .+ α .* μ_final)

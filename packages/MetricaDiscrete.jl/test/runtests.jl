@@ -102,6 +102,12 @@ end
     payload = result_to_payload(result)
     @test payload["status"] == "success"
     @test haskey(payload["result_payload"], "incidence_rate_ratios")
+
+    df_high_mean = DataFrame(y=Float64.(2:11), x=collect(1.0:10.0))
+    high_mean_result = MetricaBase.fit(PoissonModel, "y ~ x", df_high_mean)
+    @test high_mean_result isa PoissonFitResult
+    @test maximum(high_mean_result.fitted_values) > 1.0
+    @test high_mean_result.loglikelihood > -10.0
 end
 
 # === 有序 Logit ===============================================================
@@ -112,6 +118,10 @@ end
     @test result isa OrderedLogitFitResult
     @test result.converged
     @test result.n_categories >= 3
+    @test !(Symbol("(Intercept)") in result.coefficient_names)
+    @test all(diff(result.thresholds) .> 0)
+    @test all(isfinite, result.stderror_values)
+    @test all(result.stderror_values .> 0)
 
     g = MetricaBase.glance(result)
     @test g.model == :ordered_logit
@@ -137,7 +147,136 @@ end
         @test result.converged
         g = MetricaBase.glance(result)
         @test g.model == :multinomial_logit
+        @test haskey(g.metrics, :pseudo_r2)
+        @test haskey(g.metrics, :aic)
+        @test haskey(g.metrics, :bic)
     end
+end
+
+@testset "MultinomialLogitJointMLE" begin
+    Random.seed!(123)
+    n = 500
+    x1 = randn(n)
+    x2 = randn(n)
+    X = [ones(n) x1 x2]
+    # 3 个类别，基准类别 1
+    β2_true = [0.5, 1.0, -0.3]
+    β3_true = [-0.5, -0.5, 0.8]
+    η = zeros(n, 3)
+    η[:, 2] = X * β2_true
+    η[:, 3] = X * β3_true
+    # softmax 概率
+    probs = zeros(n, 3)
+    for i in 1:n
+        exp_η = exp.(η[i, :] .- maximum(η[i, :]))
+        probs[i, :] = exp_η ./ sum(exp_η)
+    end
+    # 生成响应
+    y = zeros(n)
+    for i in 1:n
+        r = rand()
+        cum = 0.0
+        for j in 1:3
+            cum += probs[i, j]
+            if r <= cum
+                y[i] = j
+                break
+            end
+        end
+    end
+    df = DataFrame(y=y, x1=x1, x2=x2)
+
+    result = MetricaBase.fit(MultinomialLogitModel, "y ~ x1 + x2", df; reference_category=1)
+    @test result isa MultinomialLogitFitResult
+    @test result.converged
+
+    # 概率和为 1
+    for i in 1:n
+        @test abs(sum(result.fitted_values[i, :]) - 1.0) < 1e-10
+    end
+
+    # 联合 MLE 似然应优于 one-vs-rest
+    @test isfinite(result.loglikelihood)
+    @test result.loglikelihood < 0
+
+    # glance 包含必要字段
+    g = MetricaBase.glance(result)
+    @test g.model == :multinomial_logit
+    @test g.nobs == n
+    @test haskey(g.metrics, :pseudo_r2)
+    @test haskey(g.metrics, :aic)
+    @test haskey(g.metrics, :bic)
+    @test haskey(g.metrics, :n_categories)
+    @test g.metrics[:n_categories] == 3
+
+    # tidy 表有 (J-1) * ncoef = 2 * 3 = 6 行
+    t = MetricaBase.tidy(result)
+    @test length(t.rows) == 6
+    for row in t.rows
+        @test row.stderror > 0
+        @test isfinite(row.pvalue)
+        @test 0 <= row.pvalue <= 1
+    end
+
+    # vcov 维度正确
+    V = MetricaBase.vcov(result)
+    @test size(V) == (6, 6)
+
+    # 标准误为正
+    se = MetricaBase.stderror(result)
+    @test length(se) == 6
+    @test all(se .> 0)
+end
+
+@testset "MultinomialLogit reference_category=2" begin
+    Random.seed!(456)
+    n = 400
+    x = randn(n)
+    X = [ones(n) x]
+    # 3 个类别，基准类别 2
+    β1_true = [0.3, -0.8]
+    β3_true = [-0.2, 0.6]
+    η = zeros(n, 3)
+    η[:, 1] = X * β1_true
+    η[:, 3] = X * β3_true
+    probs = zeros(n, 3)
+    for i in 1:n
+        exp_η = exp.(η[i, :] .- maximum(η[i, :]))
+        probs[i, :] = exp_η ./ sum(exp_η)
+    end
+    y = zeros(n)
+    for i in 1:n
+        r = rand()
+        cum = 0.0
+        for j in 1:3
+            cum += probs[i, j]
+            if r <= cum
+                y[i] = j
+                break
+            end
+        end
+    end
+    df = DataFrame(y=y, x=x)
+
+    result = MetricaBase.fit(MultinomialLogitModel, "y ~ x", df; reference_category=2)
+    @test result isa MultinomialLogitFitResult
+    @test result.converged
+    @test result.reference == 2
+    @test result.categories == [1, 2, 3]
+
+    # fitted 返回原始类别值（1, 2, 3），而非列索引
+    f = MetricaBase.fitted(result)
+    @test all(v -> v in result.categories, f)
+
+    # 概率和为 1
+    for i in 1:n
+        @test abs(sum(result.fitted_values[i, :]) - 1.0) < 1e-10
+    end
+
+    # residuals 使用原始类别值，应在合理范围内
+    res = MetricaBase.residuals(result)
+    @test length(res) == n
+    @test all(isfinite, res)
 end
 
 # === 负二项回归 ===============================================================

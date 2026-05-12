@@ -58,16 +58,17 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     nobs = twfe_result.nobs
     ncoef_es = length(coefficients)
 
-    # 个体聚类标准误
+    # 个体聚类标准误（使用吸收后的设计矩阵和残差）
     if vcov == :cluster
-        residuals = y - X_noint * coefficients
-        XtX_inv = twfe_result.vcov
+        X_absorbed = twfe_result.X_demeaned
+        residuals = twfe_result.residuals
+        XtX_inv = twfe_result.XtX_inv
         unique_ids = unique(id_vec)
         G = length(unique_ids)
         meat = zeros(ncoef_es, ncoef_es)
         for g in unique_ids
             idx = id_vec .== g
-            Xg = X_noint[idx, :]
+            Xg = X_absorbed[idx, :]
             eg = residuals[idx]
             meat += (Xg' * eg) * (eg' * Xg)
         end

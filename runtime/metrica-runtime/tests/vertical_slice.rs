@@ -7,6 +7,7 @@ use metrica_runtime::{
     sample_query_dataset_request,
     AppState, JuliaSession,
 };
+use std::fs;
 
 async fn spawn_test_runtime() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     let root = repo_root();
@@ -60,6 +61,76 @@ fn fit_model_forwards_hc1_vcov_to_julia() {
     assert_eq!(
         payload.get("vcov_label").and_then(|value| value.as_str()),
         Some("HC1")
+    );
+}
+
+#[test]
+fn fit_model_forwards_lowercase_hc1_vcov_to_julia() {
+    let mut request = sample_fit_model_request();
+    request.model_spec.vcov.as_mut().expect("vcov").kind = "hc1".to_string();
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert_eq!(
+        payload.get("vcov_label").and_then(|value| value.as_str()),
+        Some("HC1")
+    );
+}
+
+#[test]
+fn fit_model_runs_unitroot_through_time_series_bridge() {
+    let path = std::env::temp_dir().join("metrica_unitroot_bridge.csv");
+    fs::write(
+        &path,
+        "time,y\n1,1.0\n2,1.2\n3,1.1\n4,1.4\n5,1.3\n6,1.6\n7,1.5\n8,1.8\n9,1.7\n10,2.0\n11,1.9\n12,2.2\n",
+    )
+    .expect("write time series fixture");
+
+    let mut request = sample_fit_model_request();
+    request.dataset_ref.path = path.to_string_lossy().to_string();
+    request.model_spec.model_type = "unitroot".to_string();
+    request.model_spec.formula = "y".to_string();
+    request.model_spec.variable = Some("y".to_string());
+    request.model_spec.time_column = Some("time".to_string());
+    request.model_spec.deterministic = Some("constant".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let glance = payload.get("glance").expect("glance");
+    assert_eq!(
+        glance.get("model").and_then(|value| value.as_str()),
+        Some("unitroot")
+    );
+}
+
+#[test]
+fn fit_model_runs_ipw_with_propensity_formula() {
+    let path = std::env::temp_dir().join("metrica_ipw_bridge.csv");
+    fs::write(
+        &path,
+        "y,treated,x1,x2\n10,0,0.1,1.0\n11,0,0.2,0.8\n12,0,0.3,0.6\n14,1,0.7,0.4\n15,1,0.8,0.2\n16,1,0.9,0.1\n",
+    )
+    .expect("write causal fixture");
+
+    let mut request = sample_fit_model_request();
+    request.dataset_ref.path = path.to_string_lossy().to_string();
+    request.model_spec.model_type = "ipw".to_string();
+    request.model_spec.formula = "".to_string();
+    request.model_spec.treatment_column = Some("treated".to_string());
+    request.model_spec.outcome_column = Some("y".to_string());
+    request.model_spec.propensity_formula = Some("treated ~ x1 + x2".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let glance = payload.get("glance").expect("glance");
+    assert_eq!(
+        glance.get("model").and_then(|value| value.as_str()),
+        Some("ipw")
     );
 }
 

@@ -107,7 +107,7 @@ struct AIPWFitResult <: AbstractCausalFitResult
     tidy_table::MetricaBase.TidyTable
     ate::Float64; ate_se::Float64
     att::Float64; att_se::Float64
-    outcome_model::Any
+    outcome_model::Any  # NamedTuple{(:treated, :control)} 两个结果模型
     propensity_model::LogitFitResult
     loglikelihood::Float64
 end

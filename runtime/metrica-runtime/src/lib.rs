@@ -53,6 +53,7 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("iv", vec!["instruments", "endog_columns"]),
         ("gls", vec![]),
         ("panel", vec!["panel_id", "panel_time"]),
+        ("panel_iv", vec!["panel_id", "panel_time", "instruments", "endog_columns"]),
         ("logit", vec![]),
         ("probit", vec![]),
         ("poisson", vec![]),
@@ -61,9 +62,9 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("negbin", vec![]),
         ("did", vec!["panel_id", "panel_time", "treated_column", "post_column"]),
         ("event_study", vec!["panel_id", "panel_time", "treated_column", "post_column"]),
-        ("ipw", vec!["treatment_column"]),
-        ("psm", vec!["treatment_column"]),
-        ("aipw", vec!["treatment_column"]),
+        ("ipw", vec!["treatment_column", "outcome_column", "propensity_formula"]),
+        ("psm", vec!["treatment_column", "outcome_column", "propensity_formula"]),
+        ("aipw", vec!["treatment_column", "outcome_column", "propensity_formula", "outcome_formula"]),
         // S4c: TimeSeries 模型
         ("arima", vec!["variable", "time_column", "order"]),
         ("var", vec!["variables", "time_column", "lags"]),
@@ -102,6 +103,8 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     "post_column" => spec.post_column.as_deref(),
                     "event_time_column" => spec.event_time_column.as_deref(),
                     "outcome_column" => spec.outcome_column.as_deref(),
+                    "propensity_formula" => spec.propensity_formula.as_deref(),
+                    "outcome_formula" => spec.outcome_formula.as_deref(),
                     // S4c: TimeSeries 字段
                     "time_column" => spec.time_column.as_deref(),
                     "variable" => spec.variable.as_deref(),
@@ -143,6 +146,7 @@ pub mod actions {
     pub const LOAD_PROJECT: &str = "load_project";
     pub const LIST_RUNS: &str = "list_runs";
     pub const RERUN_TASK: &str = "rerun_task";
+    pub const RUN_DIAGNOSTIC: &str = "run_diagnostic";
 }
 
 // === Julia 响应解析 ===========================================================
@@ -239,6 +243,10 @@ pub struct ModelSpec {
     pub event_time_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outcome_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub propensity_formula: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome_formula: Option<String>,
     // S4c: TimeSeries 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_column: Option<String>,
@@ -287,6 +295,23 @@ pub struct TaskRequest {
     pub dataset_ref: DatasetRef,
     pub model_spec: ModelSpec,
     pub options: RequestOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnosticRequest {
+    pub task_id: String,
+    pub action: String,
+    pub project_context: ProjectContext,
+    pub dataset_ref: DatasetRef,
+    pub model_spec: ModelSpec,
+    pub diagnostic: DiagnosticSpec,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnosticSpec {
+    pub test: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lags: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -535,6 +560,8 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             post_column: None,
             event_time_column: None,
             outcome_column: None,
+            propensity_formula: None,
+            outcome_formula: None,
             time_column: None,
             variable: None,
             variables: None,
@@ -606,6 +633,8 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         post_column: None,
         event_time_column: None,
         outcome_column: None,
+        propensity_formula: None,
+        outcome_formula: None,
         time_column: None,
         variable: None,
         variables: None,

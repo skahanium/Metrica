@@ -37,6 +37,7 @@ struct OLSFitResult <: MetricaBase.AbstractLinearFitResult
     coefficient_values::Vector{Float64}
     vcov_matrix::Matrix{Float64}
     stderror_values::Vector{Float64}
+    bread_matrix::Matrix{Float64}
 end
 
 MetricaBase.glance(result::OLSFitResult) = result.glance_table
@@ -53,11 +54,10 @@ function MetricaBase.augment(result::OLSFitResult)
     std_residuals = sigma > 0 ? residuals ./ sigma : zeros(nobs)
 
     # 计算杠杆值（hat matrix 对角线）
-    # H = X(X'X)^{-1}X'，杠杆值 h_ii = diag(H)
-    XtX = X' * X
-    if det(XtX) > eps(Float64)
-        XtX_inv = inv(XtX)
-        leverage = [dot(X[i, :], XtX_inv * X[i, :]) for i in 1:nobs]
+    # WLS: H = X(X'WX)^{-1}X'W，杠杆值 h_ii 使用 bread 矩阵
+    bread = result.bread_matrix
+    if det(bread) > eps(Float64)
+        leverage = [dot(X[i, :], bread * X[i, :]) for i in 1:nobs]
     else
         leverage = fill(NaN, nobs)
     end
@@ -106,12 +106,12 @@ function MetricaBase.predict(result::OLSFitResult;
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
-    XtX_inv = inv(result.design_matrix' * result.design_matrix)
+    bread = result.bread_matrix
 
     if interval === :confidence
-        se_pred = [sqrt(sigma^2 * dot(X[i, :], XtX_inv * X[i, :])) for i in 1:size(X, 1)]
+        se_pred = [sqrt(sigma^2 * dot(X[i, :], bread * X[i, :])) for i in 1:size(X, 1)]
     else
-        se_pred = [sqrt(sigma^2 * (1 + dot(X[i, :], XtX_inv * X[i, :]))) for i in 1:size(X, 1)]
+        se_pred = [sqrt(sigma^2 * (1 + dot(X[i, :], bread * X[i, :]))) for i in 1:size(X, 1)]
     end
 
     lower = predictions .- t_crit .* se_pred

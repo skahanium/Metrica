@@ -48,8 +48,10 @@ function fit_fe(panel_data::MetricaBase.PanelData, formula::String)
     X_demeaned_noint = X_demeaned[:, 2:end]
     coefficient_names = Symbol.(coefnames(model_frame))[2:end]  # 去掉 intercept
 
+    residual_dof = nobs - length(coefficient_names) - (n_ids - 1)
     stats = ols_statistics(X_demeaned_noint, y_demeaned, coefficient_names, :fe,
-                           Dict(:n_ids => n_ids, :n_times => n_times))
+                           Dict(:n_ids => n_ids, :n_times => n_times);
+                           residual_dof=residual_dof)
 
     # 重建原始尺度拟合值（用无截距的 demeaned X + within-beta）
     fitted_original = y_means .+ X_demeaned_noint * stats.coefficients

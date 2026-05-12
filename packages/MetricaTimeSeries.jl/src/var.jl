@@ -389,23 +389,25 @@ end
 function MetricaBase.augment(result::VARFitResult)
     n = size(result.original_data, 1)
     n_fitted = size(result.fitted_values, 1)
+    var_names = result.variable_names
+    n_vars = length(var_names)
 
     obs = collect(1.0:n)
-    fitted = zeros(n, length(result.variable_names))
-    resid = zeros(n, length(result.variable_names))
-
     start_idx = n - n_fitted + 1
-    fitted[start_idx:end, :] = result.fitted_values
-    resid[start_idx:end, :] = result.residuals
 
-    return MetricaBase.AugmentTable(
-        Dict(
-            :observation => obs,
-            :fitted => fitted,
-            :residual => resid,
-        ),
-        n
-    )
+    columns = Dict{Symbol, Vector{Float64}}()
+    columns[:observation] = obs
+
+    for (i, name) in enumerate(var_names)
+        fitted_col = zeros(n)
+        resid_col = zeros(n)
+        fitted_col[start_idx:end] = result.fitted_values[:, i]
+        resid_col[start_idx:end] = result.residuals[:, i]
+        columns[Symbol("fitted_$(name)")] = fitted_col
+        columns[Symbol("residual_$(name)")] = resid_col
+    end
+
+    return MetricaBase.AugmentTable(columns, n)
 end
 
 function MetricaBase.coef(result::VARFitResult)

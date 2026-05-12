@@ -3,7 +3,7 @@
  * 每个 handler 接收 parse 结果，返回 true/false/Promise<boolean>。
  */
 import type { ParsedCommand } from './commandParser';
-import { parseToModelSpec } from './commandParser';
+import { parseToModelSpec, parseToDiagnosticSpec, isDiagnosticVerb } from './commandParser';
 import { parseToDataOp } from './commandDataOps';
 import { executeDataOperations } from './dataOperationExecutor';
 import { pickCsvFile } from './nativeHost';
@@ -295,6 +295,14 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         postColumn: spec.post_column || '',
         eventTimeColumn: spec.event_time_column || '',
         outcomeColumn: spec.outcome_column || '',
+        propensityFormula: spec.propensity_formula || '',
+        outcomeFormula: spec.outcome_formula || '',
+        timeColumn: spec.time_column || '',
+        tsVariable: spec.variable || '',
+        tsVariables: Array.isArray(spec.variables) ? spec.variables.join(',') : '',
+        tsLags: spec.lags,
+        tsDeterministic: spec.deterministic || 'constant',
+        tsMethod: spec.ts_method || '',
         orderP: spec.order?.[0], orderD: spec.order?.[1], orderQ: spec.order?.[2],
         strataColumn: spec.strata_column || '', psuColumn: spec.psu_column || '', fpcColumn: spec.fpc_column || '',
       });
@@ -319,14 +327,56 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
   })();
 };
 
-// ---- diagnostic / post-estimation stubs ----
+// ---- diagnostic / post-estimation ----
 
-const DIAG_VERBS = new Set(['ovtest', 'hettest', 'vif', 'dwstat', 'bgodfrey', 'hausman']);
 const POSTEST_VERBS = new Set(['predict', 'margins', 'test', 'lincom', 'estimates']);
 
-export const handleDiagnostic: CmdHandler = (parsed, _input, feedback) => {
-  feedback('warning', `诊断命令 ${parsed.verb} 将在后续版本接入 Julia 诊断引擎。当前诊断信息已包含在模型结果中。`);
-  return false;
+export const handleDiagnostic: CmdHandler = (parsed, input, feedback) => {
+  const specResult = parseToDiagnosticSpec(parsed);
+  if ('error' in specResult) { feedback('warning', specResult.error); return false; }
+
+  const ms = useModelStore.getState();
+  const { lastResult, formula, modelType } = ms;
+  if (!lastResult || !formula) {
+    feedback('warning', '请先运行模型（如 regress）再执行诊断命令。');
+    return false;
+  }
+
+  const activePath = getActivePath();
+  if (!activePath) {
+    feedback('warning', '请先加载数据集。');
+    return false;
+  }
+
+  const spec = specResult;
+  return (async () => {
+    setLoading(true);
+    try {
+      const result = await api.runDiagnostic({
+        datasetPath: activePath,
+        formula,
+        modelType,
+        diagnostic: spec,
+      });
+      const ms2 = useMessageStore.getState();
+      ms2.addMessage({
+        kind: 'result',
+        command: input,
+        result: {
+          glance: { model: `diagnostic:${spec.test}`, nobs: 0, dof: 0, metrics: {} },
+          tidy: [],
+          diagnostics: { [spec.test]: result },
+          warnings: [],
+        },
+      });
+      setError(null);
+    } catch (e: unknown) {
+      setError((e as Error).message || '诊断命令执行失败');
+    } finally {
+      setLoading(false);
+    }
+    return true;
+  })();
 };
 
 export const handlePostest: CmdHandler = (parsed, _input, feedback) => {
@@ -336,11 +386,11 @@ export const handlePostest: CmdHandler = (parsed, _input, feedback) => {
 
 // ---- router ----
 
-/** 是否需要活动数据集（model / data-op / data-view 命令需要） */
+/** 是否需要活动数据集（model / data-op / data-view / diagnostic 命令需要） */
 export function requiresActiveDataset(verb: string): boolean {
   return !['use', 'project', 'trash', 'datahistory', 'save'].includes(verb)
-    && !DIAG_VERBS.has(verb) && !POSTEST_VERBS.has(verb);
+    && !POSTEST_VERBS.has(verb);
 }
 
-export function isDiagnosticVerb(verb: string) { return DIAG_VERBS.has(verb); }
+export { isDiagnosticVerb };
 export function isPostestVerb(verb: string) { return POSTEST_VERBS.has(verb); }

@@ -30,12 +30,43 @@ function MetricaBase.fit(
         data
     end
 
-    # 构造 SurveyDesign
-    design = SurveyDesign(dataset, wc; strata_column=sc, psu_column=pc, fpc_column=fc)
+    # 解析公式获取模型列
+    model_formula = MetricaLinear.parse_formula_term(formula)
+    model_formula isa MetricaBase.ModelError && return model_formula
+    model_columns = MetricaLinear.collect_term_symbols(model_formula)
+
+    # 确定需要检查缺失值的列
+    required_columns = Symbol[wc]  # 权重列
+    if !isnothing(sc)
+        push!(required_columns, sc)
+    end
+    if !isnothing(pc)
+        push!(required_columns, pc)
+    end
+    if !isnothing(fc)
+        push!(required_columns, fc)
+    end
+    # 添加公式中的列
+    for col in model_columns
+        push!(required_columns, col)
+    end
+    required_columns = unique(required_columns)
+
+    # 过滤数据集，只保留相关列中没有缺失值的行
+    filtered_dataset = dataset[completecases(dataset[:, required_columns]), :]
+    nrow(filtered_dataset) > 0 || return MetricaBase.ModelError(
+        :empty_effective_sample,
+        "有效样本为空",
+        "在模型相关列完成缺失值删除后，没有剩余观测可用于拟合。",
+        "请检查响应变量与解释变量中的缺失情况。",
+    )
+
+    # 构造 SurveyDesign（使用过滤后的数据集）
+    design = SurveyDesign(filtered_dataset, wc; strata_column=sc, psu_column=pc, fpc_column=fc)
     design isa MetricaBase.ModelError && return design
 
-    # 用抽样权重做 WLS 获取点估计
-    ols_result = MetricaBase.fit(OLSModel, formula, dataset; weights=wc, vcov=:classical)
+    # 用抽样权重做 WLS 获取点估计（使用过滤后的数据集）
+    ols_result = MetricaBase.fit(OLSModel, formula, filtered_dataset; weights=wc, vcov=:classical)
     ols_result isa MetricaBase.ModelError && return ols_result
 
     # 提取所需数据
@@ -45,7 +76,7 @@ function MetricaBase.fit(
     coef_names = ols_result.coefficient_names
     ncoef = length(coef_vals)
     nobs = length(residuals)
-    w = dataset[1:nobs, wc]
+    w = filtered_dataset[1:nobs, wc]
 
     # 计算 Taylor 线性化 Sandwich 方差
     survey_vcov = taylor_linearization_vcov(X, residuals, w, design)

@@ -28,6 +28,31 @@ MetricaBase.glance(result::PanelIVFitResult) = result.glance_table
 MetricaBase.tidy(result::PanelIVFitResult) = result.tidy_table
 MetricaBase.coef(result::PanelIVFitResult) = result.coefficient_names .=> result.coefficient_values
 
+function demean_vector_by_id(values::Vector{Float64}, ids)
+    demeaned = copy(values)
+    means = zeros(length(values))
+    for id in unique(ids)
+        mask = ids .== id
+        group_mean = mean(values[mask])
+        demeaned[mask] = values[mask] .- group_mean
+        means[mask] .= group_mean
+    end
+    return demeaned, means
+end
+
+function demean_matrix_by_id(values::Matrix{Float64}, ids)
+    demeaned = copy(values)
+    for id in unique(ids)
+        mask = ids .== id
+        group_values = values[mask, :]
+        group_means = vec(mean(group_values, dims=1))
+        for j in 1:size(values, 2)
+            demeaned[mask, j] = group_values[:, j] .- group_means[j]
+        end
+    end
+    return demeaned
+end
+
 function MetricaBase.augment(result::PanelIVFitResult)
     nobs = length(result.fitted_values)
     k = length(result.coefficient_names)
@@ -62,7 +87,7 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
 
     prepared = MetricaLinear.prepare_model_data(data, model_formula, model_columns, nothing, nothing)
     prepared isa MetricaBase.ModelError && return prepared
-    (_, model_frame, _, X, y, _, _, _, _) = prepared
+    (filtered_df, model_frame, _, X, y, _, _, _, _) = prepared
 
     nobs = length(y)
     base_names = Symbol.(coefnames(model_frame))
@@ -70,7 +95,7 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
     inst_syms = Symbol.(instruments)
 
     # 验证变量存在
-    available = Set(Symbol.(names(data)))
+    available = Set(Symbol.(names(filtered_df)))
     for ev in endog_syms
         ev ∉ available && return MetricaBase.ModelError(:unknown_endog_variable,
             "内生变量不存在", "内生变量 $ev 无法在数据集中找到。", "请检查变量名。")
@@ -86,9 +111,19 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
     exog_idx = [findfirst(==(name), base_names) for name in exog_names]
     endog_idx = [findfirst(==(name), base_names) for name in endog_in_base]
 
-    X_exog = X[:, exog_idx]
-    X_endog = X[:, endog_idx]
-    Z_inst = hcat([Float64.(data[!, iv]) for iv in inst_syms]...)
+    isempty(endog_idx) && return MetricaBase.ModelError(:missing_endog_in_formula,
+        "公式中缺少内生变量", "Panel IV 的公式必须包含至少一个 endog 变量。", "请检查公式和 endog 参数。")
+
+    ids = filtered_df[!, id_col]
+    y_within, y_means = demean_vector_by_id(y, ids)
+    X_within = demean_matrix_by_id(Matrix{Float64}(X), ids)
+    Z_inst_raw = hcat([Float64.(filtered_df[!, iv]) for iv in inst_syms]...)
+    Z_inst = demean_matrix_by_id(Matrix{Float64}(Z_inst_raw), ids)
+
+    exog_keep = [idx for idx in exog_idx if norm(X_within[:, idx]) > 1e-10]
+    exog_names = [base_names[idx] for idx in exog_keep]
+    X_exog = X_within[:, exog_keep]
+    X_endog = X_within[:, endog_idx]
     Z = hcat(X_exog, Z_inst)
 
     # 第一阶段
@@ -99,14 +134,26 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
     first_stage_stats = Dict{Symbol, Float64}()
     weak_warnings = MetricaBase.ModelWarning[]
     k_inst = length(inst_syms)
-    k_exog = length(exog_idx)
+    k_exog = size(X_exog, 2)
+
+    # 受约束模型：X_endog 仅对外生变量回归（去均值后）
+    Pi_exog = X_exog \ X_endog
+    X_endog_hat_exog = X_exog * Pi_exog
 
     for (idx, ev) in enumerate(endog_in_base)
+        # 无约束模型残差 RSS（外生 + 工具变量）
         resid_fs = X_endog[:, idx] - X_endog_hat[:, idx]
-        rss_fs = sum(abs2, resid_fs)
-        tss_fs = sum(abs2, X_endog[:, idx] .- mean(X_endog[:, idx]))
-        r2_fs = iszero(tss_fs) ? 0.0 : 1 - rss_fs / tss_fs
-        f_stat = iszero(1 - r2_fs) ? Inf : (r2_fs / (1 - r2_fs)) * (nobs - k_exog - k_inst) / k_inst
+        rss_unrestricted = sum(abs2, resid_fs)
+        # 受约束模型残差 RSS（仅外生变量）
+        resid_restricted = X_endog[:, idx] - X_endog_hat_exog[:, idx]
+        rss_restricted = sum(abs2, resid_restricted)
+        # 增量 F 统计量：检验排除工具变量的联合显著性
+        f_stat = if iszero(rss_unrestricted)
+            Inf
+        else
+            raw_f = ((rss_restricted - rss_unrestricted) / k_inst) / (rss_unrestricted / (nobs - k_exog - k_inst))
+            max(0.0, raw_f)
+        end
         first_stage_stats[ev] = f_stat
 
         if f_stat < 10.0
@@ -120,20 +167,21 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
 
     # 第二阶段
     X_second = hcat(X_exog, X_endog_hat)
-    coefficients = X_second \ y
-    fitted = X_second * coefficients
+    coefficients = X_second \ y_within
+    fitted_within = X_second * coefficients
+    fitted = y_means .+ fitted_within
     residuals = y - fitted
 
     coef_names = Symbol.(vcat(string.(exog_names), string.(endog_in_base)))
     ncoef = length(coefficients)
-    dof_val = nobs - ncoef
+    dof_val = nobs - ncoef - (n_ids - 1)
     sigma2 = sum(abs2, residuals) / dof_val
     XtX_inv = inv(X_second' * X_second)
     vcov_mat = sigma2 * XtX_inv
     se = sqrt.(diag(vcov_mat))
 
     rss = sum(abs2, residuals)
-    tss = sum(abs2, y .- mean(y))
+    tss = sum(abs2, y_within .- mean(y_within))
     r2_val = iszero(tss) ? 1.0 : 1 - rss / tss
     adj_r2 = iszero(tss) ? 1.0 : 1 - (rss / dof_val) / (tss / (nobs - 1))
     sigma = sqrt(rss / dof_val)

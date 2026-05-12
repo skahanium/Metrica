@@ -71,7 +71,7 @@ struct SurveyLogitFitResult <: AbstractSurveyFitResult
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
-    discrete_result::MetricaDiscrete.LogitFitResult
+    discrete_result::Any  # 加权 IRLS 返回的命名元组
     survey_vcov::Matrix{Float64}
     survey_se::Vector{Float64}
     design_effects::Vector{Float64}
@@ -84,7 +84,7 @@ struct SurveyProbitFitResult <: AbstractSurveyFitResult
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
-    discrete_result::MetricaDiscrete.ProbitFitResult
+    discrete_result::Any  # 加权 IRLS 返回的命名元组
     survey_vcov::Matrix{Float64}
     survey_se::Vector{Float64}
     design_effects::Vector{Float64}
@@ -97,7 +97,7 @@ struct SurveyPoissonFitResult <: AbstractSurveyFitResult
     formula::String
     glance_table::MetricaBase.ModelGlance
     tidy_table::MetricaBase.TidyTable
-    discrete_result::MetricaDiscrete.PoissonFitResult
+    discrete_result::Any  # 加权 IRLS 返回的命名元组
     survey_vcov::Matrix{Float64}
     survey_se::Vector{Float64}
     design_effects::Vector{Float64}

@@ -201,12 +201,24 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
     k_inst = length(inst_syms)
     k_exog = size(X_exog, 2)
 
+    # 受约束模型：X_endog 仅对外生变量回归
+    Pi_exog = X_exog \ X_endog
+    X_endog_hat_exog = X_exog * Pi_exog
+
     for (idx, ev) in enumerate(endog_syms)
+        # 无约束模型残差 RSS（外生 + 工具变量）
         resid_fs = X_endog[:, idx] - X_endog_hat[:, idx]
-        rss_fs = sum(abs2, resid_fs)
-        tss_fs = sum(abs2, X_endog[:, idx] .- mean(X_endog[:, idx]))
-        r2_fs = iszero(tss_fs) ? 0.0 : 1 - rss_fs / tss_fs
-        f_stat = iszero(1 - r2_fs) ? Inf : (r2_fs / (1 - r2_fs)) * (nobs - k_exog - k_inst) / k_inst
+        rss_unrestricted = sum(abs2, resid_fs)
+        # 受约束模型残差 RSS（仅外生变量）
+        resid_restricted = X_endog[:, idx] - X_endog_hat_exog[:, idx]
+        rss_restricted = sum(abs2, resid_restricted)
+        # 增量 F 统计量：检验排除工具变量的联合显著性
+        f_stat = if iszero(rss_unrestricted)
+            Inf
+        else
+            raw_f = ((rss_restricted - rss_unrestricted) / k_inst) / (rss_unrestricted / (nobs - k_exog - k_inst))
+            max(0.0, raw_f)
+        end
         first_stage_stats[ev] = f_stat
 
         if f_stat < 10.0
@@ -232,8 +244,13 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
 
     ncoef = length(coefficients)
     dof_val = nobs - ncoef
-    # vcov 使用第二阶段矩阵（含投影），残差使用结构残差
-    vcov_result = compute_vcov(X_second, residuals, nobs, dof_val, vcov, nothing)
+    # HC1 使用 GMM 最优 sandwich 口径：bread 与 meat 均反映 Z 投影
+    # classical/cluster 仍使用第二阶段矩阵 X_second
+    if vcov === :HC1
+        vcov_result = compute_vcov(X_original, residuals, nobs, dof_val, vcov, nothing, Z)
+    else
+        vcov_result = compute_vcov(X_second, residuals, nobs, dof_val, vcov, nothing)
+    end
     vcov_result isa MetricaBase.ModelError && return vcov_result
     vcov_mat, stderror = vcov_result
 

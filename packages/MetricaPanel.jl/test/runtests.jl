@@ -53,6 +53,7 @@ end
         g = glance(result)
         @test g.model === :fe
         @test g.nobs == 9
+        @test g.dof == 5
         @test haskey(g.metrics, :r2)
         @test haskey(g.metrics, :adj_r2)
         @test haskey(g.metrics, :n_ids)
@@ -132,9 +133,34 @@ end
         # M7: BP LM 现在支持不平衡面板
         @test diagnostics["breusch_pagan_lm"]["available"] == true
         @test occursin("不平衡面板", diagnostics["breusch_pagan_lm"]["note"])
+
+        # BP-LM 不平衡面板应使用 T_star 修正量
+        # 手动计算 T_star 验证统计量
+        N = 5
+        n_groups = 2
+        group_sizes = [2, 3]
+        sum_T_sq = sum(s^2 for s in group_sizes)  # 4 + 9 = 13
+        T_star_expected = (N - sum_T_sq / N) / (n_groups - 1)  # (5 - 2.6) / 1 = 2.4
+
+        # 获取 pooled OLS 残差并计算 ratio
+        design = MetricaPanel._panel_design(unbalanced_panel, "invest ~ mvalue")
+        pooled_stats = MetricaPanel.ols_statistics(
+            Matrix{Float64}(design.X_design), design.y, design.coef_names, :pooled,
+            Dict{Symbol, MetricaBase.MetricValue}(:n_ids => n_groups),
+        )
+        res = pooled_stats.residuals
+        grouped_res = groupby(DataFrame(id=unbalanced_data[:firm], residual=res), :id)
+        group_sums_res = [sum(g.residual) for g in grouped_res]
+        sum_sq_groups = sum(s^2 for s in group_sums_res)
+        total_ss = sum(abs2, res)
+        ratio = sum_sq_groups / total_ss
+
+        expected_stat = n_groups * T_star_expected / (2 * (T_star_expected - 1)) * (ratio - 1)^2
+        expected_stat = max(expected_stat, 0.0)
+        @test diagnostics["breusch_pagan_lm"]["statistic"] ≈ expected_stat atol=1e-10
     end
 
-    @testset "RE 随机效应拟合" begin
+    @testset "RE（Mundlak/CRE）拟合" begin
         result = fit_panel(panel_data, "invest ~ mvalue + capital"; method=:re)
         @test result isa PanelFitResult
         @test result.method === :re
@@ -277,9 +303,25 @@ end
     result = fit_panel_iv(pd, "y ~ x1"; instruments=["z1"], endog=["x1"])
     @test result isa PanelIVFitResult
     @test glance(result).model === :panel_iv
-    @test length(tidy(result).rows) == 2
+    @test length(tidy(result).rows) == 1
+    @test tidy(result).rows[1].name === :x1
     @test length(result.first_stage_stats) == 1
     @test haskey(result.first_stage_stats, :x1)
+
+    firm = repeat(1:8, inner=5)
+    year = repeat(1:5, outer=8)
+    alpha = repeat(collect(1.0:8.0), inner=5)
+    trend = repeat([-2.0, -1.0, 0.0, 1.0, 2.0], outer=8)
+    z = alpha .+ trend
+    x = alpha .+ z
+    y = alpha .+ 2.0 .* x
+    correlated_df = DataFrame(firm=firm, year=year, y=y, x=x, z=z)
+    correlated_panel = PanelData(correlated_df, :firm, :year)
+
+    correlated_result = fit_panel_iv(correlated_panel, "y ~ x"; instruments=["z"], endog=["x"])
+    @test correlated_result isa PanelIVFitResult
+    @test only(correlated_result.coefficient_names) === :x
+    @test only(correlated_result.coefficient_values) ≈ 2.0 atol=1e-8
 end
 
 @testset "M7 Driscoll-Kraay" begin

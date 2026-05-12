@@ -46,12 +46,23 @@ describe('commandGrammar', () => {
     expect(opts.children!.method.values).toEqual(['fe', 're', 'fd', 'between', 'hdfe', 'cre']);
   });
 
-  it('diagnostic commands have no syntax nodes', () => {
-    for (const verb of ['ovtest', 'hettest', 'vif', 'dwstat', 'bgodfrey', 'hausman']) {
+  it('diagnostic commands have correct syntax', () => {
+    for (const verb of ['ovtest', 'hettest', 'vif', 'dwstat', 'hausman']) {
       const g = getGrammar(verb);
       expect(g, `Missing grammar for ${verb}`).toBeDefined();
       expect(g!.syntax.length).toBe(0);
     }
+    const bg = getGrammar('bgodfrey')!;
+    expect(bg.syntax.length).toBe(2);
+    expect(bg.syntax[0].kind).toBe('comma');
+    expect(bg.syntax[1].kind).toBe('option');
+  });
+
+  it('diagnostic unified command has test_name positional', () => {
+    const g = getGrammar('diagnostic')!;
+    expect(g.category).toBe('diagnostic');
+    expect(g.syntax[0].kind).toBe('indepvar');
+    expect(g.syntax[0].values).toEqual(['bp', 'bg', 'reset', 'jb', 'dw', 'white', 'vif']);
   });
 
   it('COMMAND_LIST contains all grammars', () => {

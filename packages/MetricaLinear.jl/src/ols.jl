@@ -256,10 +256,12 @@ end
 计算系数的方差-协方差矩阵与标准误。
 
 `cluster_values` 仅在 `vcov === :cluster` 时使用，包含每个观测的聚类标识。
+`instrument_matrix` 为 IV/2SLS 模型的工具变量矩阵 Z；提供时 HC1 使用
+GMM 最优 sandwich 口径（bread 与 meat 均反映 Z 投影）。
 
 返回 `(vcov_matrix, stderror)` 或 `ModelError`。
 """
-function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float64}, nobs::Int, dof::Int, vcov::Symbol, cluster_values::Union{Nothing, AbstractVector})
+function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float64}, nobs::Int, dof::Int, vcov::Symbol, cluster_values::Union{Nothing, AbstractVector}, instrument_matrix::Union{Nothing, Matrix{Float64}}=nothing)
     ncoef = size(X_eff, 2)
     xtx = transpose(X_eff) * X_eff
     xtx_inv = inv(xtx)
@@ -270,12 +272,30 @@ function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float6
         sigma2 * xtx_inv
     elseif vcov === :HC1
         scale = nobs / dof
-        meat = zeros(ncoef, ncoef)
-        for index in 1:nobs
-            xi = reshape(X_eff[index, :], :, 1)
-            meat += effective_residuals[index]^2 .* (xi * transpose(xi))
+        if !isnothing(instrument_matrix)
+            # IV/2SLS HC1：GMM 最优 sandwich 口径
+            # Bread = (X'Z(Z'Z)^{-1}Z'X)^{-1}
+            # Meat  = X'Z(Z'Z)^{-1}(Σ e_i² z_i z_i')(Z'Z)^{-1}Z'X
+            Z = instrument_matrix
+            ZtZ_inv = inv(transpose(Z) * Z)
+            XZ = transpose(X_eff) * Z
+            bread = inv(XZ * ZtZ_inv * transpose(XZ))
+            ninst = size(Z, 2)
+            meat_inner = zeros(ninst, ninst)
+            for index in 1:nobs
+                zi = reshape(Z[index, :], :, 1)
+                meat_inner += effective_residuals[index]^2 .* (zi * transpose(zi))
+            end
+            meat = XZ * ZtZ_inv * meat_inner * ZtZ_inv * transpose(XZ)
+            scale .* (bread * meat * bread)
+        else
+            meat = zeros(ncoef, ncoef)
+            for index in 1:nobs
+                xi = reshape(X_eff[index, :], :, 1)
+                meat += effective_residuals[index]^2 .* (xi * transpose(xi))
+            end
+            scale .* (xtx_inv * meat * xtx_inv)
         end
-        scale .* (xtx_inv * meat * xtx_inv)
     elseif vcov === :cluster
         if isnothing(cluster_values)
             return MetricaBase.ModelError(
@@ -410,6 +430,10 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
     X_eff, y_eff, model_label = apply_weights(X, y, weight_values)
     coefficients, fitted, residuals, effective_residuals = compute_ols_estimates(X, y, X_eff, y_eff)
 
+    # bread 矩阵：(X_eff'X_eff)^{-1}
+    # OLS: (X'X)^{-1}；WLS: (X'WX)^{-1}
+    bread_matrix = inv(X_eff' * X_eff)
+
     vcov_result = compute_vcov(X_eff, effective_residuals, nobs, dof, vcov, cluster_values)
     vcov_result isa MetricaBase.ModelError && return vcov_result
     vcov_matrix, stderror = vcov_result
@@ -437,5 +461,6 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
         String(formula), glance_table, tidy_table,
         Matrix{Float64}(X), copy(y), fitted, residuals,
         coefficient_names, coefficients, vcov_matrix, stderror,
+        bread_matrix,
     )
 end

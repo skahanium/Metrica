@@ -17,7 +17,8 @@ export AbstractDiscreteModel, AbstractDiscreteFitResult,
     LogitFitResult, ProbitFitResult, PoissonFitResult,
     OrderedLogitFitResult, MultinomialLogitFitResult, NegBinFitResult,
     fit, result_to_payload,
-    ame, mem, lr_test, compare_aic_bic
+    ame, mem, lr_test, compare_aic_bic,
+    weighted_irls, LOGIT_LINK, PROBIT_LINK, LOG_LINK
 
 # === 抽象类型 =============================================================
 
@@ -186,6 +187,7 @@ struct MultinomialLogitFitResult <: AbstractDiscreteFitResult
     categories::Vector{Int}
     reference::Int
     loglikelihood::Float64
+    iterations::Int
     converged::Bool
 end
 

@@ -263,8 +263,10 @@ function pp_test(y::Vector{Float64}; deterministic::Symbol=:constant, lags=:auto
         Dict(0.01 => -2.58, 0.05 => -1.94, 0.10 => -1.62)
     end
 
-    # 近似 p 值（使用正态分布近似）
-    p_value = 2 * cdf(Normal(0, 1), pp_stat)
+    # PP 统计量与 ADF 统计量服从相同的渐近 Dickey-Fuller 分布
+    # 使用 MacKinnon (1994) 响应面计算 p 值（复用 HypothesisTests 的辅助函数）
+    z = HypothesisTests.adf_pv_aux(pp_stat, deterministic)
+    p_value = cdf(Normal(0, 1), z)
     conclusion = p_value < 0.05 ? "reject" : "fail_to_reject"
 
     return UnitRootResult(

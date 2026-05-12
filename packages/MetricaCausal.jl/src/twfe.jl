@@ -64,5 +64,6 @@ function fit_twfe(X::Matrix{Float64}, y::Vector{Float64},
     stderror = sqrt.(max.(diag(vcov), 0.0))
 
     return (coefficients=coefficients, fitted=fitted, residuals=residuals,
-            vcov=vcov, stderror=stderror, dof=dof, nobs=nobs)
+            vcov=vcov, stderror=stderror, dof=dof, nobs=nobs,
+            X_demeaned=X_demeaned, XtX_inv=XtX_inv)
 end

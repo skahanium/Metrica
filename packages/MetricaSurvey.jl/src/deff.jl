@@ -2,12 +2,12 @@
 
 function design_effect(result::AbstractSurveyFitResult)
     coef_str = String.(result.coefficient_names)
-    srs_result = if result isa SurveyOLSFitResult
-        result.ols_result
+    srs_se = if result isa SurveyOLSFitResult
+        MetricaBase.stderror(result.ols_result)
     else
-        result.discrete_result
+        # discrete_result 是加权 IRLS 返回的命名元组
+        sqrt.(max.(diag(result.discrete_result.vcov_matrix), 0.0))
     end
-    srs_se = MetricaBase.stderror(srs_result)
     return DEFFResult(
         coef_str,
         result.design_effects,

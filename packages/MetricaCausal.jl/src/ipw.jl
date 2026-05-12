@@ -46,15 +46,24 @@ function MetricaBase.fit(::Type{IPWModel}, formula::AbstractString, data;
     n1 = sum(treated_mask)
     att_se = sqrt(var(y_out[treated_mask]) / n1 + sum((w[control_mask] .* (y_out[control_mask] .- mu0)).^2) / sum(w[control_mask])^2)
 
+    # ATU SE
+    n0 = sum(control_mask)
+    mu1_atu = sum(w[treated_mask] .* y_out[treated_mask]) / sum(w[treated_mask])
+    atu_se = sqrt(sum((w[treated_mask] .* (y_out[treated_mask] .- mu1_atu)).^2) / sum(w[treated_mask])^2 + var(y_out[control_mask]) / n0)
+
     glance_table = MetricaBase.ModelGlance(:ipw, n, n-1,
         Dict{Symbol, MetricaBase.MetricValue}(:ate => ate, :att => att, :atu => atu),
         MetricaBase.ModelWarning[])
 
-    tidy_rows = [MetricaBase.CoefRow(:ATE, ate, ate_se, ate/ate_se, 2*(1-cdf(Normal(), abs(ate/ate_se))))]
+    tidy_rows = [
+        MetricaBase.CoefRow(:ATE, ate, ate_se, ate/ate_se, 2*(1-cdf(Normal(), abs(ate/ate_se)))),
+        MetricaBase.CoefRow(:ATT, att, att_se, att/att_se, 2*(1-cdf(Normal(), abs(att/att_se)))),
+        MetricaBase.CoefRow(:ATU, atu, atu_se, atu/atu_se, 2*(1-cdf(Normal(), abs(atu/atu_se))))
+    ]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "IPW (robust sandwich)")
 
     return IPWFitResult(formula, glance_table, tidy_table,
-        ps_result, ate, ate_se, att, att_se, atu, ate_se, w, ps_result.loglikelihood)
+        ps_result, ate, ate_se, att, att_se, atu, atu_se, w, ps_result.loglikelihood)
 end
 
 MetricaBase.glance(result::IPWFitResult) = result.glance_table

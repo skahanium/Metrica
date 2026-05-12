@@ -71,6 +71,7 @@ White 异方差检验（无交叉项版本）。
 
 在原始设计矩阵的基础上加入每个非截距列的平方项作为辅助回归元，对残差平方做
 辅助回归，以 n·R² 作为 LM 统计量，渐近服从 χ²(df)。
+df = 辅助回归矩阵非截距列数 = 原始非截距列数 + 平方项列数。
 
 返回 `(statistic, pvalue, dof)`。
 """
@@ -101,7 +102,7 @@ function white_test(fit::MetricaLinear.OLSFitResult)
     tss = sum(abs2, squared_residuals .- mean(squared_residuals))
     r2 = iszero(tss) ? 0.0 : max(0.0, 1 - rss / tss)
     statistic = nobs * r2
-    dof = length(non_intercept_cols)
+    dof = size(Z, 2) - 1
     dof = max(dof, 1)
     pvalue = 1 - cdf(Chisq(dof), statistic)
 
@@ -117,14 +118,17 @@ Durbin-Watson 一阶自相关检验。
 统计量 DW 的取值范围为 [0, 4]，接近 2 表示无一阶自相关。
 DW < 2 表示正自相关，DW > 2 表示负自相关。
 
-返回 `(statistic, pvalue)`。
+返回 `(statistic, pvalue, warnings)`。
 p 值采用正态近似（DW 在大样本下渐近正态）。
+DW 分布依赖样本量和设计矩阵结构，当前正态近似为粗略近似，
+小样本或复杂设计矩阵下 p 值可能严重失真。
+建议参考 Durbin-Watson 界限检验表（dL, dU）获取精确推断。
 """
 function durbin_watson(fit::MetricaLinear.OLSFitResult)
     residuals = fit.residual_vector
     n = length(residuals)
 
-    n < 2 && return (statistic=NaN, pvalue=NaN)
+    n < 2 && return (statistic=NaN, pvalue=NaN, warnings=Dict{String,Any}[])
 
     diff_sum = sum(abs2, residuals[2:end] - residuals[1:(end-1)])
     residual_sum = sum(abs2, residuals)
@@ -139,7 +143,19 @@ function durbin_watson(fit::MetricaLinear.OLSFitResult)
         nothing
     end
 
-    return (statistic=dw, pvalue=pvalue)
+    # 结构化警告：标记 p 值为粗略近似
+    dw_warnings = Dict{String,Any}[]
+    if pvalue !== nothing
+        push!(dw_warnings, Dict(
+            "code" => "dw_pvalue_approximate",
+            "title" => "DW p 值为粗略近似",
+            "detail" => "Durbin-Watson 分布依赖样本量和设计矩阵结构，当前正态近似 N(2, 4/n) 在小样本或复杂设计下可能严重失真。",
+            "hint" => "参考 Durbin-Watson 界限检验表（dL, dU）获取精确推断，或使用 Breusch-Godfrey 检验作为替代。",
+            "severity" => "warning",
+        ))
+    end
+
+    return (statistic=dw, pvalue=pvalue, warnings=dw_warnings)
 end
 
 # === Breusch-Godfrey ===========================================================

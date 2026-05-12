@@ -8,6 +8,7 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
+HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
@@ -33,5 +34,6 @@ MetricaPanel = {path = "../MetricaPanel.jl"}
 MetricaSurvey = {path = "../MetricaSurvey.jl"}
 
 [compat]
+HypothesisTests = "0.11.7"
 Optim = "2.0.1"
 julia = "1.12"

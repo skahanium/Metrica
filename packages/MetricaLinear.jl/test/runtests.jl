@@ -1,5 +1,6 @@
 using Test
-using LinearAlgebra: I
+using LinearAlgebra: I, dot, Diagonal, cholesky, Symmetric, inv
+using Distributions: TDist, quantile
 using MetricaBase: fit, coef, vcov, stderror, nobs, dof, r2, fitted, residuals, predict,
     glance, tidy, augment, ModelError, ModelWarning, AugmentTable, AbstractLinearModel, AbstractLinearFitResult
 using MetricaLinear
@@ -65,6 +66,30 @@ end
     missing_weight = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; weights=:w9)
     @test missing_weight isa ModelError
     @test missing_weight.code === :unknown_weight_variable
+end
+
+@testset "WLS 预测区间 bread 矩阵口径" begin
+    weighted = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; weights=:x1)
+
+    # WLS 预测区间应使用 (X'WX)^{-1} 作为 bread，而非 (X'X)^{-1}
+    ci = predict(weighted; interval=:confidence, level=0.95)
+    @test ci isa NamedTuple{(:predictions, :lower, :upper)}
+    @test all(ci.lower .<= ci.predictions .<= ci.upper)
+
+    pi = predict(weighted; interval=:prediction, level=0.95)
+    @test pi isa NamedTuple{(:predictions, :lower, :upper)}
+    @test all(pi.lower .<= pi.predictions .<= pi.upper)
+    @test all((pi.upper .- pi.lower) .>= (ci.upper .- ci.lower) .- 1e-10)
+
+    # bread 矩阵应为 (X'WX)^{-1}，不同于 (X'X)^{-1}（因为权重不是全 1）
+    X = weighted.design_matrix
+    XWX_inv = weighted.bread_matrix
+    XX_inv = inv(X' * X)
+    @test XWX_inv != XX_inv
+
+    # OLS 的 bread 应等于 (X'X)^{-1}
+    ols = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+    @test ols.bread_matrix ≈ inv(ols.design_matrix' * ols.design_matrix) atol=1e-12
 end
 
 @testset "HC1 协方差链路" begin
@@ -249,6 +274,25 @@ end
     @test all(cooks_d .>= 0.0)
 end
 
+@testset "WLS augment 杠杆值口径" begin
+    weighted = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV; weights=:x1)
+    at = augment(weighted)
+    @test at isa AugmentTable
+
+    # 杠杆值应使用 bread 矩阵 (X'WX)^{-1}，而非 (X'X)^{-1}
+    # 验证杠杆值非负
+    leverage = at.columns[:leverage]
+    @test all(0.0 .<= leverage)
+    # Cook's D 非负
+    @test all(at.columns[:cooks_d] .>= 0.0)
+
+    # 对比：若使用错误 bread (X'X)^{-1}，杠杆值会不同
+    X = weighted.design_matrix
+    wrong_bread = inv(X' * X)
+    wrong_leverage = [dot(X[i, :], wrong_bread * X[i, :]) for i in 1:size(X, 1)]
+    @test leverage != wrong_leverage
+end
+
 @testset "数据检查载荷输出" begin
     inspection = inspect_dataset(DEMO_CSV)
     @test inspection isa Dict
@@ -369,6 +413,72 @@ end
     rm(iv_csv; force=true)
 end
 
+@testset "IV 第一阶段增量 F 统计量" begin
+    # 场景：z 与 x1 高度相关但不增加增量解释力
+    # 旧 R²-based F 会高估（给出 Inf），增量 F 应正确识别弱工具
+    weak_csv, weak_io = mktemp()
+    close(weak_io)
+    # x1 强外生变量；z ≈ x1 + 噪声，对 x 无增量解释力
+    # x = 2*x1 + 1（完全由 x1 决定）
+    write(weak_csv, """y,x,x1,z
+10,3,1,1.1
+12,5,2,1.9
+14,7,3,3.2
+16,9,4,3.8
+18,11,5,5.3
+20,13,6,5.7
+22,15,7,7.1
+24,17,8,8.2
+26,19,9,8.9
+28,21,10,10.1
+30,23,11,11.3
+32,25,12,11.8
+34,27,13,13.1
+36,29,14,13.9
+38,31,15,15.2
+40,33,16,15.7
+42,35,17,17.1
+44,37,18,18.3
+46,39,19,18.8
+48,41,20,20.2
+""")
+    result = fit(IVModel, "y ~ x1 + x", weak_csv;
+                 instruments=["z"], endog=["x"])
+    @test result isa IVFitResult
+    f_val = result.first_stage_stats[:x]
+    # z ≈ x1，对 x 无增量解释力，F 应 < 10
+    @test f_val < 10.0
+    @test f_val >= 0.0
+    # 应触发弱工具变量警告
+    weak_warns = [w for w in glance(result).warnings if w.code === :weak_instrument]
+    @test length(weak_warns) >= 1
+
+    # 场景：强工具变量，z 与 x 高度相关且独立于 x1
+    strong_csv, strong_io = mktemp()
+    close(strong_io)
+    write(strong_csv, """y,x,x1,z
+10,3,1,5
+12,5,2,9
+14,7,3,13
+16,9,4,17
+18,11,5,21
+20,13,6,25
+22,15,7,29
+24,17,8,33
+26,19,9,37
+28,21,10,41
+""")
+    strong_result = fit(IVModel, "y ~ x1 + x", strong_csv;
+                        instruments=["z"], endog=["x"])
+    @test strong_result isa IVFitResult
+    strong_f = strong_result.first_stage_stats[:x]
+    # 强工具变量应远高于阈值
+    @test strong_f > 10.0
+
+    rm(weak_csv; force=true)
+    rm(strong_csv; force=true)
+end
+
 @testset "IV 欠识别" begin
     # instruments 数量 < endog 数量
     iv_csv, iv_io = mktemp()
@@ -410,6 +520,60 @@ end
     rm(iv_csv; force=true)
 end
 
+@testset "IV HC1 sandwich 使用 Z 矩阵" begin
+    iv_csv, iv_io = mktemp()
+    close(iv_io)
+    # 构造 x2 不在 Z 列空间中的数据（避免退化）
+    write(iv_csv, """y,x1,x2,z1,z2
+10,1,5,3,8
+12,2,3,5,7
+14,3,8,7,4
+20,2,2,4,9
+22,3,4,6,5
+24,4,6,8,3
+30,5,1,9,10
+32,6,7,11,2
+""")
+
+    result = fit(IVModel, "y ~ x1 + x2", iv_csv;
+                 instruments=["z1", "z2"], endog=["x2"], vcov=:HC1)
+    @test result isa IVFitResult
+
+    # 手动构造 Z 矩阵和 X_original 矩阵
+    nobs_val = 8
+    Z = hcat(ones(nobs_val),
+             Float64[1,2,3,2,3,4,5,6],
+             Float64[3,5,7,4,6,8,9,11],
+             Float64[8,7,4,9,5,3,10,2])
+    X_orig = hcat(ones(nobs_val),
+                  Float64[1,2,3,2,3,4,5,6],
+                  Float64[5,3,8,2,4,6,1,7])
+
+    e = result.residual_vector
+    n = length(e)
+    k = length(result.coefficient_names)
+    dof_val = n - k
+
+    # GMM 最优 sandwich：bread = (X'Z(Z'Z)^{-1}Z'X)^{-1}
+    #                       meat  = X'Z(Z'Z)^{-1}(Σ e_i² z_i z_i')(Z'Z)^{-1}Z'X
+    ZtZ_inv = inv(Z' * Z)
+    XZ = X_orig' * Z
+    bread = inv(XZ * ZtZ_inv * XZ')
+    meat_inner = zeros(size(Z, 2), size(Z, 2))
+    for i in 1:n
+        zi = Z[i, :]
+        meat_inner += e[i]^2 .* (zi * zi')
+    end
+    meat = XZ * ZtZ_inv * meat_inner * ZtZ_inv * XZ'
+    expected_vcov = (n / dof_val) .* (bread * meat * bread)
+    expected_se = sqrt.(diag(expected_vcov))
+
+    @test result.vcov_matrix ≈ expected_vcov atol=1e-10
+    @test result.stderror_values ≈ expected_se atol=1e-10
+
+    rm(iv_csv; force=true)
+end
+
 @testset "GLS 链路" begin
     identity_omega = r -> Matrix{Float64}(I, length(r), length(r))
     gls_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=identity_omega)
@@ -437,6 +601,15 @@ end
     payload = result_to_payload(gls_result)
     @test payload["status"] == "success"
 
+    ols_r2 = r2(ols_result)
+    @test r2(gls_result) ≈ ols_r2 atol=1e-10
+
+    ci_gls = predict(gls_result; interval=:confidence, level=0.95)
+    ci_ols = predict(ols_result; interval=:confidence, level=0.95)
+    @test ci_gls.predictions ≈ ci_ols.predictions atol=1e-10
+    @test ci_gls.lower ≈ ci_ols.lower atol=1e-10
+    @test ci_gls.upper ≈ ci_ols.upper atol=1e-10
+
     bad_omega = r -> -Matrix{Float64}(I, length(r), length(r))
     bad_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=bad_omega)
     @test bad_result isa ModelError
@@ -446,6 +619,53 @@ end
     wrong_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=wrong_dim_omega)
     @test wrong_result isa ModelError
     @test wrong_result.code === :omega_dimension_mismatch
+end
+
+@testset "GLS 变换空间 R² 与预测区间" begin
+    wts = [1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0]
+    omega_het = r -> Diagonal(wts)
+    gls_het = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=omega_het)
+
+    ols_ref = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+
+    gls_r2_het = r2(gls_het)
+    ols_r2_ref = r2(ols_ref)
+    @test gls_r2_het != ols_r2_ref
+
+    @test 0.0 <= gls_r2_het <= 1.0
+
+    ci_het = predict(gls_het; interval=:confidence, level=0.95)
+    @test ci_het isa NamedTuple
+    @test all(ci_het.lower .<= ci_het.predictions .<= ci_het.upper)
+
+    ci_het_pred = predict(gls_het; interval=:prediction, level=0.95)
+    @test ci_het_pred isa NamedTuple
+    @test all(ci_het_pred.lower .<= ci_het_pred.predictions .<= ci_het_pred.upper)
+end
+
+@testset "GLS 预测区间使用变换后矩阵" begin
+    omega_fn = r -> Diagonal([1.0, 4.0, 1.0, 4.0, 1.0, 4.0, 1.0])
+    gls = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=omega_fn)
+
+    ci = predict(gls; interval=:confidence, level=0.95)
+
+    X = gls.design_matrix
+    omega = gls.omega
+    L_inv = inv(Matrix(cholesky(Symmetric(omega)).L))
+    X_gls = L_inv * X
+    XtX_gls_inv = inv(X_gls' * X_gls)
+
+    sigma = gls.glance_table.metrics[:sigma]
+    n = length(gls.response_vector)
+    k = length(gls.coefficient_names)
+    dof_val = n - k
+    t_crit = quantile(TDist(dof_val), 0.975)
+
+    for i in 1:size(X, 1)
+        expected_se = sqrt(sigma^2 * dot(X[i, :], XtX_gls_inv * X[i, :]))
+        @test ci.predictions[i] ≈ dot(X[i, :], gls.coef_values) atol=1e-10
+        @test ci.lower[i] ≈ ci.predictions[i] - t_crit * expected_se atol=1e-6
+    end
 end
 
 @testset "黄金样例与模型比较载荷" begin

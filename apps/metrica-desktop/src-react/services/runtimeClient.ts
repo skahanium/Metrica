@@ -2,7 +2,7 @@ import type {
   DataCommandRequest, DataCommandResult,
   DataOp, FitModelRequest, TaskResponse, DatasetSummary, TransformRequest, TransformResult,
   TransformTaskResponse, SaveProjectRequest, ProjectManifest, LoadProjectRequest, ListRunsRequest,
-  RerunTaskRequest, RunRecord,
+  RerunTaskRequest, RunRecord, DiagnosticSpec,
 } from '../types/protocol';
 
 const DEFAULT_BASE = 'http://127.0.0.1:47821';
@@ -40,6 +40,8 @@ export interface FitModelParams {
   postColumn?: string;
   eventTimeColumn?: string;
   outcomeColumn?: string;
+  propensityFormula?: string;
+  outcomeFormula?: string;
   timeColumn?: string;
   tsVariable?: string;
   tsVariables?: string;
@@ -52,6 +54,7 @@ export interface FitModelParams {
   seasonalS?: number;
   tsLags?: number;
   tsDeterministic?: string;
+  tsMethod?: string;
   strataColumn?: string;
   psuColumn?: string;
   fpcColumn?: string;
@@ -76,6 +79,8 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     postColumn = '',
     eventTimeColumn = '',
     outcomeColumn = '',
+    propensityFormula = '',
+    outcomeFormula = '',
     timeColumn = '',
     tsVariable = '',
     tsVariables = '',
@@ -83,6 +88,7 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     seasonalP = 0, seasonalD = 0, seasonalQ = 0, seasonalS = 0,
     tsLags = 2,
     tsDeterministic = 'constant',
+    tsMethod = '',
     strataColumn = '',
     psuColumn = '',
     fpcColumn = '',
@@ -95,10 +101,18 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     formula,
   };
 
-  if (modelType === 'panel') {
+  if (modelType === 'panel' || modelType === 'panel_iv') {
     modelSpec.panel_id = panelId;
     modelSpec.panel_time = panelTime;
-    modelSpec.panel_method = panelMethod as 'fe' | 're' | 'fd' | 'between';
+    if (modelType === 'panel') {
+      modelSpec.panel_method = panelMethod as 'fe' | 're' | 'fd' | 'between';
+    }
+    if (modelType === 'panel_iv') {
+      modelSpec.vcov = { type: vcovType };
+      if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
+      if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
+      if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
+    }
   } else if (modelType === 'iv') {
     modelSpec.vcov = { type: vcovType };
     if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
@@ -115,6 +129,8 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
   } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
     if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
     if (outcomeColumn?.trim()) modelSpec.outcome_column = outcomeColumn.trim();
+    if (propensityFormula?.trim()) modelSpec.propensity_formula = propensityFormula.trim();
+    if (outcomeFormula?.trim()) modelSpec.outcome_formula = outcomeFormula.trim();
   } else if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration') {
     if (timeColumn.trim()) modelSpec.time_column = timeColumn.trim();
     if (tsVariable.trim()) modelSpec.variable = tsVariable.trim();
@@ -125,6 +141,7 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     }
     if (tsLags > 0) modelSpec.lags = tsLags;
     if (tsDeterministic !== 'constant') modelSpec.deterministic = tsDeterministic as 'constant' | 'trend' | 'none';
+    if (tsMethod.trim()) modelSpec.ts_method = tsMethod.trim() as 'mle' | 'css' | 'engle_granger' | 'johansen';
   } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin') {
     modelSpec.vcov = { type: vcovType };
   } else if (modelType === 'survey_ols' || modelType === 'survey_logit' || modelType === 'survey_probit' || modelType === 'survey_poisson') {
@@ -456,5 +473,65 @@ export async function exportReport(
   if (!res.ok) throw new Error(`Runtime error: ${res.status}`);
   const json = await res.json() as TaskResponse & { result_payload?: { content: string; format: string; run_id: string } };
   if (!json.result_payload) throw new Error('Export returned no payload');
+  return json.result_payload;
+}
+
+// ---- diagnostic ----
+
+export interface RunDiagnosticParams {
+  datasetPath: string;
+  formula: string;
+  modelType?: string;
+  diagnostic: DiagnosticSpec;
+  workingDir?: string;
+  projectId?: string;
+}
+
+export function buildDiagnosticRequest(params: RunDiagnosticParams) {
+  const {
+    datasetPath, formula, modelType = 'ols', diagnostic,
+    workingDir = inferWorkingDir(datasetPath), projectId = 'alpha-demo',
+  } = params;
+
+  return {
+    task_id: createTaskId(),
+    action: 'run_diagnostic',
+    project_context: { project_id: projectId, working_dir: workingDir },
+    dataset_ref: { source: 'file', path: datasetPath, format: 'csv' },
+    model_spec: { model_type: modelType, formula },
+    diagnostic,
+  };
+}
+
+export interface DiagnosticResponse {
+  test: string;
+  statistic: number | null;
+  pvalue: number | null;
+  dof?: number | null;
+  df_num?: number | null;
+  df_den?: number | null;
+  skewness?: number | null;
+  kurtosis?: number | null;
+  vif?: Array<{ name: string; vif: number }> | null;
+  interpretation?: string;
+}
+
+export async function runDiagnostic(
+  params: RunDiagnosticParams,
+  baseUrl: string = DEFAULT_BASE,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DiagnosticResponse> {
+  const body = JSON.stringify(buildDiagnosticRequest(params));
+  const res = await fetchImpl(`${baseUrl}/run_diagnostic`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+  if (!res.ok) throw new Error(`Runtime error: ${res.status}`);
+  const json = await res.json() as TaskResponse & { result_payload?: DiagnosticResponse };
+  if (!json.result_payload) {
+    const text = json.messages?.map(m => m.text).filter(Boolean).join('; ') || '诊断命令执行失败';
+    throw new Error(text);
+  }
   return json.result_payload;
 }

@@ -29,21 +29,12 @@ function compute_dk_vcov(residuals::Vector{Float64}, X::Matrix{Float64},
     # 构建时间期映射
     time_index = Dict(t => i for (i, t) in enumerate(unique_times))
 
-    # 计算每个时间期的得分向量
+    # 计算每个时间期的得分向量（期内求和，不取平均）
     scores = zeros(T, k)
-    counts = zeros(Int, T)
     for i in 1:nobs
         t_val = data[i, time_col]
         t_idx = time_index[t_val]
         scores[t_idx, :] .+= X[i, :] .* residuals[i]
-        counts[t_idx] += 1
-    end
-
-    # 按每期观测数平均化得分
-    for t in 1:T
-        if counts[t] > 0
-            scores[t, :] ./= counts[t]
-        end
     end
 
     # 计算得分均值
@@ -65,7 +56,7 @@ function compute_dk_vcov(residuals::Vector{Float64}, X::Matrix{Float64},
         end
     end
 
-    # DK 协方差 = (X'X)^{-1} * S * (X'X)^{-1} * (N/T)
+    # DK 协方差 = (X'X)^{-1} * S * (X'X)^{-1} / T^2
     XtX = X' * X
     XtX_inv = try
         inv(XtX)
@@ -75,9 +66,8 @@ function compute_dk_vcov(residuals::Vector{Float64}, X::Matrix{Float64},
             "请检查是否存在完全共线性。")
     end
 
-    # 规模修正因子
-    N = nobs
-    scale = N / T
+    # 规模修正因子：得分使用期内求和，故除以 T^2
+    scale = 1.0 / (T * T)
     vcov_matrix = scale .* (XtX_inv * S * XtX_inv)
     std_errors = sqrt.(max.(diag(vcov_matrix), 0.0))
 
@@ -106,18 +96,13 @@ function compute_iv_dk_vcov(residuals::Vector{Float64}, X::Matrix{Float64},
 
     time_index = Dict(t => i for (i, t) in enumerate(unique_times))
 
-    # 得分：g_t = (1/N_t) Σ_i Z_it * e_it
+    # 得分：g_t = Σ_i Z_it * e_it（期内求和，不取平均）
     p = size(Z, 2)
     scores = zeros(T, p)
-    counts = zeros(Int, T)
     for i in 1:nobs
         t_val = data[i, time_col]
         t_idx = time_index[t_val]
         scores[t_idx, :] .+= Z[i, :] .* residuals[i]
-        counts[t_idx] += 1
-    end
-    for t in 1:T
-        counts[t] > 0 && (scores[t, :] ./= counts[t])
     end
 
     g_bar = vec(mean(scores, dims=1))
@@ -145,8 +130,8 @@ function compute_iv_dk_vcov(residuals::Vector{Float64}, X::Matrix{Float64},
     ZX = Z' * X
     bread = inv(XZ * ZtZ_inv * ZX)
 
-    N = nobs
-    scale = N / T
+    # 规模修正因子：得分使用期内求和，故除以 T^2
+    scale = 1.0 / (T * T)
     vcov_matrix = scale .* (bread * (XZ * ZtZ_inv * S * ZtZ_inv * ZX) * bread)
     std_errors = sqrt.(max.(diag(vcov_matrix), 0.0))
 

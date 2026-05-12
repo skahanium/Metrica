@@ -34,8 +34,13 @@ end
 """
     hausman(fe_result, re_result)
 
-比较 FE 与 RE 的共同斜率系数，返回 Hausman 检验载荷。
-使用完整协方差矩阵差值计算检验统计量。
+比较 FE 与 Mundlak/CRE 的共同斜率系数，返回 Hausman 检验载荷。
+
+**计算方式：** 使用对角近似（`Var(β_FE) - Var(β_RE)` 的对角元素），
+而非完整协方差矩阵差值。当完整 vcov 矩阵不可用时，此近似是必要的。
+
+**语义说明：** `re_result` 实际为 Mundlak/CRE（非传统 GLS-RE），
+因此此检验比较的是 FE 与 CRE 的系数一致性，而非传统 FE vs RE。
 """
 function hausman(fe_result::PanelFitResult, re_result::PanelFitResult)
     fe_rows = _coef_lookup(fe_result)
@@ -69,8 +74,8 @@ function hausman(fe_result::PanelFitResult, re_result::PanelFitResult)
         re_se[i] = something(re_row.stderror, 0.0)
     end
 
-    # 完整协方差矩阵差值：Var(β_FE) - Var(β_RE)
-    # 使用对角矩阵近似（当完整 vcov 不可用时）
+    # 对角近似：Var(β_FE) - Var(β_RE) 的对角元素
+    # 注：完整协方差矩阵差值需要完整 vcov，此处使用对角近似
     var_diff = fe_se .^ 2 .- re_se .^ 2
 
     # 检查正定性
@@ -99,7 +104,7 @@ function hausman(fe_result::PanelFitResult, re_result::PanelFitResult)
         "pvalue" => pvalue,
         "dof" => k,
         "method" => "hausman_fe_re_v2",
-        "note" => "H0: RE 估计量一致；p 值较小说明更倾向 FE。使用完整协方差矩阵差值。",
+        "note" => "H0: CRE 估计量一致；p 值较小说明更倾向 FE。使用对角近似（非完整协方差矩阵）。比较对象为 Mundlak/CRE，非传统 GLS-RE。",
     )
 end
 
@@ -205,7 +210,7 @@ function breusch_pagan_lm(panel_data::MetricaBase.PanelData, formula::String)
         # 不平衡面板：使用 Searle 公式
         sum_T_sq = sum(s^2 for s in group_sizes)
         T_star = (N - sum_T_sq / N) / (n_groups - 1)
-        statistic = n_groups / 2 * (ratio - 1)^2
+        statistic = n_groups * T_star / (2 * (T_star - 1)) * (ratio - 1)^2
     end
     statistic = max(statistic, 0.0)
     pvalue = 1 - cdf(Chisq(1), statistic)
@@ -226,6 +231,8 @@ end
     panel_diagnostics(panel_data, formula)
 
 返回面板模型的结构化诊断载荷，用于 Runtime 与 App 消费。
+
+Hausman 检验比较 FE 与 Mundlak/CRE（非传统 GLS-RE）的系数一致性。
 """
 function panel_diagnostics(panel_data::MetricaBase.PanelData, formula::String)
     fe_result = fit_fe(panel_data, formula)

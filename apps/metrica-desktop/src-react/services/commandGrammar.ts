@@ -284,27 +284,39 @@ const grammars: CommandGrammar[] = [
   makeModelGrammar('ipw', '逆概率加权（IPW）', {
     treat: { kind: 'option_value', label: 'treat', required: true, multiple: false },
     outcome: optionValue('outcome', false),
+    propensity: optionValue('propensity', false),
   }),
   makeModelGrammar('psm', '倾向得分匹配（PSM）', {
     treat: { kind: 'option_value', label: 'treat', required: true, multiple: false },
     outcome: optionValue('outcome', false),
+    propensity: optionValue('propensity', false),
   }),
   makeModelGrammar('aipw', '增强逆概率加权（AIPW）', {
     treat: { kind: 'option_value', label: 'treat', required: true, multiple: false },
     outcome: optionValue('outcome', false),
+    propensity: optionValue('propensity', false),
+    outcome_model: optionValue('outcome_model', false),
   }),
   makeModelGrammar('arima', 'ARIMA 时间序列模型', {
+    time: optionValue('time', false),
     ar: optionValue('ar', false),
     i: optionValue('i', false),
     ma: optionValue('ma', false),
   }),
   makeModelGrammar('var', '向量自回归（VAR）', {
+    time: optionValue('time', false),
     lags: { kind: 'option_value', label: 'lags', required: true, multiple: false },
   }),
   makeModelGrammar('dfuller', '单位根检验（Dickey-Fuller）', {
+    time: optionValue('time', false),
     deterministic: { kind: 'option_value', label: 'deterministic', required: false, multiple: false, values: ['constant', 'trend', 'none'] },
   }),
-  makeModelGrammar('coint', '协整检验'),
+  makeModelGrammar('coint', '协整检验', {
+    time: optionValue('time', false),
+    method: { kind: 'option_value', label: 'method', required: false, multiple: false, values: ['engle_granger', 'johansen'] },
+    lags: optionValue('lags', false),
+    deterministic: { kind: 'option_value', label: 'deterministic', required: false, multiple: false, values: ['constant', 'trend', 'none'] },
+  }),
 
   // ===== SVY prefix command =====
   {
@@ -332,6 +344,24 @@ const grammars: CommandGrammar[] = [
 
   // ===== Diagnostic commands =====
   {
+    verb: 'diagnostic',
+    description: '诊断检验（bp / bg / reset / jb / dw / white / vif）',
+    category: 'diagnostic',
+    syntax: [
+      { kind: 'indepvar', label: '检验名称', required: true, multiple: false, values: ['bp', 'bg', 'reset', 'jb', 'dw', 'white', 'vif'] },
+      { kind: 'comma', label: ',', required: false, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: false,
+        multiple: true,
+        children: {
+          lags: { kind: 'option_value', label: 'lags', required: false, multiple: false },
+        },
+      },
+    ],
+  },
+  {
     verb: 'ovtest',
     description: '模型设定检验（RESET）',
     category: 'diagnostic',
@@ -339,7 +369,7 @@ const grammars: CommandGrammar[] = [
   },
   {
     verb: 'hettest',
-    description: '异方差检验',
+    description: '异方差检验（Breusch-Pagan）',
     category: 'diagnostic',
     syntax: [],
   },
@@ -359,7 +389,18 @@ const grammars: CommandGrammar[] = [
     verb: 'bgodfrey',
     description: 'Breusch-Godfrey 自相关检验',
     category: 'diagnostic',
-    syntax: [],
+    syntax: [
+      { kind: 'comma', label: ',', required: false, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: false,
+        multiple: true,
+        children: {
+          lags: { kind: 'option_value', label: 'lags', required: false, multiple: false },
+        },
+      },
+    ],
   },
   {
     verb: 'hausman',

@@ -1,5 +1,5 @@
 import { getGrammar } from './commandGrammar';
-import type { ModelSpec } from '../types/protocol';
+import type { ModelSpec, DiagnosticSpec } from '../types/protocol';
 
 // ---- 解析类型 ----
 
@@ -138,7 +138,7 @@ function verbToModelType(verb: string): string {
     ivregress: 'iv',
     gls: 'gls',
     xtreg: 'panel',
-    xtivreg: 'panel',
+    xtivreg: 'panel_iv',
     logit: 'logit',
     probit: 'probit',
     poisson: 'poisson',
@@ -199,7 +199,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   // ---- 通用选项 ----
 
-  if (optMap.has('robust')) spec.vcov = { type: 'hc1' };
+  if (optMap.has('robust')) spec.vcov = { type: 'HC1' };
 
   if (optMap.has('cluster')) spec.cluster_column = optMap.get('cluster');
 
@@ -209,7 +209,9 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   if (optMap.has('id')) spec.panel_id = optMap.get('id');
   if (optMap.has('time')) spec.panel_time = optMap.get('time');
-  if (optMap.has('method')) spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
+  if (optMap.has('method') && modelType !== 'panel_iv') {
+    spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
+  }
 
   // ---- IV 选项 ----
 
@@ -230,11 +232,14 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
     if (optMap.has('treat')) spec.treatment_column = optMap.get('treat');
     if (optMap.has('outcome')) spec.outcome_column = optMap.get('outcome');
+    if (optMap.has('propensity')) spec.propensity_formula = optMap.get('propensity');
+    if (optMap.has('outcome_model')) spec.outcome_formula = optMap.get('outcome_model');
   }
 
   // ---- 时间序列选项 ----
 
   if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration') {
+    if (optMap.has('time')) spec.time_column = optMap.get('time');
     const ar = optMap.has('ar') ? parseInt(optMap.get('ar')!) : 1;
     const i = optMap.has('i') ? parseInt(optMap.get('i')!) : 0;
     const ma = optMap.has('ma') ? parseInt(optMap.get('ma')!) : 0;
@@ -242,15 +247,69 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
       spec.order = [ar, i, ma];
     }
     if (optMap.has('lags')) spec.lags = parseInt(optMap.get('lags')!);
+    if (modelType === 'cointegration' && optMap.has('method')) {
+      spec.ts_method = optMap.get('method') as 'mle' | 'css' | 'engle_granger' | 'johansen';
+    }
     if (optMap.has('deterministic')) {
       spec.deterministic = optMap.get('deterministic') as 'constant' | 'trend' | 'none';
     }
-    // 第一个 positional 可能是变量名（时间序列模型无因变量）
-    if (positionals.length >= 1 && spec.formula) {
+    if (modelType === 'var' || modelType === 'cointegration') {
+      spec.variables = positionals;
+    } else if (positionals.length >= 1 && spec.formula) {
       spec.variable = positionals[0];
     }
   }
 
+  return spec;
+}
+
+// ---- 诊断命令解析 ----
+
+/** 已知诊断动词集合（包含别名） */
+const DIAGNOSTIC_VERBS = new Set(['diagnostic', 'ovtest', 'hettest', 'vif', 'dwstat', 'bgodfrey', 'hausman']);
+
+/** 别名动词到规范检验名的映射 */
+const VERB_TO_DIAGNOSTIC_TEST: Record<string, DiagnosticSpec['test']> = {
+  ovtest: 'reset',
+  hettest: 'bp',
+  vif: 'vif',
+  dwstat: 'dw',
+  bgodfrey: 'bg',
+};
+
+export function isDiagnosticVerb(verb: string): boolean {
+  return DIAGNOSTIC_VERBS.has(verb);
+}
+
+/**
+ * 将解析后的命令翻译为 DiagnosticSpec 对象。
+ * 支持统一 `diagnostic <test>` 和个别别名动词。
+ */
+export function parseToDiagnosticSpec(parsed: ParsedCommand): DiagnosticSpec | { error: string } {
+  const { verb, positionals, options, error } = parsed;
+  if (error) return { error };
+
+  const optMap = new Map(options.map(o => [o.name, o.value]));
+
+  // 统一 diagnostic 动词：第一个位置参数为检验名
+  if (verb === 'diagnostic') {
+    const testName = (positionals[0] || '').toLowerCase();
+    const validTests = new Set(['bp', 'bg', 'reset', 'jb', 'dw', 'white', 'vif']);
+    if (!testName || !validTests.has(testName)) {
+      return { error: `未知的诊断检验: "${testName}"。支持: bp, bg, reset, jb, dw, white, vif` };
+    }
+    const spec: DiagnosticSpec = { test: testName as DiagnosticSpec['test'] };
+    if (optMap.has('lags')) spec.lags = parseInt(optMap.get('lags')!);
+    return spec;
+  }
+
+  // 别名动词
+  const test = VERB_TO_DIAGNOSTIC_TEST[verb];
+  if (!test) {
+    return { error: `命令 "${verb}" 不是已知的诊断命令。` };
+  }
+  const spec: DiagnosticSpec = { test };
+  if (optMap.has('lags')) spec.lags = parseInt(optMap.get('lags')!);
   return spec;
 }
 
@@ -290,7 +349,7 @@ function parseSvyToModelSpec(
     formula,
   };
 
-  if (optMap.has('robust')) spec.vcov = { type: 'hc1' };
+  if (optMap.has('robust')) spec.vcov = { type: 'HC1' };
   if (optMap.has('cluster')) spec.cluster_column = optMap.get('cluster');
   // svy 的 weights 选项映射为 weights_column
   if (optMap.has('weights')) spec.weights_column = optMap.get('weights');

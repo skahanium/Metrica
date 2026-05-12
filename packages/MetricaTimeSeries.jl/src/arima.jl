@@ -1,5 +1,5 @@
 # arima.jl - ARIMA 模型模块
-# 实现 ARMA/ARIMA 模型，依赖 StateSpaceModels.jl
+# 实现 ARMA/ARIMA 模型，使用 Optim.jl 进行数值优化
 
 # === 类型定义 =============================================================
 
@@ -107,162 +107,238 @@ end
 """
     fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int) -> ARIMAFitResult
 
-使用 MLE（通过 StateSpaceModels.jl 的 Kalman 滤波）拟合 ARIMA 模型。
+使用条件 MLE（数值优化）拟合 ARIMA 模型。
+基于条件对数似然函数，通过 Optim.jl 进行数值优化。
 """
 function fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int)
     p, d, q = model.order
-    P, D, Q, s = model.seasonal_order
 
-    # 构建 StateSpaceModels SARIMA 模型
-    ssm_order = (p, d, q)
-    ssm_seasonal = s > 0 ? (P, D, Q, s) : nothing
-
-    if isnothing(ssm_seasonal)
-        ssm_model = StateSpaceModels.SARIMA(y, order=ssm_order, include_mean=model.include_constant)
-    else
-        ssm_model = StateSpaceModels.SARIMA(y, order=ssm_order, seasonal_order=ssm_seasonal, include_mean=model.include_constant)
+    # 差分
+    y_diff = copy(y)
+    for _ in 1:d
+        y_diff = diff(y_diff)
     end
-
-    # 拟合模型
-    StateSpaceModels.fit!(ssm_model)
-
-    # 提取系数
-    coefficients = Dict{Symbol, Float64}()
-    std_errors = Dict{Symbol, Float64}()
-
-    # 从结果中提取系数
-    coef_names = ssm_model.results.coefficient_table.names
-    coef_values = ssm_model.results.coefficient_table.values
-    coef_stderrs = ssm_model.results.coefficient_table.std_errors
-
-    for (i, name) in enumerate(coef_names)
-        if name == "sigma2_η"
-            continue  # 跳过方差参数
-        end
-        sym = Symbol(name)
-        coefficients[sym] = coef_values[i]
-        std_errors[sym] = coef_stderrs[i]
-    end
-
-    # 提取 sigma2
-    sigma2_idx = findfirst(==("sigma2_η"), coef_names)
-    sigma2 = isnothing(sigma2_idx) ? 0.0 : coef_values[sigma2_idx]
-
-    # 提取信息准则
-    loglik = ssm_model.results.loglik
-    aic = ssm_model.results.aic
-    bic = ssm_model.results.bic
-
-    # 计算残差和拟合值
-    y_diff = difference(y, d)
     n_diff = length(y_diff)
 
-    # 简化的残差计算
+    include_const = model.include_constant
+    n_ar = p
+    n_ma = q
+    n_params = n_ar + n_ma + (include_const ? 1 : 0) + 1  # +1 for sigma2
+
+    if n_params <= 1
+        # 纯白噪声
+        residuals = y_diff
+        sigma2 = sum(residuals .^ 2) / n_diff
+        coefficients = Dict{Symbol, Float64}()
+        std_errors = Dict{Symbol, Float64}()
+        loglik = -n_diff / 2 * log(2π * sigma2) - n_diff / 2
+        aic = -2 * loglik + 2
+        bic = -2 * loglik + log(n_diff)
+        warnings = MetricaBase.ModelWarning[]
+        glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
+            :nobs => n, :sigma2 => sigma2, :loglik => loglik,
+            :aic => aic, :bic => bic, :p => p, :d => d, :q => q,
+        )
+        glance_table = MetricaBase.ModelGlance(
+            Symbol("ARIMA($(p),$(d),$(q))"), n, 0, glance_metrics, MetricaBase.ModelWarning[]
+        )
+        tidy_table = MetricaBase.TidyTable(MetricaBase.CoefRow[], "std.error")
+        return ARIMAFitResult(
+            string(model.variable), model.order, model.seasonal_order,
+            coefficients, std_errors, sigma2, loglik, aic, bic,
+            residuals, zeros(n_diff), y, y_diff, glance_table, tidy_table, warnings
+        )
+    end
+
+    # 条件对数似然函数
+    function neg_loglik(theta)
+        ar_coeffs = theta[1:n_ar]
+        ma_coeffs = theta[n_ar+1:n_ar+n_ma]
+        const_term = include_const ? theta[n_ar+n_ma+1] : 0.0
+        sigma2 = exp(theta[end])  # 用 exp 保证正数
+        sigma2 = max(sigma2, 1e-10)
+
+        resid = zeros(n_diff)
+        for t in 1:n_diff
+            ar_part = 0.0
+            for i in 1:n_ar
+                if t > i
+                    ar_part += ar_coeffs[i] * y_diff[t - i]
+                end
+            end
+            ma_part = 0.0
+            for j in 1:n_ma
+                if t > j
+                    ma_part += ma_coeffs[j] * resid[t - j]
+                end
+            end
+            mu = const_term + ar_part + ma_part
+            resid[t] = y_diff[t] - mu
+        end
+
+        # 条件对数似然（正态分布）
+        ll = -n_diff / 2 * log(2π * sigma2) - sum(resid .^ 2) / (2 * sigma2)
+        return -ll  # 返回负对数似然
+    end
+
+    # 初始值
+    initial_theta = zeros(n_params)
+    if n_ar > 0
+        max_lag = max(p, q)
+        if max_lag > 0 && n_diff > max_lag
+            X_ar = zeros(n_diff - max_lag, p)
+            for i in 1:p
+                X_ar[:, i] = y_diff[max_lag+1-i:n_diff-i]
+            end
+            y_reg = y_diff[max_lag+1:end]
+            initial_theta[1:n_ar] = X_ar \ y_reg
+        else
+            initial_theta[1:n_ar] .= 0.1
+        end
+    end
+    if include_const
+        initial_theta[n_ar+n_ma+1] = mean(y_diff)
+    end
+    initial_theta[end] = log(var(y_diff))  # log(sigma2)
+
+    # 数值优化
+    opt_result = Optim.optimize(
+        neg_loglik,
+        initial_theta,
+        Optim.NelderMead(),
+        Optim.Options(iterations=2000, g_tol=1e-10)
+    )
+
+    theta_hat = Optim.minimizer(opt_result)
+    converged = Optim.converged(opt_result)
+
+    # 提取参数
+    ar_coeffs_hat = theta_hat[1:n_ar]
+    ma_coeffs_hat = theta_hat[n_ar+1:n_ar+n_ma]
+    const_hat = include_const ? theta_hat[n_ar+n_ma+1] : 0.0
+    sigma2_hat = exp(theta_hat[end])
+
+    # 计算最终残差
     residuals = zeros(n_diff)
-    fitted_values = zeros(n_diff)
-
-    # 使用 AR 系数计算拟合值
-    ar_coeffs = Float64[]
-    for i in 1:p
-        key = Symbol("ar_L$i")
-        push!(ar_coeffs, get(coefficients, key, 0.0))
-    end
-
-    ma_coeffs = Float64[]
-    for i in 1:q
-        key = Symbol("ma_L$i")
-        push!(ma_coeffs, get(coefficients, key, 0.0))
-    end
-
-    # 计算残差
-    for t in max(p, q)+1:n_diff
+    fitted = zeros(n_diff)
+    for t in 1:n_diff
         ar_part = 0.0
-        for (i, coeff) in enumerate(ar_coeffs)
-            if t - i > 0
-                ar_part += coeff * y_diff[t - i]
+        for i in 1:n_ar
+            if t > i
+                ar_part += ar_coeffs_hat[i] * y_diff[t - i]
             end
         end
-
         ma_part = 0.0
-        for (i, coeff) in enumerate(ma_coeffs)
-            if t - i > 0 && t - i <= length(residuals)
-                ma_part += coeff * residuals[t - i]
+        for j in 1:n_ma
+            if t > j
+                ma_part += ma_coeffs_hat[j] * residuals[t - j]
             end
         end
-
-        fitted_values[t] = ar_part + ma_part
-        residuals[t] = y_diff[t] - fitted_values[t]
+        fitted[t] = const_hat + ar_part + ma_part
+        residuals[t] = y_diff[t] - fitted[t]
     end
 
-    # 如果有差分，还原拟合值
-    if d > 0
-        last_values = y[end-d+1:end]
-        fitted_original = zeros(n)
-        for i in 1:d
-            fitted_original[i] = last_values[i]
-        end
-        for i in 1:n_diff
-            fitted_original[d + i] = fitted_values[i] + (i > 1 ? fitted_original[d + i - 1] : last_values[end])
-        end
-        fitted_values = fitted_original[d+1:end]
+    # 构建系数字典
+    coefficients = Dict{Symbol, Float64}()
+    std_errors = Dict{Symbol, Float64}()
+    for i in 1:n_ar
+        coefficients[Symbol("ar_L$i")] = ar_coeffs_hat[i]
     end
+    for j in 1:n_ma
+        coefficients[Symbol("ma_L$j")] = ma_coeffs_hat[j]
+    end
+    if include_const
+        coefficients[:constant] = const_hat
+    end
+
+    # 用数值 Hessian 计算标准误
+    ϵ = 1e-5
+    H_fd = zeros(n_params, n_params)
+    f0 = neg_loglik(theta_hat)
+    for i in 1:n_params
+        for j in i:n_params
+            θ_ij = copy(theta_hat); θ_ij[i] += ϵ; θ_ij[j] += ϵ
+            θ_i = copy(theta_hat); θ_i[i] += ϵ
+            θ_j = copy(theta_hat); θ_j[j] += ϵ
+            f_ij = neg_loglik(θ_ij)
+            f_i = neg_loglik(θ_i)
+            f_j = neg_loglik(θ_j)
+            H_fd[i, j] = (f_ij - f_i - f_j + f0) / (ϵ * ϵ)
+            H_fd[j, i] = H_fd[i, j]
+        end
+    end
+    H_fd = (H_fd + H_fd') ./ 2
+
+    hessian_ok = false
+    if all(isfinite, H_fd) && isposdef(H_fd)
+        vcov_matrix = inv(H_fd)
+        ses = sqrt.(max.(diag(vcov_matrix), 0.0))
+        idx = 1
+        for i in 1:n_ar
+            std_errors[Symbol("ar_L$i")] = ses[idx]; idx += 1
+        end
+        for j in 1:n_ma
+            std_errors[Symbol("ma_L$j")] = ses[idx]; idx += 1
+        end
+        if include_const
+            std_errors[:constant] = ses[idx]; idx += 1
+        end
+        hessian_ok = true
+    end
+
+    if !hessian_ok
+        for (k, _) in coefficients
+            std_errors[k] = 0.0
+        end
+    end
+
+    # 信息准则
+    loglik = -n_diff / 2 * log(2π * sigma2_hat) - sum(residuals .^ 2) / (2 * sigma2_hat)
+    k = n_params
+    aic = -2 * loglik + 2 * k
+    bic = -2 * loglik + k * log(n_diff)
 
     # 构建 glance 表
+    P, D, Q, s = model.seasonal_order
     glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
-        :nobs => n,
-        :sigma2 => sigma2,
-        :loglik => loglik,
-        :aic => aic,
-        :bic => bic,
-        :p => p,
-        :d => d,
-        :q => q,
-        :P => P,
-        :D => D,
-        :Q => Q,
-        :s => s,
+        :nobs => n, :sigma2 => sigma2_hat, :loglik => loglik,
+        :aic => aic, :bic => bic, :p => p, :d => d, :q => q,
+        :P => P, :D => D, :Q => Q, :s => s,
     )
-
     model_label = Symbol("ARIMA($(p),$(d),$(q))" * (s > 0 ? "×($(P),$(D),$(Q),$(s))" : ""))
-    glance_table = MetricaBase.ModelGlance(
-        model_label,
-        n,
-        0,
-        glance_metrics,
-        MetricaBase.ModelWarning[]
-    )
+    glance_table = MetricaBase.ModelGlance(model_label, n, 0, glance_metrics, MetricaBase.ModelWarning[])
 
     # 构建 tidy 表
     coef_rows = MetricaBase.CoefRow[]
     for (name, value) in coefficients
-        se = std_errors[name]
+        se = get(std_errors, name, 0.0)
         t_stat = se > 0 ? value / se : 0.0
         p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
         push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value))
     end
-
     tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
 
     # 警告
     warnings = MetricaBase.ModelWarning[]
+    if !converged
+        push!(warnings, MetricaBase.ModelWarning(
+            :mle_not_converged, "MLE 优化未收敛",
+            "数值优化在最大迭代次数内未收敛",
+            "考虑使用 CSS 方法或检查数据", MetricaBase.warning
+        ))
+    end
+    if !hessian_ok
+        push!(warnings, MetricaBase.ModelWarning(
+            :mle_se_unavailable, "无法计算 MLE 标准误",
+            "Hessian 矩阵不可逆，标准误已设为 0",
+            "考虑使用 CSS 方法", MetricaBase.warning
+        ))
+    end
 
     return ARIMAFitResult(
-        string(model.variable),
-        model.order,
-        model.seasonal_order,
-        coefficients,
-        std_errors,
-        sigma2,
-        loglik,
-        aic,
-        bic,
-        residuals,
-        fitted_values,
-        y,
-        d > 0 ? difference(y, d) : nothing,
-        glance_table,
-        tidy_table,
-        warnings
+        string(model.variable), model.order, model.seasonal_order,
+        coefficients, std_errors, sigma2_hat, loglik, aic, bic,
+        residuals, fitted, y, y_diff, glance_table, tidy_table, warnings
     )
 end
 
@@ -543,7 +619,7 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
         aic,
         bic,
         residuals,
-        [y[1:d]; fitted],
+        fitted,
         y,
         y_diff,
         glance_table,

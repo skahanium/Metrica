@@ -17,12 +17,25 @@ function MetricaBase.fit(::Type{AIPWModel}, formula::AbstractString, data;
     treated = treat_vec .== 1.0
     control = .!treated
 
-    # Step 1: 结果模型 (OLS) — 全数据拟合
-    ols_result = MetricaBase.fit(OLSModel, outcome_formula, df)
-    ols_result isa MetricaBase.ModelError && return ols_result
-    μ_hat = MetricaBase.predict(ols_result)
-    μ1_hat = copy(μ_hat)
-    μ0_hat = copy(μ_hat)
+    # Step 1: 结果模型 (OLS) — 分别按处理组拟合
+    # 拟合全样本模型以获取设计矩阵（用于后续预测）
+    ols_full = MetricaBase.fit(OLSModel, outcome_formula, df)
+    ols_full isa MetricaBase.ModelError && return ols_full
+    X_full = ols_full.design_matrix
+
+    # 拟合处理组结果模型 E[Y|X,T=1]
+    df_treated = df[treated, :]
+    ols1_result = MetricaBase.fit(OLSModel, outcome_formula, df_treated)
+    ols1_result isa MetricaBase.ModelError && return ols1_result
+    μ1_hat = MetricaBase.predict(ols1_result, newdata=X_full)
+
+    # 拟合控制组结果模型 E[Y|X,T=0]
+    df_control = df[control, :]
+    ols0_result = MetricaBase.fit(OLSModel, outcome_formula, df_control)
+    ols0_result isa MetricaBase.ModelError && return ols0_result
+    μ0_hat = MetricaBase.predict(ols0_result, newdata=X_full)
+
+    ols_result = (treated=ols1_result, control=ols0_result)
 
     # Step 2: 倾向得分模型 (Logit)
     ps_result = MetricaBase.fit(LogitModel, propensity_formula, df)
@@ -49,14 +62,14 @@ function MetricaBase.fit(::Type{AIPWModel}, formula::AbstractString, data;
     tidy_table = MetricaBase.TidyTable(tidy_rows, "AIPW (doubly robust)")
 
     return AIPWFitResult(formula, glance_table, tidy_table,
-        ate, ate_se, att, att_se, ols_result, ps_result, ols_result.glance_table.metrics[:r2])
+        ate, ate_se, att, att_se, ols_result, ps_result, ols_result.treated.glance_table.metrics[:r2])
 end
 
 MetricaBase.glance(result::AIPWFitResult) = result.glance_table
 MetricaBase.tidy(result::AIPWFitResult) = result.tidy_table
-MetricaBase.coef(result::AIPWFitResult) = MetricaBase.coef(result.outcome_model)
-MetricaBase.vcov(result::AIPWFitResult) = MetricaBase.vcov(result.outcome_model)
+MetricaBase.coef(result::AIPWFitResult) = MetricaBase.coef(result.outcome_model.treated)
+MetricaBase.vcov(result::AIPWFitResult) = MetricaBase.vcov(result.outcome_model.treated)
 MetricaBase.nobs(result::AIPWFitResult) = result.glance_table.nobs
 MetricaBase.dof(result::AIPWFitResult) = result.glance_table.dof
 MetricaBase.r2(result::AIPWFitResult) = result.glance_table.metrics[:pseudo_r2]
-MetricaBase.stderror(result::AIPWFitResult) = MetricaBase.stderror(result.outcome_model)
+MetricaBase.stderror(result::AIPWFitResult) = MetricaBase.stderror(result.outcome_model.treated)

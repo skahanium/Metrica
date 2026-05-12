@@ -39,9 +39,9 @@ using .MetricaData
 include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaSurvey.jl", "src", "MetricaSurvey.jl"))
 using .MetricaSurvey
 
-# 加载时间序列模块（等待 StateSpaceModels 依赖可用）
-# include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTimeSeries.jl", "src", "MetricaTimeSeries.jl"))
-# using .MetricaTimeSeries
+# 加载时间序列模块
+include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTimeSeries.jl", "src", "MetricaTimeSeries.jl"))
+using .MetricaTimeSeries
 
 function handle_request(req::Dict{String, Any})
     id = get(req, "id", nothing)
@@ -119,7 +119,8 @@ function handle_request(req::Dict{String, Any})
                 # 构造 kwargs
                 kwargs = Dict{Symbol, Any}()
                 vcov_type = get(params, "vcov", "classical")
-                vcov_symbol = vcov_type == "HC1" ? :HC1 : vcov_type == "cluster" ? :cluster : :classical
+                vcov_key = lowercase(String(vcov_type))
+                vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
                 kwargs[:vcov] = vcov_symbol
                 weights = get(params, "weights", nothing)
                 if !isnothing(weights) && !isempty(weights); kwargs[:weights] = Symbol(weights); end
@@ -163,6 +164,12 @@ function handle_request(req::Dict{String, Any})
                 if haskey(params, "outcome_column")
                     kwargs[:outcome_column] = Symbol(params["outcome_column"])
                 end
+                if haskey(params, "propensity_formula")
+                    kwargs[:propensity_formula] = String(params["propensity_formula"])
+                end
+                if haskey(params, "outcome_formula")
+                    kwargs[:outcome_formula] = String(params["outcome_formula"])
+                end
 
                 # S4d Survey 特有参数
                 if startswith(model_type, "survey_")
@@ -178,31 +185,78 @@ function handle_request(req::Dict{String, Any})
                     end
                 end
 
-                # S4c TimeSeries 特有参数（等待 StateSpaceModels 依赖就绪后启用）
-                # if model_type in ("arima", "var", "unitroot", "cointegration")
-                #     kwargs[:time_column] = Symbol(params["time_column"])
-                #     if haskey(params, "variable") && !isempty(get(params, "variable", ""))
-                #         kwargs[:variable] = Symbol(params["variable"])
-                #     end
-                #     ...
-                # end
+                # 时间序列模型使用结构体构造 + DataFrame 拟合
+                if model_type in ("arima", "var", "unitroot", "cointegration")
+                    data = CSV.read(dataset_path, DataFrame)
+                    time_col = Symbol(get(params, "time_column", "time"))
 
-                result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
+                    if model_type == "arima"
+                        var_sym = Symbol(get(params, "variable", first(names(data))))
+                        order_arr = get(params, "order", [1, 1, 0])
+                        length(order_arr) == 3 || error("order must have 3 elements [p, d, q]")
+                        order_tuple = Tuple(Int.(order_arr))
+                        seasonal_arr = get(params, "seasonal_order", [0, 0, 0, 0])
+                        length(seasonal_arr) == 4 || error("seasonal_order must have 4 elements [P, D, Q, S]")
+                        seasonal_tuple = Tuple(Int.(seasonal_arr))
+                        ts_method = Symbol(get(params, "ts_method", "mle"))
+                        model = ARIMAModel(
+                            variable=var_sym,
+                            time_column=time_col,
+                            order=order_tuple,
+                            seasonal_order=seasonal_tuple,
+                            method=ts_method,
+                        )
+                    elseif model_type == "var"
+                        vars_raw = get(params, "variables", String[])
+                        var_syms = Symbol.(String.(vars_raw))
+                        lags = Int(get(params, "lags", 1))
+                        model = VARModel(
+                            variables=var_syms,
+                            time_column=time_col,
+                            lags=lags,
+                        )
+                    elseif model_type == "unitroot"
+                        var_sym = Symbol(get(params, "variable", first(names(data))))
+                        det = Symbol(get(params, "deterministic", "constant"))
+                        lags_val = Int(get(params, "lags", 0))
+                        model = UnitRootModel(
+                            variable=var_sym,
+                            time_column=time_col,
+                            deterministic=det,
+                            max_lags=lags_val,
+                        )
+                    else  # cointegration
+                        vars_raw = get(params, "variables", String[])
+                        var_syms = Symbol.(String.(vars_raw))
+                        method_sym = Symbol(get(params, "ts_method", "engle_granger"))
+                        lags = Int(get(params, "lags", 1))
+                        det = Symbol(get(params, "deterministic", "constant"))
+                        model = CointegrationModel(
+                            variables=var_syms,
+                            time_column=time_col,
+                            method=method_sym,
+                            lags=lags,
+                            deterministic=det,
+                        )
+                    end
 
-                # 分派 result_to_payload
-                if result isa MetricaCausal.AbstractCausalFitResult
-                    payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
-                elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
-                    payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
-                elseif result isa MetricaSurvey.AbstractSurveyFitResult
-                    payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
-                # 等待 StateSpaceModels 依赖就绪
-                # elseif result isa MetricaTimeSeries.AbstractTSFitResult
-                #     payload = MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
-                elseif model_type in ("panel", "panel_iv")
-                    payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
+                    result = MetricaBase.fit(model, data)
+                    payload = MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
                 else
-                    payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
+                    result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
+
+                    # 分派 result_to_payload
+                    if result isa MetricaCausal.AbstractCausalFitResult
+                        payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
+                    elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
+                        payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+                    elseif result isa MetricaSurvey.AbstractSurveyFitResult
+                        payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
+                    elseif model_type in ("panel", "panel_iv")
+                        payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
+                    else
+                        payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
+                    end
                 end
             else
                 payload = Dict(
@@ -237,14 +291,135 @@ function handle_request(req::Dict{String, Any})
                 "content" => content,
                 "format" => format,
             )
+        elseif action == "run_diagnostic"
+            dataset_path = params["dataset_path"]
+            formula = params["formula"]
+            model_type = get(params, "model_type", "ols")
+            test_name = get(params, "test", "")
+            lags = get(params, "lags", nothing)
+
+            # 先拟合模型以获取 OLSFitResult
+            if !haskey(MetricaBase.MODEL_REGISTRY, model_type)
+                payload = Dict(
+                    "status" => "error",
+                    "messages" => [Dict(
+                        "level" => "error",
+                        "code" => "UNKNOWN_MODEL_TYPE",
+                        "text" => "诊断要求的模型类型未知：$model_type",
+                    )],
+                )
+            else
+                ModelT = MetricaBase.MODEL_REGISTRY[model_type]
+                vcov_type = get(params, "vcov", "classical")
+                vcov_key = lowercase(String(vcov_type))
+                vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
+                result = MetricaBase.fit(ModelT, formula, dataset_path; vcov=vcov_symbol)
+
+                if !(result isa MetricaLinear.OLSFitResult)
+                    payload = Dict(
+                        "status" => "error",
+                        "messages" => [Dict(
+                            "level" => "error",
+                            "code" => "DIAGNOSTIC_REQUIRES_OLS",
+                            "text" => "当前诊断检验仅支持 OLS 模型结果。",
+                            "hint" => "请先运行 regress 命令。",
+                        )],
+                    )
+                else
+                    diag = if test_name == "bp"
+                        bp = MetricaDiagnostics.breusch_pagan(result)
+                        Dict(
+                            "test" => "bp",
+                            "statistic" => bp.statistic,
+                            "pvalue" => bp.pvalue,
+                            "dof" => bp.dof,
+                            "interpretation" => bp.pvalue < 0.05 ? "拒绝原假设（存在异方差）" : "不拒绝原假设（无异方差证据）",
+                        )
+                    elseif test_name == "bg"
+                        p = isnothing(lags) ? 2 : round(Int, Float64(lags))
+                        bg = MetricaDiagnostics.breusch_godfrey(result; p=p)
+                        Dict(
+                            "test" => "bg",
+                            "statistic" => bg.statistic,
+                            "pvalue" => bg.pvalue,
+                            "dof" => bg.dof,
+                            "interpretation" => bg.pvalue < 0.05 ? "拒绝原假设（存在自相关）" : "不拒绝原假设（无自相关证据）",
+                        )
+                    elseif test_name == "reset"
+                        reset = MetricaDiagnostics.reset_test(result)
+                        Dict(
+                            "test" => "reset",
+                            "statistic" => reset.statistic,
+                            "pvalue" => reset.pvalue,
+                            "df_num" => reset.df_num,
+                            "df_den" => reset.df_den,
+                            "interpretation" => reset.pvalue < 0.05 ? "拒绝原假设（模型设定可能有误）" : "不拒绝原假设（无设定偏误证据）",
+                        )
+                    elseif test_name == "jb"
+                        jb = MetricaDiagnostics.jarque_bera(result)
+                        Dict(
+                            "test" => "jb",
+                            "statistic" => jb.statistic,
+                            "pvalue" => jb.pvalue,
+                            "skewness" => jb.skewness,
+                            "kurtosis" => jb.kurtosis,
+                            "interpretation" => jb.pvalue < 0.05 ? "拒绝原假设（残差非正态）" : "不拒绝原假设（残差近似正态）",
+                        )
+                    elseif test_name == "dw"
+                        dw = MetricaDiagnostics.durbin_watson(result)
+                        Dict(
+                            "test" => "dw",
+                            "statistic" => dw.statistic,
+                            "pvalue" => dw.pvalue,
+                            "interpretation" => isnothing(dw.pvalue) ? "样本量不足，无法判断" :
+                                dw.pvalue < 0.05 ? "存在一阶自相关" : "无一阶自相关证据",
+                        )
+                    elseif test_name == "white"
+                        white = MetricaDiagnostics.white_test(result)
+                        Dict(
+                            "test" => "white",
+                            "statistic" => white.statistic,
+                            "pvalue" => white.pvalue,
+                            "dof" => white.dof,
+                            "interpretation" => white.pvalue < 0.05 ? "拒绝原假设（存在异方差）" : "不拒绝原假设（无异方差证据）",
+                        )
+                    elseif test_name == "vif"
+                        vif_results = MetricaDiagnostics.vif(result)
+                        Dict(
+                            "test" => "vif",
+                            "vif" => [Dict("name" => row.name, "vif" => row.vif) for row in vif_results],
+                            "interpretation" => "VIF > 10 表示严重多重共线性",
+                        )
+                    else
+                        nothing
+                    end
+
+                    if isnothing(diag)
+                        payload = Dict(
+                            "status" => "error",
+                            "messages" => [Dict(
+                                "level" => "error",
+                                "code" => "UNKNOWN_DIAGNOSTIC",
+                                "text" => "未知的诊断检验：$test_name",
+                                "hint" => "支持的检验：bp, bg, reset, jb, dw, white, vif",
+                            )],
+                        )
+                    else
+                        payload = Dict(
+                            "status" => "success",
+                            "result_payload" => diag,
+                        )
+                    end
+                end
+            end
         else
             payload = Dict(
                 "status" => "error",
                 "messages" => [Dict(
                     "level" => "error",
                     "code" => "UNKNOWN_ACTION",
-                    "text" => "守护进程不支持的动作：$action",
-                    "hint" => "当前支持 fit_model、inspect_dataset、query_dataset、transform 与 export_report。",
+                "text" => "守护进程不支持的动作：$action",
+                "hint" => "当前支持 fit_model、inspect_dataset、query_dataset、transform、run_diagnostic 与 export_report。",
                 )],
             )
         end

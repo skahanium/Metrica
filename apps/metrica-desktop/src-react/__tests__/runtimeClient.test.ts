@@ -4,6 +4,7 @@ import {
   buildFitModelRequest, buildLoadProjectRequest, buildRerunTaskRequest,
   buildSaveProjectRequest, buildTransformRequest, listRuns, transformDataset, transformTask,
   saveProject, loadProject, rerunTask, inspectDataset, runDataCommand,
+  buildDiagnosticRequest,
 } from '../services/runtimeClient';
 
 describe('buildFitModelRequest', () => {
@@ -55,6 +56,25 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.endog_columns).toEqual(['x1']);
   });
 
+  it('passes panel IV fields without dropping panel identity', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'panel.csv',
+      formula: 'y ~ x1 + x2',
+      modelType: 'panel_iv',
+      panelId: 'firm',
+      panelTime: 'year',
+      instruments: 'z1 z2',
+      endogColumns: 'x1',
+      vcovType: 'HC1',
+    });
+    expect(req.model_spec.model_type).toBe('panel_iv');
+    expect(req.model_spec.panel_id).toBe('firm');
+    expect(req.model_spec.panel_time).toBe('year');
+    expect(req.model_spec.instruments).toEqual(['z1', 'z2']);
+    expect(req.model_spec.endog_columns).toEqual(['x1']);
+    expect(req.model_spec.vcov?.type).toBe('HC1');
+  });
+
   it('handles space-separated instruments', () => {
     const req = buildFitModelRequest({
       datasetPath: 'data.csv',
@@ -77,6 +97,37 @@ describe('buildFitModelRequest', () => {
       panelTime: 'year',
     });
     expect(req.model_spec.treated_column).toBe('treated');
+  });
+
+  it('passes causal propensity and outcome formulas', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'causal.csv',
+      formula: '',
+      modelType: 'aipw',
+      treatmentColumn: 'treated',
+      outcomeColumn: 'y',
+      propensityFormula: 'treated ~ x1 + x2',
+      outcomeFormula: 'y ~ x1 + x2',
+    });
+    expect(req.model_spec.treatment_column).toBe('treated');
+    expect(req.model_spec.outcome_column).toBe('y');
+    expect(req.model_spec.propensity_formula).toBe('treated ~ x1 + x2');
+    expect(req.model_spec.outcome_formula).toBe('y ~ x1 + x2');
+  });
+
+  it('passes time series fields', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'ts.csv',
+      formula: 'gdp',
+      modelType: 'var',
+      timeColumn: 'year',
+      tsVariables: 'gdp,inflation',
+      tsLags: 2,
+    });
+    expect(req.model_spec.model_type).toBe('var');
+    expect(req.model_spec.time_column).toBe('year');
+    expect(req.model_spec.variables).toEqual(['gdp', 'inflation']);
+    expect(req.model_spec.lags).toBe(2);
   });
 });
 
@@ -366,5 +417,51 @@ describe('project runtime requests', () => {
       'http://runtime.test/rerun_task',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+});
+
+describe('buildDiagnosticRequest', () => {
+  it('builds request with test name', () => {
+    const req = buildDiagnosticRequest({
+      datasetPath: '/path/to/data.csv',
+      formula: 'y ~ x1',
+      modelType: 'ols',
+      diagnostic: { test: 'bp' },
+    });
+    expect(req.action).toBe('run_diagnostic');
+    expect(req.diagnostic.test).toBe('bp');
+  });
+
+  it('builds request with lags', () => {
+    const req = buildDiagnosticRequest({
+      datasetPath: '/path/to/data.csv',
+      formula: 'y ~ x1',
+      modelType: 'ols',
+      diagnostic: { test: 'bg', lags: 3 },
+    });
+    expect(req.diagnostic.test).toBe('bg');
+    expect(req.diagnostic.lags).toBe(3);
+  });
+
+  it('defaults modelType to ols', () => {
+    const req = buildDiagnosticRequest({
+      datasetPath: '/tmp/data.csv',
+      formula: 'y ~ x1',
+      diagnostic: { test: 'bp' },
+    });
+    expect(req.model_spec.model_type).toBe('ols');
+  });
+
+  it('includes dataset_ref and project_context', () => {
+    const req = buildDiagnosticRequest({
+      datasetPath: '/tmp/data.csv',
+      formula: 'y ~ x1',
+      diagnostic: { test: 'reset' },
+      workingDir: '/tmp',
+      projectId: 'test-project',
+    });
+    expect(req.dataset_ref.path).toBe('/tmp/data.csv');
+    expect(req.project_context.working_dir).toBe('/tmp');
+    expect(req.project_context.project_id).toBe('test-project');
   });
 });

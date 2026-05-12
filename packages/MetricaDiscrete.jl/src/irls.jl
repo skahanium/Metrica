@@ -12,6 +12,16 @@ struct IRLSResult
     converged::Bool
 end
 
+function clamp_mean_for_link(μ::Vector{Float64}, link::Link)
+    if link.name == :logit || link.name == :probit
+        return clamp.(μ, 1e-10, 1.0 - 1e-10)
+    elseif link.name == :log
+        return max.(μ, 1e-10)
+    else
+        return μ
+    end
+end
+
 """
     irls(X::Matrix{Float64}, y::Vector{Float64}, link::Link;
          max_iter=25, tol=1e-8, offset=zeros(length(y)))
@@ -49,7 +59,7 @@ function irls(
 
         η_new = X * β_new .+ offset
         μ_new = link.linkinv(η_new)
-        μ_new = clamp.(μ_new, 1e-10, 1.0 - 1e-10)
+        μ_new = clamp_mean_for_link(μ_new, link)
 
         β_change = norm(β_new - β) / (norm(β) + tol)
         β = β_new
@@ -58,7 +68,7 @@ function irls(
         if β_change < tol
             η_final = X * β .+ offset
             μ_final = link.linkinv(η_final)
-            μ_final = clamp.(μ_final, 1e-10, 1.0 - 1e-10)
+            μ_final = clamp_mean_for_link(μ_final, link)
 
             dμ_dη_final = link.mu_eta(μ_final)
             working_var_final = link.variance(μ_final)
@@ -142,6 +152,144 @@ function loglikelihood_bernoulli(y::Vector{Float64}, μ::Vector{Float64})
         end
     end
     return ll
+end
+
+"""
+    weighted_irls(X, y, link, survey_weights; max_iter, tol, offset)
+
+带调查权重的 IRLS 求解器。survey weights 进入 WLS 步骤：
+W_working = survey_weight * IRLS_working_weight
+"""
+function weighted_irls(
+    X::Matrix{Float64}, y::Vector{Float64}, link::Link,
+    survey_weights::Vector{Float64};
+    max_iter::Int=25, tol::Float64=1e-8,
+    offset::Vector{Float64}=zeros(length(y)),
+)
+    nobs, p = size(X)
+
+    μ = if link.name == :log
+        max.(copy(y), 0.1) .+ 0.5
+    else
+        clamp.(copy(y), 0.05, 0.95)
+    end
+    β = zeros(p)
+
+    for iter in 1:max_iter
+        η = link.linkfun(μ) .+ offset
+        dμ_dη = link.mu_eta(μ)
+        working_var = link.variance(μ)
+        z = η .+ (y .- μ) ./ max.(dμ_dη, 1e-10)
+
+        w = survey_weights .* (dμ_dη .^ 2 ./ max.(working_var, 1e-10))
+        w_sqrt = sqrt.(w)
+
+        Xw = X .* w_sqrt
+        zw = z .* w_sqrt
+        β_new = Xw \ zw
+
+        η_new = X * β_new .+ offset
+        μ_new = link.linkinv(η_new)
+        μ_new = clamp_mean_for_link(μ_new, link)
+
+        β_change = norm(β_new - β) / (norm(β) + tol)
+        β = β_new
+        μ = μ_new
+
+        if β_change < tol
+            η_final = X * β .+ offset
+            μ_final = link.linkinv(η_final)
+            μ_final = clamp_mean_for_link(μ_final, link)
+
+            dμ_dη_final = link.mu_eta(μ_final)
+            working_var_final = link.variance(μ_final)
+            w_final = survey_weights .* (dμ_dη_final .^ 2 ./ max.(working_var_final, 1e-10))
+
+            Xw_final = X .* sqrt.(w_final)
+            hessian = Xw_final' * Xw_final
+            hessian = (hessian + hessian') ./ 2
+
+            vcov = try
+                inv(hessian)
+            catch
+                pinv(hessian)
+            end
+
+            deviance = weighted_compute_deviance(y, μ_final, survey_weights, link)
+            loglik = weighted_compute_loglikelihood(y, μ_final, survey_weights, link)
+            working_residuals = (y .- μ_final) ./ max.(dμ_dη_final, 1e-10)
+
+            return IRLSResult(
+                β, vcov, μ_final, η_final,
+                working_residuals, deviance, loglik, iter, true,
+            )
+        end
+    end
+
+    return MetricaBase.ModelError(
+        :irls_not_converged,
+        "加权 IRLS 未收敛",
+        "加权 IRLS 在 $(max_iter) 次迭代后仍未收敛。",
+        "请检查数据中是否存在完全分离、过度分散或其他数值问题。",
+    )
+end
+
+function weighted_compute_deviance(
+    y::Vector{Float64}, μ::Vector{Float64},
+    w::Vector{Float64}, link::Link,
+)
+    if link.name == :logit || link.name == :probit
+        d = 0.0
+        for i in eachindex(y)
+            μ_i = clamp(μ[i], 1e-15, 1.0 - 1e-15)
+            if y[i] == 1.0
+                d += -2 * w[i] * log(μ_i)
+            else
+                d += -2 * w[i] * log(1.0 - μ_i)
+            end
+        end
+        return d
+    elseif link.name == :log
+        d = 0.0
+        for i in eachindex(y)
+            μ_i = max(μ[i], 1e-15)
+            if y[i] > 0
+                d += 2 * w[i] * (y[i] * log(y[i] / μ_i) - (y[i] - μ_i))
+            else
+                d += 2 * w[i] * μ_i
+            end
+        end
+        return d
+    else
+        return NaN
+    end
+end
+
+function weighted_compute_loglikelihood(
+    y::Vector{Float64}, μ::Vector{Float64},
+    w::Vector{Float64}, link::Link,
+)
+    if link.name == :logit || link.name == :probit
+        ll = 0.0
+        for i in eachindex(y)
+            μ_i = clamp(μ[i], 1e-15, 1.0 - 1e-15)
+            if y[i] == 1.0
+                ll += w[i] * log(μ_i)
+            else
+                ll += w[i] * log(1.0 - μ_i)
+            end
+        end
+        return ll
+    elseif link.name == :log
+        ll = 0.0
+        for i in eachindex(y)
+            μ_i = max(μ[i], 1e-15)
+            ll += w[i] * (y[i] * log(μ_i) - μ_i)
+        end
+        return ll
+    else
+        return NaN
+    end
 end
 
 function loglikelihood_poisson(y::Vector{Float64}, μ::Vector{Float64})

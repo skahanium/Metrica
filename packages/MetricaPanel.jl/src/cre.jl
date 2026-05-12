@@ -1,7 +1,22 @@
 # === CRE/Mundlak 估计器 =======================================================
-# 统一使用 StatsModels 公式
+# Correlated Random Effects / Mundlak 方法：在 pooled 回归中加入组均值，
+# 使个体效应与解释变量的相关性可被控制。数学上等价于一阶差分的替代参数化。
+# 注意：这不是 Swamy-Arora 类 GLS 随机效应估计量。
+# 统一使用 StatsModels 公式。
 
-function fit_crea(panel_data::MetricaBase.PanelData, formula::String)
+"""
+    fit_crea(panel_data, formula; method_override=nothing)
+
+Mundlak/CRE（Correlated Random Effects）估计器。
+
+在 pooled OLS 中加入各解释变量的组均值，控制个体效应与解释变量的相关性。
+返回的 `PanelFitResult` 中 `method` 字段默认为 `:cre`；可通过 `method_override`
+指定为 `:re` 以保持向后兼容。
+
+**这不是 Swamy-Arora 等传统 GLS 随机效应。**
+"""
+function fit_crea(panel_data::MetricaBase.PanelData, formula::String;
+                  method_override::Union{Nothing,Symbol}=nothing)
     data = DataFrame(panel_data.data)
     id_col = panel_data.id_col
     time_col = panel_data.time_col
@@ -37,12 +52,14 @@ function fit_crea(panel_data::MetricaBase.PanelData, formula::String)
     gm_names = [Symbol("group_mean_$(name)") for name in base_names]
     coef_names = vcat([:intercept], base_names, gm_names)
 
-    stats = ols_statistics(X_design, y, coef_names, :cre,
+    result_method = something(method_override, :cre)
+
+    stats = ols_statistics(X_design, y, coef_names, result_method,
                            Dict(:n_ids => n_ids, :n_times => length(unique(filtered_df[!, time_col]))))
 
     fitted = X_design * stats.coefficients
     residuals = y - fitted
 
     return PanelFitResult(formula, stats.glance_table, stats.tidy_table,
-                          panel_data, fitted, residuals, coef_names, :cre)
+                          panel_data, fitted, residuals, coef_names, result_method)
 end

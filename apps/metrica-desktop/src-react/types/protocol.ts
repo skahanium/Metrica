@@ -20,6 +20,11 @@ export interface Message {
 
 // ---- 诊断类型（OLS） ----
 
+export interface DiagnosticSpec {
+  test: 'bp' | 'bg' | 'reset' | 'jb' | 'dw' | 'white' | 'vif';
+  lags?: number;
+}
+
 export interface VifEntry {
   name: string;
   vif: number;
@@ -314,7 +319,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'panel_iv' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -330,6 +335,8 @@ export interface ModelSpec {
   post_column?: string;
   event_time_column?: string;
   outcome_column?: string;
+  propensity_formula?: string;
+  outcome_formula?: string;
   // S4c: TimeSeries 字段
   time_column?: string;
   variable?: string;

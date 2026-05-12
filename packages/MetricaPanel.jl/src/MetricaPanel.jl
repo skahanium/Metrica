@@ -22,7 +22,7 @@ struct PanelModel <: MetricaBase.AbstractPanelModel
     formula::String
     id_col::Symbol
     time_col::Symbol
-    method::Symbol  # :fe, :re, :fd, :between
+    method::Symbol  # :fe, :re（Mundlak/CRE 别名）, :cre, :fd, :between
 end
 
 """
@@ -93,10 +93,11 @@ end
 """
 function ols_statistics(X::Matrix{Float64}, y::Vector{Float64},
                          coef_names::Vector{Symbol}, model_sym::Symbol,
-                         extra_metrics::Dict{Symbol, <:MetricaBase.MetricValue})
+                         extra_metrics::Dict{Symbol, <:MetricaBase.MetricValue};
+                         residual_dof::Union{Nothing,Int}=nothing)
     nobs = length(y)
     k = size(X, 2)
-    dof = nobs - k
+    dof = isnothing(residual_dof) ? nobs - k : residual_dof
 
     coefficients = X \ y
     fitted = X * coefficients
@@ -157,9 +158,13 @@ include("serialize.jl")
 
 根据 `method` 参数选择估计方法：
 - `:fe` — 固定效应（默认）
-- `:re` — 随机效应
+- `:re` — Mundlak/CRE（向后兼容别名，语义同 `:cre`）
+- `:cre` — Mundlak/Correlated Random Effects（推荐）
 - `:fd` — 一阶差分
 - `:between` — 组间估计
+
+**注意：** `:re` 和 `:cre` 均实现为 Mundlak/CRE 方法（pooled OLS + 组均值），
+不是 Swamy-Arora 等传统 GLS 随机效应。
 
 返回 `PanelFitResult`。
 """

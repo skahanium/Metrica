@@ -20,6 +20,7 @@ struct GLSFitResult <: MetricaBase.AbstractLinearFitResult
     vcov_matrix::Matrix{Float64}
     stderror_values::Vector{Float64}
     design_matrix::Matrix{Float64}
+    design_matrix_gls::Matrix{Float64}
     response_vector::Vector{Float64}
     fitted_values::Vector{Float64}
     residual_vector::Vector{Float64}
@@ -40,18 +41,14 @@ MetricaBase.residuals(result::GLSFitResult) = result.residual_vector
 function MetricaBase.augment(result::GLSFitResult)
     nobs_val = length(result.response_vector)
     X = result.design_matrix
+    X_gls = result.design_matrix_gls
     residuals = result.residual_vector
 
     sigma = sqrt(sum(abs2, residuals) / (nobs_val - size(X, 2)))
     std_residuals = sigma > 0 ? residuals ./ sigma : zeros(nobs_val)
 
-    XtX = X' * X
-    leverage = if det(XtX) > eps(Float64)
-        XtX_inv = inv(XtX)
-        [dot(X[i, :], XtX_inv * X[i, :]) for i in 1:nobs_val]
-    else
-        fill(NaN, nobs_val)
-    end
+    XtX_gls_inv = inv(X_gls' * X_gls)
+    leverage = [dot(X[i, :], XtX_gls_inv * X[i, :]) for i in 1:nobs_val]
 
     k = size(X, 2)
     cooks_d = fill(NaN, nobs_val)
@@ -83,12 +80,12 @@ function MetricaBase.predict(result::GLSFitResult;
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
-    XtX_inv = inv(result.design_matrix' * result.design_matrix)
+    XtX_gls_inv = inv(result.design_matrix_gls' * result.design_matrix_gls)
 
     se_pred = if interval === :confidence
-        [sqrt(sigma^2 * dot(X[i, :], XtX_inv * X[i, :])) for i in 1:size(X, 1)]
+        [sqrt(sigma^2 * dot(X[i, :], XtX_gls_inv * X[i, :])) for i in 1:size(X, 1)]
     else
-        [sqrt(sigma^2 * (1 + dot(X[i, :], XtX_inv * X[i, :]))) for i in 1:size(X, 1)]
+        [sqrt(sigma^2 * (1 + dot(X[i, :], XtX_gls_inv * X[i, :]))) for i in 1:size(X, 1)]
     end
 
     return (predictions=predictions, lower=predictions .- t_crit .* se_pred, upper=predictions .+ t_crit .* se_pred)
@@ -162,13 +159,14 @@ function MetricaBase.fit(::Type{GLSModel}, formula::AbstractString, data;
     coefficients = X_gls \ y_gls
     fitted = X * coefficients
     residuals = y - fitted
+    residuals_gls = y_gls - X_gls * coefficients
 
-    vcov_result = compute_vcov(X_gls, y_gls - X_gls * coefficients, nobs, dof_val, vcov, nothing)
+    vcov_result = compute_vcov(X_gls, residuals_gls, nobs, dof_val, vcov, nothing)
     vcov_result isa MetricaBase.ModelError && return vcov_result
     vcov_mat, stderror = vcov_result
 
-    rss = sum(abs2, residuals)
-    tss = sum(abs2, y .- mean(y))
+    rss = sum(abs2, residuals_gls)
+    tss = sum(abs2, y_gls .- mean(y_gls))
     r2_val = iszero(tss) ? 1.0 : 1 - rss / tss
     adj_r2 = iszero(tss) ? 1.0 : 1 - (rss / dof_val) / (tss / (nobs - 1))
     sigma = sqrt(rss / dof_val)
@@ -187,6 +185,6 @@ function MetricaBase.fit(::Type{GLSModel}, formula::AbstractString, data;
 
     return GLSFitResult(String(formula), glance_table, tidy_table,
         coefficient_names, coefficients, vcov_mat, stderror,
-        Matrix{Float64}(X), copy(y), fitted, residuals,
+        Matrix{Float64}(X), Matrix{Float64}(X_gls), copy(y), fitted, residuals,
         Matrix{Float64}(omega))
 end
