@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:runtime": "cargo build --release --manifest-path ../../runtime/metrica-runtime/Cargo.toml",
+    "build:desktop": "cargo build --release --manifest-path src-tauri/Cargo.toml",
+    "build:all": "npm run build && npm run build:runtime && npm run build:desktop",
     "preview": "vite preview",
+    "start": "node scripts/launch.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

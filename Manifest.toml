@@ -506,7 +506,7 @@ uuid = "2248ac24-609b-424e-8643-ff19a1f22962"
 version = "0.1.0"
 
 [[deps.MetricaDiagnostics]]
-deps = ["Distributions", "LinearAlgebra", "MetricaLinear", "Statistics"]
+deps = ["Distributions", "LinearAlgebra", "MetricaBase", "Statistics"]
 path = "packages/MetricaDiagnostics.jl"
 uuid = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
 version = "0.1.0"
@@ -518,7 +518,7 @@ uuid = "d1e2f3a4-b5c6-7890-def0-123456789abc"
 version = "0.1.0"
 
 [[deps.MetricaLinear]]
-deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaCausal", "MetricaData", "MetricaDiagnostics", "MetricaDiscrete", "MetricaOutput", "MetricaPanel", "MetricaSurvey", "Optim", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaData", "MetricaOutput", "Statistics", "StatsModels"]
 path = "packages/MetricaLinear.jl"
 uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 version = "0.1.0"

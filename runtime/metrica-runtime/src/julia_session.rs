@@ -39,7 +39,8 @@ impl JuliaSession {
     /// 启动一个独立的 reader 线程从 stdout 逐行读取，通过 mpsc channel
     /// 发送给主线程，从而让 `recv_timeout` 能正确实现超时。
     pub fn start(repo_root: &str, project_path: &str) -> Result<Self, String> {
-        let mut child = Command::new("julia")
+        let julia_bin = std::env::var("JULIA_BIN").unwrap_or_else(|_| "julia".to_string());
+        let mut child = Command::new(&julia_bin)
             .arg(format!("--project={project_path}"))
             .arg("--startup-file=no")
             .arg("--color=no")

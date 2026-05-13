@@ -13,7 +13,7 @@ import { useModelStore } from '../stores/modelStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useMessageStore } from '../stores/messageStore';
 import { useProjectStore } from '../stores/projectStore';
-import type { CliFeedback } from '../components/CommandLine';
+import type { CliFeedback, DatasetSummary } from '../types/protocol';
 
 type FeedbackFn = (level: CliFeedback['level'], message: string) => void;
 type CmdHandler = (parsed: ParsedCommand, input: string, feedback: FeedbackFn) => boolean | Promise<boolean>;
@@ -48,6 +48,7 @@ function normalizePayload(payload: Record<string, unknown>): Record<string, unkn
 
 export const handleUse: CmdHandler = (parsed, _input, feedback) => {
   const raw = parsed.positionals[0] || '';
+  console.log('[handleUse] raw:', raw);
   const clearAll = () => {
     const ds = useDatasetStore.getState();
     ds.setSourceAndActivePath('', '');
@@ -81,13 +82,14 @@ export const handleUse: CmdHandler = (parsed, _input, feedback) => {
         setError(null);
         const fileName = filePath.split('/').pop() || filePath;
         feedback('success', `已加载 ${fileName}（${r.nrows} 行 × ${r.ncols} 列）`);
+        useMessageStore.getState().addMessage({ kind: 'result', command: `use ${filePath}`, result: { glance: null as any, tidy: [], warnings: [], diagnostics: {} } });
         try {
           const describeResult = await api.runDataCommand({
             datasetPath: filePath,
             command: { kind: 'describe' },
           });
-          useMessageStore.getState().addMessage({ kind: 'data', command: 'describe', data_result: describeResult as import('../types/protocol').DataResult });
-        } catch { /* describe 失败不阻塞导入流程 */ }
+          useMessageStore.getState().addMessage({ kind: 'data', command: '', data_result: describeResult as import('../types/protocol').DataResult });
+        } catch (err) { feedback('warning', '自动描述失败，可手动执行 describe 命令'); }
       } catch (e: unknown) {
         feedback('error', (e as Error).message || '数据加载失败');
         setError((e as Error).message || '数据加载失败');
@@ -109,13 +111,14 @@ export const handleUse: CmdHandler = (parsed, _input, feedback) => {
       setError(null);
       const fileName = filePath.split('/').pop() || filePath;
       feedback('success', `已加载 ${fileName}（${r.nrows} 行 × ${r.ncols} 列）`);
+      useMessageStore.getState().addMessage({ kind: 'result', command: `use ${filePath}`, result: { glance: null as any, tidy: [], warnings: [], diagnostics: {} } });
       try {
         const describeResult = await api.runDataCommand({
           datasetPath: filePath,
           command: { kind: 'describe' },
         });
-        useMessageStore.getState().addMessage({ kind: 'data', command: 'describe', data_result: describeResult as import('../types/protocol').DataResult });
-      } catch { /* describe 失败不阻塞导入流程 */ }
+        useMessageStore.getState().addMessage({ kind: 'data', command: '', data_result: describeResult as import('../types/protocol').DataResult });
+      } catch (err) { feedback('warning', '自动描述失败，可手动执行 describe 命令'); }
     } catch (e: unknown) {
       feedback('error', (e as Error).message || '数据加载失败');
       setError((e as Error).message || '数据加载失败');
@@ -255,9 +258,11 @@ export const handleSave: CmdHandler = (_parsed, _input, feedback) => {
 export const handleDataView: CmdHandler = (parsed, input, feedback) => {
   const activePath = getActivePath();
   const verb = parsed.verb;
+  feedback('success', `执行 ${verb}...（数据集：${activePath ? activePath.split('/').pop() : '未加载'}）`);
   return (async () => {
     setLoading(true);
     try {
+      console.log('[handleDataView] calling runDataCommand...');
       const result = await api.runDataCommand({
         datasetPath: activePath,
         command: {
@@ -265,6 +270,7 @@ export const handleDataView: CmdHandler = (parsed, input, feedback) => {
           variables: parsed.positionals.length > 0 ? parsed.positionals : undefined,
         },
       });
+      console.log('[handleDataView] result:', result?.kind);
       const ds = useDatasetStore.getState();
       if (result.kind === 'browse') {
         ds.setBrowseContext(result.columns.map(c => c.name), result.readonly);
@@ -272,9 +278,10 @@ export const handleDataView: CmdHandler = (parsed, input, feedback) => {
       } else {
         ds.clearBrowseContext();
         useMessageStore.getState().addMessage({ kind: 'data', command: input, data_result: result });
+        feedback('success', `${verb} 完成`);
       }
       setError(null);
-    } catch (e: unknown) { feedback('warning', (e as Error).message || '数据命令执行失败'); return false; }
+    } catch (e: unknown) { feedback('error', (e as Error).message || `${verb} 执行失败`); return false; }
     finally { setLoading(false); }
     return true;
   })();
@@ -407,6 +414,12 @@ export const handlePostest: CmdHandler = (parsed, _input, feedback) => {
   feedback('warning', `后估计命令 ${parsed.verb} 将在后续版本中支持。请先运行模型后重试。`);
   return false;
 };
+
+// ---- full preview (for DataFullscreen) ----
+
+export async function loadFullPreview(datasetPath: string): Promise<DatasetSummary> {
+  return api.inspectDataset(datasetPath);
+}
 
 // ---- router ----
 

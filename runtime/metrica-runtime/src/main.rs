@@ -29,7 +29,7 @@ async fn main() {
         let julia_project = std::env::var("METRICA_JULIA_PROJECT").unwrap_or_else(|_| {
             repo_root
                 .join("packages")
-                .join("MetricaLinear.jl")
+                .join("MetricaRuntime.jl")
                 .to_string_lossy()
                 .to_string()
         });

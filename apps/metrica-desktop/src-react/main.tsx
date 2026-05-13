@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { App } from './components/App';
+import './styles.css';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 

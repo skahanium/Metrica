@@ -9,19 +9,35 @@ import { useMessageStore } from '../stores/messageStore';
 import { useModelStore } from '../stores/modelStore';
 import { useTransformStore } from '../stores/transformStore';
 
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+  };
+})();
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
+
 const runtimeMocks = vi.hoisted(() => ({
   checkHealth: vi.fn(),
   fitModel: vi.fn(),
   inspectDataset: vi.fn(),
   queryDataset: vi.fn(),
 }));
-const originalAppActions = useAppStore.getState();
 
 vi.mock('../services/runtimeClient', () => ({
   checkHealth: (...args: unknown[]) => runtimeMocks.checkHealth(...args),
   fitModel: (...args: unknown[]) => runtimeMocks.fitModel(...args),
   inspectDataset: (...args: unknown[]) => runtimeMocks.inspectDataset(...args),
   runDataCommand: (...args: unknown[]) => runtimeMocks.queryDataset(...args),
+}));
+
+vi.mock('../services/healthPolling', () => ({
+  startHealthPolling: vi.fn(),
+  stopHealthPolling: vi.fn(),
+  MAX_RESTARTS: 3,
 }));
 
 vi.mock('../components/ResultFlow', () => ({
@@ -73,11 +89,10 @@ describe('App command error classification', () => {
       error: null,
       isLoading: false,
       juliaHealthy: true,
+      healthChecked: true,
       restartCount: 0,
       healthPollingId: null,
       dataFullscreen: false,
-      startHealthPolling: vi.fn(),
-      stopHealthPolling: vi.fn(),
     });
     useCommandStore.setState({
       input: '',
@@ -116,10 +131,6 @@ describe('App command error classification', () => {
 
   afterEach(() => {
     cleanup();
-    useAppStore.setState({
-      startHealthPolling: originalAppActions.startHealthPolling,
-      stopHealthPolling: originalAppActions.stopHealthPolling,
-    });
   });
 
   it('shows unknown commands in cli feedback instead of the global error alert', async () => {

@@ -38,7 +38,7 @@ describe('ResultFlow', () => {
 
     expect(screen.getByText(/summarize y/)).toBeDefined();
     expect(screen.getAllByText('N').length).toBeGreaterThan(0);
-    expect(screen.getByText('1.5000')).toBeDefined();
+    expect(screen.getAllByText('1.5000').length).toBeGreaterThan(0);
   });
 
   it('renders model results without legacy detection', () => {

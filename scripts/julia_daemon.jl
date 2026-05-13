@@ -1,10 +1,6 @@
 # === Metrica Julia 守护进程 ====================================================
 # 持久化进程，通过 stdin/stdout JSON lines 与 Runtime 通信。
 #
-# 启动方式：
-#   METRICA_REPO_ROOT=/path/to/repo julia --project=packages/MetricaLinear.jl \
-#       --startup-file=no --color=no scripts/julia_daemon.jl
-#
 # 协议（每行一个完整 JSON 对象）：
 #   stdin:  {"id":"<请求标识>","action":"fit_model|inspect_dataset|query_dataset|transform|shutdown","params":{...}}
 #   stdout: {"id":"<匹配请求标识>","status":"success|error","payload":{...}}
@@ -18,30 +14,14 @@ using DataFrames
 using MetricaBase
 using MetricaLinear
 using MetricaOutput
-using LinearAlgebra: I
 using MetricaDiscrete
-
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaCausal.jl", "src", "MetricaCausal.jl"))
-using .MetricaCausal
-
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
-using .MetricaDiagnostics
-
-# 加载面板模块
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaPanel.jl", "src", "MetricaPanel.jl"))
-using .MetricaPanel
-
-# 加载数据操作模块
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaData.jl", "src", "MetricaData.jl"))
-using .MetricaData
-
-# 加载调查模型模块
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaSurvey.jl", "src", "MetricaSurvey.jl"))
-using .MetricaSurvey
-
-# 加载时间序列模块
-include(joinpath(ENV["METRICA_REPO_ROOT"], "packages", "MetricaTimeSeries.jl", "src", "MetricaTimeSeries.jl"))
-using .MetricaTimeSeries
+using MetricaCausal
+using MetricaDiagnostics
+using MetricaPanel
+using MetricaData
+using MetricaSurvey
+using MetricaTimeSeries
+using LinearAlgebra: I
 
 function handle_request(req::Dict{String, Any})
     id = get(req, "id", nothing)
@@ -298,7 +278,6 @@ function handle_request(req::Dict{String, Any})
             test_name = get(params, "test", "")
             lags = get(params, "lags", nothing)
 
-            # 先拟合模型以获取 OLSFitResult
             if !haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 payload = Dict(
                     "status" => "error",
@@ -315,14 +294,15 @@ function handle_request(req::Dict{String, Any})
                 vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
                 result = MetricaBase.fit(ModelT, formula, dataset_path; vcov=vcov_symbol)
 
-                if !(result isa MetricaLinear.OLSFitResult)
+                X = MetricaBase.design_matrix(result)
+                if isnothing(X)
                     payload = Dict(
                         "status" => "error",
                         "messages" => [Dict(
                             "level" => "error",
-                            "code" => "DIAGNOSTIC_REQUIRES_OLS",
-                            "text" => "当前诊断检验仅支持 OLS 模型结果。",
-                            "hint" => "请先运行 regress 命令。",
+                            "code" => "DIAGNOSTIC_REQUIRES_DESIGN_MATRIX",
+                            "text" => "该模型类型不支持诊断检验（缺少设计矩阵）。",
+                            "hint" => "当前诊断检验需要模型提供设计矩阵，请使用 OLS 等线性模型。",
                         )],
                     )
                 else

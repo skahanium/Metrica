@@ -4,6 +4,13 @@
 // normalizeTidyRow() 在 runtimeClient 或数据处理入口处执行转换
 // ============================================================
 
+// ---- CLI 反馈类型 ----
+
+export interface CliFeedback {
+  level: 'error' | 'warning' | 'success';
+  message: string;
+}
+
 // ---- 基础消息类型 ----
 
 export interface Warning {

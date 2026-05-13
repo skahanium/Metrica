@@ -82,6 +82,9 @@ package-lock.json.bak
 !.yarn/versions
 .pnp.*
 
+# --- Vite（前端构建缓存）---
+.vite/
+
 # --- Tauri ---
 apps/**/src-tauri/target/
 

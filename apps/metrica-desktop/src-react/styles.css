@@ -1,0 +1,151 @@
+/* ============================================================
+ * Metrica 全局色彩系统（一体化深色模式）
+ * 所有组件通过 CSS 自定义属性引用颜色，不在组件内硬编码。
+ * 切换深色模式只需修改 html[data-theme] 属性。
+ * ============================================================ */
+
+/* ---- 浅色模式（默认） ---- */
+:root {
+  /* 品牌 */
+  --m-brand-text: #8c8c8c;
+  --m-brand-bar-bg: #ffffff;
+  --m-brand-bar-border: #f0f0f0;
+  --m-accent: #1677ff;
+  --m-accent-light: rgba(22, 119, 255, 0.08);
+
+  /* 面板 / 背景 */
+  --m-panel-bg: #ffffff;
+  --m-page-bg: #f5f5f5;
+  --m-surface: #ffffff;
+  --m-surface-hover: #fafafa;
+
+  /* 边框 */
+  --m-border: #f0f0f0;
+  --m-border-strong: #d9d9d9;
+
+  /* 文字 */
+  --m-text-primary: rgba(0, 0, 0, 0.88);
+  --m-text-secondary: rgba(0, 0, 0, 0.65);
+  --m-text-muted: rgba(0, 0, 0, 0.45);
+  --m-text-placeholder: #bfbfbf;
+
+  /* 输入 */
+  --m-input-bg: transparent;
+  --m-input-text: rgba(0, 0, 0, 0.88);
+  --m-input-border: #d9d9d9;
+  --m-input-focus-border: #1677ff;
+  --m-input-focus-shadow: rgba(22, 119, 255, 0.12);
+
+  /* 反馈 */
+  --m-success: #52c41a;
+  --m-success-bg: #f6ffed;
+  --m-success-border: #b7eb8f;
+  --m-warning: #faad14;
+  --m-warning-bg: #fffbe6;
+  --m-warning-border: #ffe58f;
+  --m-error: #ff4d4f;
+  --m-error-bg: #fff2f0;
+  --m-error-border: #ffccc7;
+  --m-info: #1677ff;
+  --m-info-bg: #e6f4ff;
+  --m-info-border: #91caff;
+
+  /* 补全弹窗 */
+  --m-completion-bg: #ffffff;
+  --m-completion-shadow: rgba(0, 0, 0, 0.12);
+  --m-completion-item-hover: #e6f4ff;
+  --m-completion-item-active: #bae0ff;
+  --m-completion-desc-text: rgba(0, 0, 0, 0.45);
+  --m-completion-kind-tag-bg: rgba(0, 0, 0, 0.06);
+  --m-completion-kind-tag-text: rgba(0, 0, 0, 0.45);
+
+  /* Ghost 文本 */
+  --m-ghost-text: #bfbfbf;
+
+  /* 提示栏 */
+  --m-hint-text: #bbbbbb;
+  --m-hint-correction: #faad14;
+
+  /* 阴影 */
+  --m-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --m-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --m-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* 杂项 */
+  --m-trash-bg: #fafafa;
+  --m-scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --m-scrollbar-track: transparent;
+}
+
+/* ---- 深色模式 ---- */
+html[data-theme="dark"] {
+  /* 品牌 */
+  --m-brand-text: rgba(255, 255, 255, 0.65);
+  --m-brand-bar-bg: #141414;
+  --m-brand-bar-border: #303030;
+  --m-accent: #1677ff;
+  --m-accent-light: rgba(22, 119, 255, 0.15);
+
+  /* 面板 / 背景 */
+  --m-panel-bg: #141414;
+  --m-page-bg: #000000;
+  --m-surface: #1f1f1f;
+  --m-surface-hover: #262626;
+
+  /* 边框 */
+  --m-border: #303030;
+  --m-border-strong: #424242;
+
+  /* 文字 */
+  --m-text-primary: rgba(255, 255, 255, 0.85);
+  --m-text-secondary: rgba(255, 255, 255, 0.65);
+  --m-text-muted: rgba(255, 255, 255, 0.45);
+  --m-text-placeholder: rgba(255, 255, 255, 0.30);
+
+  /* 输入 */
+  --m-input-bg: transparent;
+  --m-input-text: rgba(255, 255, 255, 0.85);
+  --m-input-border: #424242;
+  --m-input-focus-border: #1677ff;
+  --m-input-focus-shadow: rgba(22, 119, 255, 0.20);
+
+  /* 反馈 */
+  --m-success: #49aa19;
+  --m-success-bg: rgba(73, 170, 25, 0.10);
+  --m-success-border: rgba(73, 170, 25, 0.30);
+  --m-warning: #d89614;
+  --m-warning-bg: rgba(216, 150, 20, 0.10);
+  --m-warning-border: rgba(216, 150, 20, 0.30);
+  --m-error: #dc4446;
+  --m-error-bg: rgba(220, 68, 70, 0.10);
+  --m-error-border: rgba(220, 68, 70, 0.30);
+  --m-info: #1677ff;
+  --m-info-bg: rgba(22, 119, 255, 0.10);
+  --m-info-border: rgba(22, 119, 255, 0.30);
+
+  /* 补全弹窗 */
+  --m-completion-bg: #1f1f1f;
+  --m-completion-shadow: rgba(0, 0, 0, 0.45);
+  --m-completion-item-hover: rgba(22, 119, 255, 0.15);
+  --m-completion-item-active: rgba(22, 119, 255, 0.25);
+  --m-completion-desc-text: rgba(255, 255, 255, 0.45);
+  --m-completion-kind-tag-bg: rgba(255, 255, 255, 0.08);
+  --m-completion-kind-tag-text: rgba(255, 255, 255, 0.45);
+
+  /* Ghost 文本 */
+  --m-ghost-text: rgba(255, 255, 255, 0.30);
+
+  /* 提示栏 */
+  --m-hint-text: rgba(255, 255, 255, 0.30);
+  --m-hint-correction: #d89614;
+
+  /* 阴影 */
+  --m-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --m-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --m-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  /* 杂项 */
+  --m-trash-bg: #1a1a1a;
+  --m-scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --m-scrollbar-track: transparent;
+}

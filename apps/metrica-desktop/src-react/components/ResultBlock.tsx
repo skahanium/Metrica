@@ -31,7 +31,7 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result }) => 
   };
 
   return (
-    <div style={{ marginBottom: 16, background: '#fff', borderRadius: 8, border: '1px solid #f0f0f0', padding: 16 }}>
+    <div style={{ marginBottom: 16, background: 'var(--m-surface)', borderRadius: 8, border: '1px solid var(--m-border)', padding: 16 }}>
       {/* Command header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Text code style={{ fontSize: 13 }}>&gt; {command}</Text>

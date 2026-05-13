@@ -4,7 +4,7 @@ import { useCommandStore } from '../stores/commandStore';
 import { useDatasetStore } from '../stores/datasetStore';
 import { getContext, getCompletions, getCorrections, getGhostText, getPartial, getUsedVariableNames, getMissingRequiredOptions } from '../services/autocomplete';
 import { COMMAND_LIST } from '../services/commandGrammar';
-import type { ColumnSummary } from '../types/protocol';
+import type { ColumnSummary, CliFeedback } from '../types/protocol';
 
 /** Stable empty array to prevent Zustand infinite-loop from new [] each render. */
 const EMPTY_COLUMNS: ColumnSummary[] = [];
@@ -18,10 +18,6 @@ interface CompletionBoxState {
   width: number;
   anchorX: number;
   placement: 'inline' | 'flip' | 'compact';
-}
-
-function isCompleteCommand(trimmed: string): boolean {
-  return COMMAND_LIST.includes(trimmed.toLowerCase().split(/\s+/)[0]);
 }
 
 function getTokenStart(value: string, cursorPos: number): number {
@@ -81,10 +77,7 @@ interface CommandLineProps {
   onClearFeedback?: () => void;
 }
 
-export interface CliFeedback {
-  level: 'error' | 'warning' | 'success';
-  message: string;
-}
+export type { CliFeedback };
 
 export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = null, onClearFeedback }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -275,7 +268,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   }, [measureInputTextWidth]);
 
   const applyCompletion = useCallback((item: { text: string; kind: string }) => {
-    const selStart = inputRef.current?.selectionStart ?? input.length;
+    const selStart = cursorPos;
     const beforeCursor = input.slice(0, selStart);
     const afterCursor = input.slice(selStart);
     const lastDelim = Math.max(
@@ -295,7 +288,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
       ensureCaretVisible(newInput, newCursor);
       updateCompletionBox(newInput, newCursor);
     });
-  }, [ensureCaretVisible, hideCompletions, input, setGhostText, setInput, updateCompletionBox]);
+  }, [cursorPos, ensureCaretVisible, hideCompletions, input, setGhostText, setInput, updateCompletionBox]);
 
   const applyManualEdit = useCallback((e: React.KeyboardEvent): boolean => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.nativeEvent.isComposing) return false;
@@ -421,17 +414,12 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
         return;
       }
       if (e.key === 'Enter') {
-        const trimmed = input.trim();
-        if (trimmed && isCompleteCommand(trimmed)) {
-          e.preventDefault();
-          hideCompletions();
-          submitCommand(trimmed);
-          return;
-        }
         e.preventDefault();
         const item = acceptCompletion();
         if (item) {
           applyCompletion(item);
+        } else {
+          hideCompletions();
         }
         return;
       }
@@ -554,8 +542,8 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
         left: shellRect ? `${Math.max(16, completionBox.left + (shellRect?.left ?? 0))}px` : '16px',
         width: shellRect ? `${completionBox.width}px` : 'auto',
         maxWidth: `calc(100vw - 32px)`,
-        background: '#fff',
-        border: '1px solid #d7e3f2',
+        background: 'var(--m-completion-bg)',
+        border: '1px solid var(--m-border)',
         borderRadius: 10,
         maxHeight: 260,
         overflowX: 'hidden',
@@ -575,23 +563,23 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
           width: 12,
           height: 12,
           transform: 'translateX(-50%) rotate(45deg)',
-          background: '#fff',
-          borderRight: '1px solid #d7e3f2',
-          borderBottom: '1px solid #d7e3f2',
+          background: 'var(--m-completion-bg)',
+          borderRight: '1px solid var(--m-border)',
+          borderBottom: '1px solid var(--m-border)',
           boxShadow: '8px 8px 18px rgba(15, 23, 42, 0.06)',
         }}
       />
       {commandPreview && (
         <div style={{
-          padding: '6px 14px', fontSize: 11, color: '#8c8c8c',
-          borderBottom: '1px solid #f0f0f0', fontFamily: 'monospace',
+          padding: '6px 14px', fontSize: 11, color: 'var(--m-text-muted)',
+          borderBottom: '1px solid var(--m-border)', fontFamily: 'monospace',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
-          命令预览：<span style={{ color: '#1677ff' }}>{commandPreview}</span>
+          命令预览：<span style={{ color: 'var(--m-accent)' }}>{commandPreview}</span>
         </div>
       )}
       {correction && (
-        <div style={{ padding: '4px 12px', fontSize: 12, color: '#999', borderBottom: '1px solid #f0f0f0' }}>
+        <div style={{ padding: '4px 12px', fontSize: 12, color: 'var(--m-text-muted)', borderBottom: '1px solid var(--m-border)' }}>
           未找到。你的意思是？
         </div>
       )}
@@ -601,7 +589,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
           style={{
             padding: '9px 14px',
             cursor: 'pointer',
-            background: idx === selectedCompletionIdx ? '#e6f4ff' : 'transparent',
+            background: idx === selectedCompletionIdx ? 'var(--m-completion-item-active)' : 'var(--m-completion-bg)',
             display: 'grid',
             gridTemplateColumns: compactCompletion ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(72px, 42%)',
             rowGap: 2,
@@ -616,11 +604,11 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
             applyCompletion(item);
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</span>
+          <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--m-text-primary)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</span>
           {item.description && (
             <span
               style={{
-                color: '#7b8794',
+                color: 'var(--m-text-secondary)',
                 fontSize: 11,
                 minWidth: 0,
                 overflow: 'hidden',
@@ -636,8 +624,8 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
       ))}
       {missingOptions.length > 0 && (
         <div style={{
-          padding: '6px 14px', fontSize: 11, color: '#faad14',
-          borderTop: '1px solid #f0f0f0', background: '#fffbe6',
+          padding: '6px 14px', fontSize: 11, color: 'var(--m-warning)',
+          borderTop: '1px solid var(--m-warning-border)', background: 'var(--m-warning-bg)',
         }}>
           还需填写：{missingOptions.map(o => o.name).join('、')}
         </div>
@@ -647,23 +635,23 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
   ) : null;
   const feedbackColors = feedback?.level === 'success'
     ? {
-      border: '#b7eb8f',
-      background: '#f6ffed',
-      text: '#135200',
-      iconBackground: '#52c41a',
+      border: 'var(--m-success-border)',
+      background: 'var(--m-success-bg)',
+      text: 'var(--m-success)',
+      iconBackground: 'var(--m-success)',
     }
     : feedback?.level === 'warning'
     ? {
-      border: '#ffd591',
-      background: '#fff7e6',
-      text: '#874d00',
-      iconBackground: '#fa8c16',
+      border: 'var(--m-warning-border)',
+      background: 'var(--m-warning-bg)',
+      text: 'var(--m-warning)',
+      iconBackground: 'var(--m-warning)',
     }
     : {
-      border: '#ffccc7',
-      background: '#fff1f0',
-      text: '#820014',
-      iconBackground: '#ff4d4f',
+      border: 'var(--m-error-border)',
+      background: 'var(--m-error-bg)',
+      text: 'var(--m-error)',
+      iconBackground: 'var(--m-error)',
     };
 
   return (
@@ -672,8 +660,8 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
       style={{
         position: 'relative',
         padding: '8px 16px 6px',
-        borderTop: '1px solid #e8e8e8',
-        background: '#fafafa',
+        borderTop: '1px solid var(--m-border)',
+        background: 'var(--m-surface-hover)',
         flexShrink: 0,
         resize: 'vertical',
         overflow: 'hidden',
@@ -701,7 +689,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
             borderBottom: `1px solid ${feedbackColors.border}`,
             background: feedbackColors.background,
             color: feedbackColors.text,
-            boxShadow: '0 -10px 28px rgba(15, 23, 42, 0.08)',
+            boxShadow: 'var(--m-shadow-md)',
           }}
         >
           <span
@@ -784,12 +772,12 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
           }}
         >
           <span style={{ visibility: 'hidden' }}>{input}</span>
-          <span style={{ color: '#bfbfbf' }}>{ghostText}</span>
+          <span style={{ color: 'var(--m-ghost-text)' }}>{ghostText}</span>
         </div>
       )}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start' }}>
           <span style={{
-            color: '#1677ff', fontWeight: 600, fontFamily: 'monospace', fontSize: 14,
+            color: 'var(--m-accent)', fontWeight: 600, fontFamily: 'monospace', fontSize: 14,
             lineHeight: '22px', paddingTop: 5, paddingRight: 6, userSelect: 'none',
           }}>
             &gt;
@@ -815,7 +803,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
               resize: 'none',
               lineHeight: '22px',
               padding: '5px 0',
-              color: 'rgba(0,0,0,0.88)',
+              color: 'var(--m-text-primary)',
             }}
           />
         </div>
@@ -824,14 +812,14 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
       <div
         style={{
           fontSize: 10,
-          color: '#bbb',
+          color: 'var(--m-hint-text)',
           marginTop: 4,
           paddingLeft: 20,
           lineHeight: '16px',
         }}
       >
-        Enter/Tab 接受补全 · ↑↓ 浏览 · Enter 执行命令 · Esc 关闭
-        {correction && <span style={{ color: '#faad14', marginLeft: 12 }}>建议: {correction}</span>}
+        Tab 接受补全 · ↑↓ 浏览 · Enter 执行 · Esc 关闭
+        {correction && <span style={{ color: 'var(--m-hint-correction)', marginLeft: 12 }}>建议: {correction}</span>}
       </div>
     </div>
   );

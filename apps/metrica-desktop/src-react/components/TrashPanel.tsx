@@ -94,7 +94,7 @@ export const TrashPanel: React.FC = () => {
               <List.Item
                 style={{
                   cursor: 'pointer',
-                  background: selectedTrashIds.has(item.id) ? '#e6f4ff' : 'transparent',
+                  background: selectedTrashIds.has(item.id) ? 'var(--m-completion-item-active)' : 'transparent',
                   padding: '8px 12px',
                 }}
                 onClick={() => toggleTrashSelection(item.id)}

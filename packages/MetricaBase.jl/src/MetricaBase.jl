@@ -40,6 +40,9 @@ export AbstractEconModel,
     r2,
     fitted,
     residuals,
+    design_matrix,
+    response,
+    coefficient_names,
     parse_metrica_formula
 
 # === 严重程度枚举 ============================================================
@@ -391,6 +394,36 @@ function fitted end
 返回残差向量。
 """
 function residuals end
+
+"""
+从已拟合结果中提取设计矩阵（若可用）。
+
+对于通过迭代优化拟合的模型（如 Logit、Probit），此函数返回 `nothing`。
+诊断检验应检查返回值并在设计矩阵不可用时优雅降级。
+"""
+function design_matrix(fit::AbstractFittedModel)
+    return nothing
+end
+
+"""
+从已拟合结果中提取响应向量（若可用）。
+
+对于没有显式响应向量的模型，此函数返回 `nothing`。
+"""
+function response(fit::AbstractFittedModel)
+    return nothing
+end
+
+"""
+从已拟合结果中提取系数名称向量。
+
+默认实现从 `coef()` 的返回值中提取名称，适用于所有实现了 `coef` 的拟合结果。
+"""
+function coefficient_names(fit::AbstractFittedModel)
+    pairs = coef(fit)
+    isnothing(pairs) && return Symbol[]
+    return [p[1] for p in pairs]
+end
 
 # === 工具函数 ================================================================
 

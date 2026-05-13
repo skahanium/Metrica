@@ -30,7 +30,7 @@ export const MessageToolbar: React.FC = () => {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '4px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa',
+      padding: '4px 16px', borderBottom: '1px solid var(--m-border)', background: 'var(--m-surface-hover)',
     }}>
       <Space size="small">
         <Button

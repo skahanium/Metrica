@@ -7,10 +7,14 @@ use crate::{DataCommandRequest, Message, TaskRequest, TaskResponse, ValidationEr
     validate_model_request,
     resolve_working_dir, resolve_dataset_path};
 
+fn julia_bin() -> String {
+    std::env::var("JULIA_BIN").unwrap_or_else(|_| "julia".to_string())
+}
+
 /// 解析 Julia 项目路径。
 ///
 /// 优先读取环境变量 `METRICA_JULIA_PROJECT`；若未设置，则基于
-/// 仓库根拼接 `packages/MetricaLinear.jl`。
+/// 仓库根拼接 `scripts/daemon`（守护进程专用项目，包含所有包依赖）。
 fn julia_project_path() -> String {
     if let Ok(path) = std::env::var("METRICA_JULIA_PROJECT") {
         return path;
@@ -87,7 +91,7 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
     } else {
         JULIA_SCRIPT
     };
-    let output = Command::new("julia")
+    let output = Command::new(&julia_bin())
         .arg(format!("--project={project_path}"))
         .arg("--startup-file=no")
         .arg("--color=no")
@@ -155,7 +159,7 @@ pub fn execute_query_dataset(request: &DataCommandRequest) -> Result<TaskRespons
     };
 
     let project_path = julia_project_path();
-    let output = Command::new("julia")
+    let output = Command::new(&julia_bin())
         .arg(format!("--project={project_path}"))
         .arg("--startup-file=no")
         .arg("--color=no")

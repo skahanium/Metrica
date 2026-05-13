@@ -36,7 +36,7 @@ export const ResultFlow: React.FC = () => {
               style={{
                 marginBottom: 12,
                 borderRadius: 8,
-                border: selectedIds.has(msg.id) ? '2px solid #1677ff' : '1px solid #f0f0f0',
+                border: selectedIds.has(msg.id) ? '2px solid var(--m-accent)' : '1px solid var(--m-border)',
                 transition: 'border 0.2s',
                 cursor: 'pointer',
               }}

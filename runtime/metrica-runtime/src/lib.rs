@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 pub use server::default_bind_addr;
-pub use julia_bridge::execute_fit_model;
-pub use julia_bridge::execute_query_dataset;
 pub use julia_session::JuliaSession;
 pub use server::{build_router, serve as serve_axum, AppState};
 
@@ -224,15 +222,12 @@ pub struct ModelSpec {
     pub panel_time: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panel_method: Option<String>,
-    // M6: IV/2SLS 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instruments: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub endog_columns: Option<Vec<String>>,
-    // M6: GLS 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub omega_spec: Option<String>,
-    // S4b: Causal 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub treatment_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -247,7 +242,6 @@ pub struct ModelSpec {
     pub propensity_formula: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outcome_formula: Option<String>,
-    // S4c: TimeSeries 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -264,7 +258,6 @@ pub struct ModelSpec {
     pub lags: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deterministic: Option<String>,
-    // S4d: Survey 字段
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weights_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -273,6 +266,150 @@ pub struct ModelSpec {
     pub psu_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fpc_column: Option<String>,
+}
+
+// === 模型族类型（从 ModelSpec 转换，提供类型安全访问）=============================
+
+/// 线性模型族字段（OLS、GLS）。
+#[derive(Debug, Clone)]
+pub struct LinearSpec {
+    pub formula: String,
+    pub vcov: Option<VcovSpec>,
+    pub weights: Option<String>,
+    pub cluster_column: Option<String>,
+}
+
+/// IV/2SLS 模型族字段。
+#[derive(Debug, Clone)]
+pub struct IVSpec {
+    pub formula: String,
+    pub vcov: Option<VcovSpec>,
+    pub instruments: Vec<String>,
+    pub endog_columns: Vec<String>,
+    pub weights: Option<String>,
+    pub cluster_column: Option<String>,
+}
+
+/// 面板模型族字段。
+#[derive(Debug, Clone)]
+pub struct PanelSpec {
+    pub formula: String,
+    pub panel_id: String,
+    pub panel_time: String,
+    pub panel_method: Option<String>,
+    pub vcov: Option<VcovSpec>,
+    pub weights: Option<String>,
+}
+
+/// 因果推断模型族字段。
+#[derive(Debug, Clone)]
+pub struct CausalSpec {
+    pub treatment_column: String,
+    pub outcome_column: String,
+    pub propensity_formula: String,
+    pub outcome_formula: Option<String>,
+}
+
+/// 时间序列模型族字段。
+#[derive(Debug, Clone)]
+pub struct TimeSeriesSpec {
+    pub time_column: String,
+    pub variable: Option<String>,
+    pub variables: Option<Vec<String>>,
+    pub order: Option<Vec<i32>>,
+    pub seasonal_order: Option<Vec<i32>>,
+    pub ts_method: Option<String>,
+    pub lags: Option<i32>,
+    pub deterministic: Option<String>,
+}
+
+/// 调查模型族字段。
+#[derive(Debug, Clone)]
+pub struct SurveySpec {
+    pub formula: String,
+    pub weights_column: String,
+    pub strata_column: Option<String>,
+    pub psu_column: Option<String>,
+    pub fpc_column: Option<String>,
+}
+
+impl ModelSpec {
+    /// 提取为线性模型字段（OLS/GLS 共用）。
+    pub fn to_linear(&self) -> Result<LinearSpec, ValidationError> {
+        Ok(LinearSpec {
+            formula: self.formula.clone(),
+            vcov: self.vcov.clone(),
+            weights: self.weights.clone(),
+            cluster_column: self.cluster_column.clone(),
+        })
+    }
+
+    /// 提取为 IV 模型字段。
+    pub fn to_iv(&self) -> Result<IVSpec, ValidationError> {
+        Ok(IVSpec {
+            formula: self.formula.clone(),
+            vcov: self.vcov.clone(),
+            instruments: self.instruments.clone().unwrap_or_default(),
+            endog_columns: self.endog_columns.clone().unwrap_or_default(),
+            weights: self.weights.clone(),
+            cluster_column: self.cluster_column.clone(),
+        })
+    }
+
+    /// 提取为面板模型字段。
+    pub fn to_panel(&self) -> Result<PanelSpec, ValidationError> {
+        Ok(PanelSpec {
+            formula: self.formula.clone(),
+            panel_id: self.panel_id.clone().ok_or_else(|| missing_field("panel_id"))?,
+            panel_time: self.panel_time.clone().ok_or_else(|| missing_field("panel_time"))?,
+            panel_method: self.panel_method.clone(),
+            vcov: self.vcov.clone(),
+            weights: self.weights.clone(),
+        })
+    }
+
+    /// 提取为因果推断模型字段。
+    pub fn to_causal(&self) -> Result<CausalSpec, ValidationError> {
+        Ok(CausalSpec {
+            treatment_column: self.treatment_column.clone().ok_or_else(|| missing_field("treatment_column"))?,
+            outcome_column: self.outcome_column.clone().ok_or_else(|| missing_field("outcome_column"))?,
+            propensity_formula: self.propensity_formula.clone().ok_or_else(|| missing_field("propensity_formula"))?,
+            outcome_formula: self.outcome_formula.clone(),
+        })
+    }
+
+    /// 提取为时间序列模型字段。
+    pub fn to_time_series(&self) -> Result<TimeSeriesSpec, ValidationError> {
+        Ok(TimeSeriesSpec {
+            time_column: self.time_column.clone().ok_or_else(|| missing_field("time_column"))?,
+            variable: self.variable.clone(),
+            variables: self.variables.clone(),
+            order: self.order.clone(),
+            seasonal_order: self.seasonal_order.clone(),
+            ts_method: self.ts_method.clone(),
+            lags: self.lags,
+            deterministic: self.deterministic.clone(),
+        })
+    }
+
+    /// 提取为调查模型字段。
+    pub fn to_survey(&self) -> Result<SurveySpec, ValidationError> {
+        Ok(SurveySpec {
+            formula: self.formula.clone(),
+            weights_column: self.weights_column.clone().ok_or_else(|| missing_field("weights_column"))?,
+            strata_column: self.strata_column.clone(),
+            psu_column: self.psu_column.clone(),
+            fpc_column: self.fpc_column.clone(),
+        })
+    }
+}
+
+fn missing_field(name: &'static str) -> ValidationError {
+    ValidationError {
+        code: "RUNTIME_MISSING_FIELD",
+        message: format!("模型需要字段 `{}`。", name),
+        hint: Some(format!("请提供 {}。", name)),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -93,6 +93,9 @@ MetricaBase.dof(result::OLSFitResult) = length(result.response_vector) - length(
 MetricaBase.r2(result::OLSFitResult) = result.glance_table.metrics[:r2]
 MetricaBase.fitted(result::OLSFitResult) = result.fitted_values
 MetricaBase.residuals(result::OLSFitResult) = result.residual_vector
+MetricaBase.design_matrix(result::OLSFitResult) = result.design_matrix
+MetricaBase.response(result::OLSFitResult) = result.response_vector
+MetricaBase.coefficient_names(result::OLSFitResult) = result.coefficient_names
 
 function MetricaBase.predict(result::OLSFitResult;
                              newdata::Union{Nothing,Matrix{Float64}}=nothing,

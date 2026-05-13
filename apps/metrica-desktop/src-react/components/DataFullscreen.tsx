@@ -5,7 +5,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import { useDatasetStore } from '../stores/datasetStore';
 import { useAppStore } from '../stores/appStore';
-import { inspectDataset } from '../services/runtimeClient';
+import { loadFullPreview } from '../services/commandExecutor';
 import { DataOperationsPanel } from './DataOperationsPanel';
 import { downloadText } from '../stores/exportStore';
 import 'ag-grid-community/styles/ag-grid.css';
@@ -48,7 +48,7 @@ export const DataFullscreen: React.FC = () => {
 
     setIsLoadingFullRows(true);
     setFullRowsError(null);
-    inspectDataset(activePath)
+    loadFullPreview(activePath)
       .then((nextSummary) => {
         if (cancelled) return;
         if (nextSummary.preview.length > summary.preview.length) {
@@ -140,43 +140,43 @@ export const DataFullscreen: React.FC = () => {
   };
 
   return (
-    <div style={{ flex: 1, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, background: '#f5f7fb' }}>
+    <div style={{ flex: 1, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column', padding: 0, background: 'var(--m-page-bg)' }}>
       <style>{`
         .metrica-data-grid .ag-root-wrapper {
-          border: 1px solid #dfe5ef;
+          border: 1px solid var(--m-border-strong);
           border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+          box-shadow: var(--m-shadow-lg);
         }
         .metrica-data-grid .ag-header {
-          background: linear-gradient(180deg, #ffffff 0%, #f3f6fb 100%);
-          border-bottom: 1px solid #dfe5ef;
-          color: #111827;
+          background: linear-gradient(180deg, var(--m-surface) 0%, var(--m-surface-hover) 100%);
+          border-bottom: 1px solid var(--m-border-strong);
+          color: var(--m-text-primary);
           font-weight: 800;
         }
         .metrica-data-grid .ag-row {
-          border-bottom-color: #edf1f7;
+          border-bottom-color: var(--m-border);
           font-size: 13px;
         }
         .metrica-data-grid .ag-row-hover {
-          background-color: #eef6ff !important;
+          background-color: var(--m-completion-item-hover) !important;
         }
         .metrica-data-grid .ag-cell {
           display: flex;
           align-items: center;
-          color: #1f2937;
+          color: var(--m-text-primary);
         }
         .metrica-data-grid .metrica-row-index {
-          color: #94a3b8;
+          color: var(--m-text-muted);
           font-weight: 700;
-          background: #f8fafc;
+          background: var(--m-surface-hover);
           justify-content: center;
         }
         .metrica-data-grid .metrica-missing-cell {
-          color: #c2410c;
+          color: var(--m-error);
           font-weight: 700;
           font-style: italic;
-          background: linear-gradient(90deg, rgba(251, 146, 60, 0.13), rgba(255, 255, 255, 0));
+          background: linear-gradient(90deg, var(--m-accent-light), transparent);
         }
       `}</style>
 
@@ -185,8 +185,8 @@ export const DataFullscreen: React.FC = () => {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '16px 26px 12px',
-        borderBottom: '1px solid #e2e8f0',
-        background: 'rgba(255, 255, 255, 0.88)',
+        borderBottom: '1px solid var(--m-border)',
+        background: 'var(--m-surface)',
         backdropFilter: 'blur(12px)',
       }}>
         <Space size={14}>
@@ -220,8 +220,8 @@ export const DataFullscreen: React.FC = () => {
         gap: 8,
         overflowX: 'auto',
         padding: '12px 26px 10px',
-        borderBottom: '1px solid #e2e8f0',
-        background: '#f8fafc',
+        borderBottom: '1px solid var(--m-border)',
+        background: 'var(--m-surface-hover)',
       }}>
         {visibleColumns.map((col, idx) => {
           const missing = col.missing_count ?? col.missing ?? 0;
@@ -232,8 +232,8 @@ export const DataFullscreen: React.FC = () => {
               type="button"
               onClick={() => setSelectedColIndex(idx)}
               style={{
-                border: active ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                background: active ? '#eff6ff' : '#ffffff',
+                border: active ? '1px solid var(--m-accent)' : '1px solid var(--m-border)',
+                background: active ? 'var(--m-info-bg)' : 'var(--m-surface)',
                 borderRadius: 16,
                 padding: '10px 14px',
                 minWidth: 128,
@@ -242,7 +242,7 @@ export const DataFullscreen: React.FC = () => {
                 boxShadow: active ? '0 14px 30px rgba(37, 99, 235, 0.14)' : '0 6px 18px rgba(15, 23, 42, 0.04)',
               }}
             >
-              <div style={{ fontWeight: 850, color: '#0f172a', marginBottom: 6 }}>{col.name}</div>
+              <div style={{ fontWeight: 850, color: 'var(--m-text-primary)', marginBottom: 6 }}>{col.name}</div>
               <Space size={6}>
                 <Tag color="blue" style={{ marginInlineEnd: 0 }}>{col.inferred_type || col.type || '?'}</Tag>
                 {missing > 0 ? <Tag color="orange" style={{ marginInlineEnd: 0 }}>缺失 {missing}</Tag> : null}
@@ -263,8 +263,8 @@ export const DataFullscreen: React.FC = () => {
           defaultColDef={{ flex: 1, minWidth: 120, filter: true, sortable: true, resizable: true }}
           key={showFilters ? 'filters-on' : 'filters-off'}
           getRowStyle={(params) => params.node.rowIndex !== null && params.node.rowIndex % 2 === 1
-            ? { background: '#f8fafc' }
-            : { background: '#ffffff' }}
+            ? { background: 'var(--m-surface-hover)' }
+            : { background: 'var(--m-surface)' }}
           onCellClicked={(e) => {
             if (e.colDef.field && e.colDef.field !== '_idx') {
               const match = e.colDef.field.match(/^col_(\d+)$/);
@@ -279,8 +279,8 @@ export const DataFullscreen: React.FC = () => {
       {selectedCol && (
         <div style={{
           padding: '10px 26px',
-          borderTop: '1px solid #e2e8f0',
-          background: '#ffffff',
+          borderTop: '1px solid var(--m-border)',
+          background: 'var(--m-surface)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',

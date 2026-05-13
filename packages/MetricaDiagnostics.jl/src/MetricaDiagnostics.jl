@@ -3,7 +3,7 @@ module MetricaDiagnostics
 using Distributions
 using LinearAlgebra
 using Statistics
-using MetricaLinear
+using MetricaBase
 
 export vif, breusch_pagan, white_test, durbin_watson, breusch_godfrey, reset_test, jarque_bera, diagnostics_to_dict
 
@@ -12,12 +12,38 @@ function is_intercept_name(name::Symbol)
     return normalized == "intercept" || normalized == "(intercept)"
 end
 
+# === 内部辅助：从拟合结果安全提取所需数据 ========================================
+
+function _check_design_matrix(fit::AbstractFittedModel)
+    X = design_matrix(fit)
+    isnothing(X) && throw(ArgumentError("该模型类型不支持设计矩阵提取。诊断检验当前仅适用于提供设计矩阵的模型。"))
+    return X
+end
+
+function _check_residuals(fit::AbstractFittedModel)
+    r = residuals(fit)
+    isnothing(r) && throw(ArgumentError("该模型类型不支持残差提取。"))
+    return r
+end
+
+function _check_response(fit::AbstractFittedModel)
+    y = response(fit)
+    isnothing(y) && throw(ArgumentError("该模型类型不支持响应向量提取。"))
+    return y
+end
+
+function _check_fitted(fit::AbstractFittedModel)
+    f = fitted(fit)
+    isnothing(f) && throw(ArgumentError("该模型类型不支持拟合值提取。"))
+    return f
+end
+
 # === VIF =======================================================================
 # 方差膨胀因子 — 检测多重共线性
 
-function vif(fit::MetricaLinear.OLSFitResult)
-    names = fit.coefficient_names
-    X = fit.design_matrix
+function vif(fit::AbstractFittedModel)
+    names = coefficient_names(fit)
+    X = _check_design_matrix(fit)
     results = NamedTuple[]
 
     for index in eachindex(names)
@@ -46,11 +72,11 @@ end
 # === Breusch-Pagan =============================================================
 # 异方差检验（线性形式）
 
-function breusch_pagan(fit::MetricaLinear.OLSFitResult)
-    residuals = fit.residual_vector
-    X = fit.design_matrix
-    nobs = length(residuals)
-    squared_residuals = residuals .^ 2
+function breusch_pagan(fit::AbstractFittedModel)
+    r = _check_residuals(fit)
+    X = _check_design_matrix(fit)
+    nobs = length(r)
+    squared_residuals = r .^ 2
     coefficients = X \ squared_residuals
     fitted = X * coefficients
     rss = sum(abs2, squared_residuals - fitted)
@@ -75,27 +101,25 @@ df = 辅助回归矩阵非截距列数 = 原始非截距列数 + 平方项列数
 
 返回 `(statistic, pvalue, dof)`。
 """
-function white_test(fit::MetricaLinear.OLSFitResult)
-    residuals = fit.residual_vector
-    X = fit.design_matrix
-    names = fit.coefficient_names
-    nobs = length(residuals)
+function white_test(fit::AbstractFittedModel)
+    r = _check_residuals(fit)
+    X = _check_design_matrix(fit)
+    names = coefficient_names(fit)
+    nobs = length(r)
 
-    # 找出非截距列的索引与列
     non_intercept_cols = Int[]
     for (i, name) in enumerate(names)
         is_intercept_name(name) && continue
         push!(non_intercept_cols, i)
     end
 
-    # 构造辅助回归矩阵：原始列 + 非截距列的平方
     aux_cols = [X[:, i] for i in 1:size(X, 2)]
     for i in non_intercept_cols
         push!(aux_cols, X[:, i] .^ 2)
     end
     Z = hcat(aux_cols...)
 
-    squared_residuals = residuals .^ 2
+    squared_residuals = r .^ 2
     coef = Z \ squared_residuals
     fitted = Z * coef
     rss = sum(abs2, squared_residuals - fitted)
@@ -124,17 +148,16 @@ DW 分布依赖样本量和设计矩阵结构，当前正态近似为粗略近�
 小样本或复杂设计矩阵下 p 值可能严重失真。
 建议参考 Durbin-Watson 界限检验表（dL, dU）获取精确推断。
 """
-function durbin_watson(fit::MetricaLinear.OLSFitResult)
-    residuals = fit.residual_vector
-    n = length(residuals)
+function durbin_watson(fit::AbstractFittedModel)
+    r = _check_residuals(fit)
+    n = length(r)
 
     n < 2 && return (statistic=NaN, pvalue=NaN, warnings=Dict{String,Any}[])
 
-    diff_sum = sum(abs2, residuals[2:end] - residuals[1:(end-1)])
-    residual_sum = sum(abs2, residuals)
+    diff_sum = sum(abs2, r[2:end] - r[1:(end-1)])
+    residual_sum = sum(abs2, r)
     dw = iszero(residual_sum) ? NaN : diff_sum / residual_sum
 
-    # 正态近似：DW ~ N(2, 4/n)
     pvalue = if !isnan(dw) && n >= 10
         se = 2 / sqrt(n)
         z = (dw - 2) / se
@@ -143,7 +166,6 @@ function durbin_watson(fit::MetricaLinear.OLSFitResult)
         nothing
     end
 
-    # 结构化警告：标记 p 值为粗略近似
     dw_warnings = Dict{String,Any}[]
     if pvalue !== nothing
         push!(dw_warnings, Dict(
@@ -170,22 +192,20 @@ Breusch-Godfrey 高阶自相关检验。
 
 返回 `(statistic, pvalue, dof)`。
 """
-function breusch_godfrey(fit::MetricaLinear.OLSFitResult; p::Int=2)
-    residuals = fit.residual_vector
-    X = fit.design_matrix
-    n = length(residuals)
+function breusch_godfrey(fit::AbstractFittedModel; p::Int=2)
+    r = _check_residuals(fit)
+    X = _check_design_matrix(fit)
+    n = length(r)
 
     n <= p && return (statistic=nothing, pvalue=nothing, dof=p)
 
-    # 构造滞后残差矩阵
     lagged_residuals = Matrix{Float64}(undef, n, p)
     for lag in 1:p
         lagged_residuals[1:lag, lag] .= 0.0
-        lagged_residuals[(lag+1):end, lag] = residuals[1:(n-lag)]
+        lagged_residuals[(lag+1):end, lag] = r[1:(n-lag)]
     end
 
-    # 截取有效观测（p+1 到 n）
-    y_aux = residuals[(p+1):end]
+    y_aux = r[(p+1):end]
     X_aux = X[(p+1):end, :]
     L_aux = lagged_residuals[(p+1):end, :]
     Z = hcat(X_aux, L_aux)
@@ -214,29 +234,27 @@ Ramsey RESET 检验（模型设定检验）。
 
 返回 `(statistic, pvalue, df_num, df_den)`。
 """
-function reset_test(fit::MetricaLinear.OLSFitResult; power::UnitRange{Int}=2:3)
-    y = fit.response_vector
-    X = fit.design_matrix
-    fitted = fit.fitted_values
-    residuals = fit.residual_vector
+function reset_test(fit::AbstractFittedModel; power::UnitRange{Int}=2:3)
+    y = _check_response(fit)
+    X = _check_design_matrix(fit)
+    f = _check_fitted(fit)
+    r = _check_residuals(fit)
     n = length(y)
     k = size(X, 2)
 
-    # 构造辅助回归矩阵 [X, ŷ^p for p in power]
     aux_cols = [X[:, i] for i in 1:k]
     for p in power
-        push!(aux_cols, fitted .^ p)
+        push!(aux_cols, f .^ p)
     end
     Z = hcat(aux_cols...)
-    r = length(power)  # 约束数
+    r = length(power)
 
     coef_aux = Z \ y
     fitted_aux = Z * coef_aux
     rss_unrestricted = sum(abs2, y - fitted_aux)
 
-    rss_restricted = sum(abs2, residuals)
+    rss_restricted = sum(abs2, r)
 
-    # F = ((RSS_R - RSS_UR) / r) / (RSS_UR / (n - k - r))
     f_stat = ((rss_restricted - rss_unrestricted) / r) / (rss_unrestricted / (n - k - r))
     df_num = r
     df_den = n - k - r
@@ -263,18 +281,18 @@ JB = n/6 · (S² + (K-3)²/4)，其中 S 为偏度，K 为峰度。
 
 返回 `(statistic, pvalue, skewness, kurtosis)`。
 """
-function jarque_bera(fit::MetricaLinear.OLSFitResult)
-    residuals = fit.residual_vector
-    n = length(residuals)
+function jarque_bera(fit::AbstractFittedModel)
+    r = _check_residuals(fit)
+    n = length(r)
 
     n < 5 && return (statistic=NaN, pvalue=NaN, skewness=NaN, kurtosis=NaN)
 
-    m2 = var(residuals; corrected=false)  # 二阶中心矩（总体方差）
-    m3 = mean((residuals .- mean(residuals)) .^ 3)  # 三阶中心矩
-    m4 = mean((residuals .- mean(residuals)) .^ 4)  # 四阶中心矩
+    m2 = var(r; corrected=false)
+    m3 = mean((r .- mean(r)) .^ 3)
+    m4 = mean((r .- mean(r)) .^ 4)
 
-    S = m3 / (m2^(3/2))  # 偏度
-    K = m4 / (m2^2)      # 峰度
+    S = m3 / (m2^(3/2))
+    K = m4 / (m2^2)
 
     statistic = (n / 6) * (S^2 + (K - 3)^2 / 4)
     pvalue = 1 - cdf(Chisq(2), statistic)

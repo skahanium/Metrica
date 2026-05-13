@@ -21,7 +21,7 @@ export const TransformResultBlock: React.FC<TransformResultBlockProps> = ({ comm
   };
 
   return (
-    <div style={{ marginBottom: 16, background: '#fff', borderRadius: 12, border: '1px solid #e5edf7', padding: 16, boxShadow: '0 12px 30px rgba(15, 23, 42, 0.05)' }}>
+    <div style={{ marginBottom: 16, background: 'var(--m-surface)', borderRadius: 12, border: '1px solid var(--m-border)', padding: 16, boxShadow: 'var(--m-shadow-sm)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Space>
           <Tag color={statusColor}>transform</Tag>
