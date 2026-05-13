@@ -177,8 +177,15 @@ function MetricaBase.fit(::Type{GLSModel}, formula::AbstractString, data;
     dropped_rows = n_total - n_effective
     dropped_rows > 0 && push!(warnings, build_rows_dropped_warning(dropped_rows))
 
+    # Wald 检验（系数联合显著性）
+    model_ss = tss - rss
+    model_df = ncoef - 1
+    wald_stat = (model_ss / model_df) / (rss / dof_val)
+    wald_pvalue = 1 - cdf(FDist(model_df, dof_val), wald_stat)
+
     glance_table = MetricaBase.ModelGlance(:gls, nobs, dof_val,
-        Dict{Symbol, MetricaBase.MetricValue}(:r2 => r2_val, :adj_r2 => adj_r2, :rss => rss, :tss => tss, :sigma => sigma),
+        Dict{Symbol, MetricaBase.MetricValue}(:r2 => r2_val, :adj_r2 => adj_r2, :rss => rss, :tss => tss, :sigma => sigma,
+            :wald_stat => wald_stat, :wald_pvalue => wald_pvalue),
         warnings)
 
     tidy_table = assemble_tidy_table(coefficients, stderror, coefficient_names, dof_val, vcov)

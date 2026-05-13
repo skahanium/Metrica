@@ -11,6 +11,8 @@ const COLUMNS: TableColumnsType<TidyRow> = [
   { dataIndex: 'std_error', title: '标准误', align: 'right', render: (v: number | null) => v != null ? v.toFixed(6) : '—' },
   { dataIndex: 'statistic', title: '统计量', align: 'right', render: (v: number | null) => v != null ? v.toFixed(4) : '—' },
   { dataIndex: 'p_value', title: 'p 值', align: 'right', render: (v: number | null) => v != null ? v.toFixed(4) : '—' },
+  { dataIndex: 'ci_lower', title: 'CI 下限', align: 'right', render: (v: number | null | undefined) => v != null ? v.toFixed(6) : '—' },
+  { dataIndex: 'ci_upper', title: 'CI 上限', align: 'right', render: (v: number | null | undefined) => v != null ? v.toFixed(6) : '—' },
 ];
 
 /** 将后端字段名 (name/stderror/pvalue) 映射为前端 TidyRow 字段名 */

@@ -57,7 +57,7 @@ export const handleUse: CmdHandler = (parsed, _input, feedback) => {
     setError(null);
   };
 
-  if (raw === 'clear') { clearAll(); return true; }
+  if (raw === 'clear') { clearAll(); feedback('success', '已清空当前数据集'); return true; }
 
   let filePath = raw.replace(/^["']|["']$/g, '');
   if (!filePath) {
@@ -67,7 +67,7 @@ export const handleUse: CmdHandler = (parsed, _input, feedback) => {
         if (result.cancelled || !result.path) return false;
         filePath = result.path;
       } catch (e: unknown) {
-        feedback('warning', (e as Error).message || '文件选择失败');
+        feedback('error', (e as Error).message || '文件选择失败');
         return false;
       }
       setLoading(true);
@@ -79,7 +79,19 @@ export const handleUse: CmdHandler = (parsed, _input, feedback) => {
         ds.clearBrowseContext();
         useAppStore.getState().setDataFullscreen(false);
         setError(null);
-      } catch (e: unknown) { setError((e as Error).message || '数据加载失败'); }
+        const fileName = filePath.split('/').pop() || filePath;
+        feedback('success', `已加载 ${fileName}（${r.nrows} 行 × ${r.ncols} 列）`);
+        try {
+          const describeResult = await api.runDataCommand({
+            datasetPath: filePath,
+            command: { kind: 'describe' },
+          });
+          useMessageStore.getState().addMessage({ kind: 'data', command: 'describe', data_result: describeResult as import('../types/protocol').DataResult });
+        } catch { /* describe 失败不阻塞导入流程 */ }
+      } catch (e: unknown) {
+        feedback('error', (e as Error).message || '数据加载失败');
+        setError((e as Error).message || '数据加载失败');
+      }
       finally { setLoading(false); }
       return true;
     })();
@@ -95,7 +107,19 @@ export const handleUse: CmdHandler = (parsed, _input, feedback) => {
       ds.clearBrowseContext();
       useAppStore.getState().setDataFullscreen(false);
       setError(null);
-    } catch (e: unknown) { setError((e as Error).message || '数据加载失败'); }
+      const fileName = filePath.split('/').pop() || filePath;
+      feedback('success', `已加载 ${fileName}（${r.nrows} 行 × ${r.ncols} 列）`);
+      try {
+        const describeResult = await api.runDataCommand({
+          datasetPath: filePath,
+          command: { kind: 'describe' },
+        });
+        useMessageStore.getState().addMessage({ kind: 'data', command: 'describe', data_result: describeResult as import('../types/protocol').DataResult });
+      } catch { /* describe 失败不阻塞导入流程 */ }
+    } catch (e: unknown) {
+      feedback('error', (e as Error).message || '数据加载失败');
+      setError((e as Error).message || '数据加载失败');
+    }
     finally { setLoading(false); }
     return true;
   })();

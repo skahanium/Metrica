@@ -383,7 +383,13 @@ end
 
     @test haskey(glance(iv_result).metrics, :r2)
     @test haskey(glance(iv_result).metrics, :sigma)
+    @test haskey(glance(iv_result).metrics, :f_stat)
+    @test haskey(glance(iv_result).metrics, :f_pvalue)
+    @test glance(iv_result).metrics[:f_stat] >= 0.0
+    @test 0.0 <= glance(iv_result).metrics[:f_pvalue] <= 1.0
     @test all(row -> row.pvalue !== nothing, tidy(iv_result).rows)
+    @test all(row -> row.ci_lower !== nothing && row.ci_upper !== nothing, tidy(iv_result).rows)
+    @test all(row -> row.ci_lower <= row.estimate <= row.ci_upper, tidy(iv_result).rows)
 
     at = augment(iv_result)
     @test at isa AugmentTable
@@ -668,6 +674,43 @@ end
     end
 end
 
+@testset "GLS tidy 置信区间与 Wald 检验" begin
+    identity_omega = r -> Matrix{Float64}(I, length(r), length(r))
+    gls_result = fit(GLSModel, "y ~ x1 + x2", DEMO_CSV; omega_fn=identity_omega)
+    ols_result = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+
+    # 置信区间应已填充
+    @test all(row -> row.ci_lower !== nothing, tidy(gls_result).rows)
+    @test all(row -> row.ci_upper !== nothing, tidy(gls_result).rows)
+
+    # ci_lower < estimate < ci_upper
+    for row in tidy(gls_result).rows
+        @test row.ci_lower < row.estimate < row.ci_upper
+    end
+
+    # 置信区间应对称：estimate - ci_lower == ci_upper - estimate
+    for row in tidy(gls_result).rows
+        @test row.estimate - row.ci_lower ≈ row.ci_upper - row.estimate atol=1e-12
+    end
+
+    # 半宽 = t_crit * stderror
+    α = 0.05
+    t_crit = quantile(TDist(7 - 3), 1 - α / 2)
+    for (gr, or_) in zip(tidy(gls_result).rows, tidy(ols_result).rows)
+        @test gr.ci_lower ≈ gr.estimate - t_crit * gr.stderror atol=1e-12
+        @test gr.ci_upper ≈ gr.estimate + t_crit * gr.stderror atol=1e-12
+        # GLS（Ω=I）应与 OLS 置信区间一致
+        @test gr.ci_lower ≈ or_.ci_lower atol=1e-10
+        @test gr.ci_upper ≈ or_.ci_upper atol=1e-10
+    end
+
+    # Wald 检验
+    @test haskey(glance(gls_result).metrics, :wald_stat)
+    @test haskey(glance(gls_result).metrics, :wald_pvalue)
+    @test glance(gls_result).metrics[:wald_stat] > 0
+    @test 0.0 <= glance(gls_result).metrics[:wald_pvalue] <= 1.0
+end
+
 @testset "黄金样例与模型比较载荷" begin
     # OLS 黄金样例：demo.csv 已知值对齐
     ols = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
@@ -713,4 +756,33 @@ end
     @test length(coef(iv)) == 2
     @test all(isfinite(last(p)) for p in coef(iv))
     rm(iv_csv; force=true)
+end
+
+@testset "OLS F 检验与 ANOVA 表" begin
+    ols = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
+    
+    # F 统计量 > 0
+    @test glance(ols).metrics[:f_stat] > 0
+    
+    # f_pvalue 在 [0, 1] 范围内
+    f_pvalue = glance(ols).metrics[:f_pvalue]
+    @test 0.0 <= f_pvalue <= 1.0
+    
+    # ci_lower < estimate < ci_upper
+    for row in tidy(ols).rows
+        @test row.ci_lower < row.estimate < row.ci_upper
+    end
+    
+    # ANOVA 表一致性
+    model_ss = glance(ols).metrics[:model_ss]
+    resid_ss = glance(ols).metrics[:resid_ss]
+    total_ss = glance(ols).metrics[:total_ss]
+    @test model_ss + resid_ss ≈ total_ss atol=1e-10
+    
+    # 自由度一致性
+    model_df = glance(ols).metrics[:model_df]
+    resid_df = glance(ols).metrics[:resid_df]
+    total_df = glance(ols).metrics[:total_df]
+    @test model_df + resid_df == total_df
+    @test total_df == nobs(ols) - 1
 end

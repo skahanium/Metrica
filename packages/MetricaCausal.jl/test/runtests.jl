@@ -446,3 +446,164 @@ end
     @test haskey(MetricaBase.MODEL_REGISTRY, "psm")
     @test haskey(MetricaBase.MODEL_REGISTRY, "aipw")
 end
+
+# === Task 20-21: R²/F/CI 补全验证 ============================================
+
+@testset "DID R²/F 统计量" begin
+    n = 40
+    df = DataFrame(
+        id = repeat(1:10, inner=4),
+        time = repeat(1:4, outer=10),
+        treated = Float64.(repeat([0, 0, 1, 1], inner=10)),
+        x1 = ones(n),
+    )
+    df.post = Float64.(df.time .>= 3)
+    df.y = 3.0 .+ 0.5 .* df.treated .+ 0.3 .* df.post .+ 2.0 .* df.treated .* df.post .+ 0.1 .* df.x1
+
+    result = MetricaBase.fit(DIDModel, "y ~ treated * post + x1", df;
+        panel_id=:id, panel_time=:time, treated_column=:treated, post_column=:post)
+
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :r2)
+    @test haskey(g.metrics, :adj_r2)
+    @test haskey(g.metrics, :f_stat)
+    @test haskey(g.metrics, :f_pvalue)
+    @test 0.0 <= g.metrics[:r2] <= 1.0
+    @test g.metrics[:f_stat] > 0
+    @test 0.0 <= g.metrics[:f_pvalue] <= 1.0
+    @test MetricaBase.r2(result) == g.metrics[:r2]
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        if row.stderror > 1e-15
+            @test row.ci_lower < row.estimate
+            @test row.ci_upper > row.estimate
+        end
+    end
+end
+
+@testset "EventStudy R²/F 统计量和置信区间" begin
+    n = 60
+    df = DataFrame(
+        id = repeat(1:10, inner=6),
+        time = repeat(1:6, outer=10),
+        treated = Float64.(repeat([0, 0, 1, 1], inner=15)),
+        event_time = repeat([4, 4, 4, 4], inner=15),
+        x1 = ones(n),
+    )
+    df.y = 2.0 .+ 1.0 .* df.treated .* Float64.(df.time .>= 4) .+ 0.1 .* df.x1
+
+    result = MetricaBase.fit(EventStudyModel, "y ~ treated + x1", df;
+        panel_id=:id, panel_time=:time, treated_column=:treated,
+        event_time_column=:event_time, pre_periods=2, post_periods=2)
+
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :r2)
+    @test haskey(g.metrics, :f_stat)
+    @test haskey(g.metrics, :f_pvalue)
+    @test 0.0 <= g.metrics[:r2] <= 1.0
+    @test MetricaBase.r2(result) == g.metrics[:r2]
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        if row.stderror > 1e-15
+            @test row.ci_lower < row.estimate
+            @test row.ci_upper > row.estimate
+        end
+    end
+end
+
+@testset "IPW 置信区间" begin
+    n = 500
+    Random.seed!(999)
+    x1 = randn(n); x2 = randn(n)
+    ps = 1.0 ./ (1.0 .+ exp.(-(0.5 .+ 0.8*x1 .- 0.3*x2)))
+    treat = Float64.(rand(n) .< ps)
+    y0 = 2.0 .+ 0.5*x1 .+ 0.2*x2 .+ randn(n)*0.3
+    y1 = y0 .+ 1.5
+    y = treat.*y1 .+ (1 .- treat).*y0
+    df = DataFrame(treat=treat, y=y, x1=x1, x2=x2)
+
+    result = MetricaBase.fit(IPWModel, "", df;
+        treatment_column=:treat, outcome_column=:y, propensity_formula="treat ~ x1 + x2")
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate
+        @test row.ci_upper > row.estimate
+    end
+end
+
+@testset "PSM 置信区间" begin
+    n = 500
+    Random.seed!(999)
+    x1 = randn(n); x2 = randn(n)
+    ps = 1.0 ./ (1.0 .+ exp.(-(0.5 .+ 0.8*x1 .- 0.3*x2)))
+    treat = Float64.(rand(n) .< ps)
+    y0 = 2.0 .+ 0.5*x1 .+ 0.2*x2 .+ randn(n)*0.3
+    y1 = y0 .+ 1.5
+    y = treat.*y1 .+ (1 .- treat).*y0
+    df = DataFrame(treat=treat, y=y, x1=x1, x2=x2)
+
+    result = MetricaBase.fit(PSMModel, "", df;
+        treatment_column=:treat, outcome_column=:y, propensity_formula="treat ~ x1 + x2")
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate
+        @test row.ci_upper > row.estimate
+    end
+end
+
+@testset "AIPW 置信区间" begin
+    n = 500
+    Random.seed!(999)
+    x1 = randn(n); x2 = randn(n)
+    ps = 1.0 ./ (1.0 .+ exp.(-(0.5 .+ 0.8*x1 .- 0.3*x2)))
+    treat = Float64.(rand(n) .< ps)
+    y0 = 2.0 .+ 0.5*x1 .+ 0.2*x2 .+ randn(n)*0.3
+    y1 = y0 .+ 1.5
+    y = treat.*y1 .+ (1 .- treat).*y0
+    df = DataFrame(treat=treat, y=y, x1=x1, x2=x2)
+
+    result = MetricaBase.fit(AIPWModel, "", df;
+        treatment_column=:treat, outcome_column=:y,
+        outcome_formula="y ~ x1 + x2", propensity_formula="treat ~ x1 + x2")
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate
+        @test row.ci_upper > row.estimate
+    end
+end
+
+@testset "因果模型序列化包含 CI" begin
+    n = 500
+    Random.seed!(999)
+    x1 = randn(n)
+    ps = 1.0 ./ (1.0 .+ exp.(-(0.5 .+ 0.8*x1)))
+    treat = Float64.(rand(n) .< ps)
+    y0 = 2.0 .+ 0.5*x1 .+ randn(n)*0.3
+    y1 = y0 .+ 1.5
+    y = treat.*y1 .+ (1 .- treat).*y0
+    df = DataFrame(treat=treat, y=y, x1=x1)
+
+    result = MetricaBase.fit(IPWModel, "", df;
+        treatment_column=:treat, outcome_column=:y, propensity_formula="treat ~ x1")
+    payload = MetricaCausal.result_to_payload(result)
+    tidy_payload = payload["result_payload"]["tidy"]
+    @test haskey(tidy_payload[1], "ci_lower")
+    @test haskey(tidy_payload[1], "ci_upper")
+    @test tidy_payload[1]["ci_lower"] < tidy_payload[1]["estimate"]
+    @test tidy_payload[1]["ci_upper"] > tidy_payload[1]["estimate"]
+end

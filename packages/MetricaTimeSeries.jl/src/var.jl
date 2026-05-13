@@ -161,7 +161,8 @@ function MetricaBase.fit(model::VARModel, data::DataFrame)
         MetricaBase.ModelWarning[]
     )
 
-    # 构建 tidy 表
+    # 构建 tidy 表（含 95% 置信区间）
+    z_95 = 1.96
     coef_rows = MetricaBase.CoefRow[]
     row_idx = 1
     for lag in 1:model.lags
@@ -171,9 +172,11 @@ function MetricaBase.fit(model::VARModel, data::DataFrame)
                 se = std_errors[row_idx, dep_idx]
                 t_stat = se > 0 ? est / se : 0.0
                 p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
+                ci_l = se > 0 ? est - z_95 * se : nothing
+                ci_u = se > 0 ? est + z_95 * se : nothing
 
                 term = Symbol("$(var_name)_lag$(lag)_to_$(dep_name)")
-                push!(coef_rows, MetricaBase.CoefRow(term, est, se, t_stat, p_value))
+                push!(coef_rows, MetricaBase.CoefRow(term, est, se, t_stat, p_value, ci_l, ci_u))
             end
             row_idx += 1
         end
@@ -186,8 +189,10 @@ function MetricaBase.fit(model::VARModel, data::DataFrame)
             se = std_errors[row_idx, dep_idx]
             t_stat = se > 0 ? est / se : 0.0
             p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
+            ci_l = se > 0 ? est - z_95 * se : nothing
+            ci_u = se > 0 ? est + z_95 * se : nothing
 
-            push!(coef_rows, MetricaBase.CoefRow(Symbol("constant_to_$(dep_name)"), est, se, t_stat, p_value))
+            push!(coef_rows, MetricaBase.CoefRow(Symbol("constant_to_$(dep_name)"), est, se, t_stat, p_value, ci_l, ci_u))
         end
     end
 
@@ -436,6 +441,32 @@ function result_to_payload(result::VARFitResult; include_augment::Bool=true)
         "sigma" => result.sigma,
     )
 
+    # Granger 因果检验（所有变量对）
+    var_syms = [Symbol(v) for v in result.variable_names]
+    granger_results = Dict{String, Any}()
+    for cause in var_syms
+        for effect in var_syms
+            if cause != effect
+                gc = granger_causality(result, cause, effect)
+                key = "$(cause)_to_$(effect)"
+                granger_results[key] = Dict(
+                    "f_stat" => gc.f_stat,
+                    "p_value" => gc.p_value,
+                    "conclusion" => gc.conclusion,
+                )
+            end
+        end
+    end
+    payload["granger_causality"] = granger_results
+
+    # 脉冲响应函数
+    irf = impulse_response(result, periods=20)
+    payload["irf"] = irf
+
+    # 方差分解
+    vd = variance_decomposition(result, periods=20)
+    payload["variance_decomposition"] = vd
+
     payload["glance"] = Dict(
         "model" => string(result.glance_table.model),
         "nobs" => result.glance_table.nobs,
@@ -449,7 +480,9 @@ function result_to_payload(result::VARFitResult; include_augment::Bool=true)
                 "estimate" => row.estimate,
                 "stderror" => row.stderror,
                 "statistic" => row.statistic,
-                "p_value" => row.pvalue
+                "p_value" => row.pvalue,
+                "ci_lower" => row.ci_lower,
+                "ci_upper" => row.ci_upper,
             )
             for row in result.tidy_table.rows
         ]

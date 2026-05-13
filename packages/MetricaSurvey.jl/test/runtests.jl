@@ -357,3 +357,81 @@ end
     @test MetricaBase.MODEL_REGISTRY["survey_ols"] == SurveyOLSModel
     @test MetricaBase.MODEL_REGISTRY["survey_logit"] == SurveyLogitModel
 end
+
+# === Task 22-23: Wald F 和置信区间验证 =========================================
+
+@testset "Survey OLS Wald F 检验" begin
+    df = make_survey_data()
+    result = MetricaBase.fit(SurveyOLSModel, "y ~ x1 + x2", df;
+        weights_column=:wt, strata_column=:stratum, psu_column=:psu)
+
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :wald_f)
+    @test haskey(g.metrics, :wald_pvalue)
+    @test g.metrics[:wald_f] > 0
+    @test 0.0 <= g.metrics[:wald_pvalue] <= 1.0
+end
+
+@testset "Survey OLS 置信区间" begin
+    df = make_survey_data()
+    result = MetricaBase.fit(SurveyOLSModel, "y ~ x1 + x2", df;
+        weights_column=:wt, strata_column=:stratum, psu_column=:psu)
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate
+        @test row.ci_upper > row.estimate
+    end
+end
+
+@testset "Survey Logit Wald F 和置信区间" begin
+    df = make_survey_data()
+    result = MetricaBase.fit(SurveyLogitModel, "y_bin ~ x1 + x2", df;
+        weights_column=:wt, strata_column=:stratum, psu_column=:psu)
+
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :wald_f)
+    @test haskey(g.metrics, :wald_pvalue)
+    @test g.metrics[:wald_f] > 0
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate
+        @test row.ci_upper > row.estimate
+    end
+end
+
+@testset "Survey Poisson Wald F 和置信区间" begin
+    df = make_survey_data()
+    df.y_count = round.(Int, max.(df.y .+ 5, 1))
+    result = MetricaBase.fit(SurveyPoissonModel, "y_count ~ x1 + x2", df;
+        weights_column=:wt)
+
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :wald_f)
+    @test haskey(g.metrics, :wald_pvalue)
+
+    t = MetricaBase.tidy(result)
+    for row in t.rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate
+        @test row.ci_upper > row.estimate
+    end
+end
+
+@testset "Survey 序列化包含 CI" begin
+    df = make_survey_data()
+    result = MetricaBase.fit(SurveyOLSModel, "y ~ x1 + x2", df;
+        weights_column=:wt, strata_column=:stratum, psu_column=:psu)
+    payload = result_to_payload(result; include_augment=false)
+    tidy_payload = payload["result_payload"]["tidy"]
+    @test haskey(tidy_payload[1], "ci_lower")
+    @test haskey(tidy_payload[1], "ci_upper")
+    @test tidy_payload[1]["ci_lower"] < tidy_payload[1]["estimate"]
+    @test tidy_payload[1]["ci_upper"] > tidy_payload[1]["estimate"]
+end

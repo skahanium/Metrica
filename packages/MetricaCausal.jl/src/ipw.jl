@@ -55,10 +55,14 @@ function MetricaBase.fit(::Type{IPWModel}, formula::AbstractString, data;
         Dict{Symbol, MetricaBase.MetricValue}(:ate => ate, :att => att, :atu => atu),
         MetricaBase.ModelWarning[])
 
+    z_crit = quantile(Normal(), 0.975)
     tidy_rows = [
-        MetricaBase.CoefRow(:ATE, ate, ate_se, ate/ate_se, 2*(1-cdf(Normal(), abs(ate/ate_se)))),
-        MetricaBase.CoefRow(:ATT, att, att_se, att/att_se, 2*(1-cdf(Normal(), abs(att/att_se)))),
-        MetricaBase.CoefRow(:ATU, atu, atu_se, atu/atu_se, 2*(1-cdf(Normal(), abs(atu/atu_se))))
+        MetricaBase.CoefRow(:ATE, ate, ate_se, ate/ate_se, 2*(1-cdf(Normal(), abs(ate/ate_se))),
+            ate - z_crit * ate_se, ate + z_crit * ate_se),
+        MetricaBase.CoefRow(:ATT, att, att_se, att/att_se, 2*(1-cdf(Normal(), abs(att/att_se))),
+            att - z_crit * att_se, att + z_crit * att_se),
+        MetricaBase.CoefRow(:ATU, atu, atu_se, atu/atu_se, 2*(1-cdf(Normal(), abs(atu/atu_se))),
+            atu - z_crit * atu_se, atu + z_crit * atu_se)
     ]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "IPW (robust sandwich)")
 

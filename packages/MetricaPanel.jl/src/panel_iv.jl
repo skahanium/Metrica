@@ -186,18 +186,28 @@ function fit_panel_iv(panel_data::MetricaBase.PanelData, formula::String;
     adj_r2 = iszero(tss) ? 1.0 : 1 - (rss / dof_val) / (tss / (nobs - 1))
     sigma = sqrt(rss / dof_val)
 
+    # 对数似然、AIC、BIC
+    loglik = -nobs / 2.0 * (1.0 + log(2π) + log(rss / nobs))
+    k_params = ncoef + 1
+    aic_val = -2.0 * loglik + 2.0 * k_params
+    bic_val = -2.0 * loglik + k_params * log(nobs)
+
     warnings = MetricaBase.ModelWarning[]
     append!(warnings, weak_warnings)
 
     glance_table = MetricaBase.ModelGlance(:panel_iv, nobs, dof_val,
         Dict{Symbol, MetricaBase.MetricValue}(:r2 => r2_val, :adj_r2 => adj_r2,
             :rss => rss, :tss => tss, :sigma => sigma,
+            :loglikelihood => loglik, :aic => aic_val, :bic => bic_val,
             :n_ids => n_ids, :n_times => n_times),
         warnings)
 
     t_stats = coefficients ./ se
     p_values = 2.0 .* (1.0 .- cdf.(TDist(dof_val), abs.(t_stats)))
-    tidy_rows = [MetricaBase.CoefRow(coef_names[i], coefficients[i], se[i], t_stats[i], p_values[i]) for i in eachindex(coef_names)]
+    t_crit = quantile(TDist(dof_val), 0.975)
+    ci_lowers = coefficients .- t_crit .* se
+    ci_uppers = coefficients .+ t_crit .* se
+    tidy_rows = [MetricaBase.CoefRow(coef_names[i], coefficients[i], se[i], t_stats[i], p_values[i], ci_lowers[i], ci_uppers[i]) for i in eachindex(coef_names)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "classical")
 
     return PanelIVFitResult(formula, glance_table, tidy_table, panel_data,

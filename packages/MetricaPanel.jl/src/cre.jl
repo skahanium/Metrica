@@ -60,6 +60,58 @@ function fit_crea(panel_data::MetricaBase.PanelData, formula::String;
     fitted = X_design * stats.coefficients
     residuals = y - fitted
 
+    # === Task 10: rho/sigma_u/sigma_e（仅 :re/:cre 方法）======================
+    nobs = length(y)
+    n_ids_val = length(unique_ids)
+    n_times_val = length(unique(filtered_df[!, time_col]))
+    rss = sum(abs2, residuals)
+    tss = sum(abs2, y .- mean(y))
+    dof_val = nobs - length(coef_names)
+
+    sigma_e² = dof_val > 0 ? rss / dof_val : 0.0
+    sigma_u² = n_ids_val > 1 ? (tss - rss) / (n_ids_val - 1) - sigma_e² / n_times_val : 0.0
+    sigma_u² = max(sigma_u², 0.0)
+    rho_val = (sigma_u² + sigma_e²) > 0 ? sigma_u² / (sigma_u² + sigma_e²) : 0.0
+    sigma_u_val = sqrt(sigma_u²)
+    sigma_e_val = sqrt(sigma_e²)
+
+    merge!(stats.glance_table.metrics, Dict{Symbol, MetricaBase.MetricValue}(
+        :sigma_u => sigma_u_val,
+        :sigma_e => sigma_e_val,
+        :rho => rho_val,
+    ))
+
+    # === Task 11: within/between/overall R² ====================================
+    # 组内 R²：在去均值空间中计算
+    y_within = zeros(nobs)
+    for id in unique_ids
+        mask = filtered_df[!, id_col] .== id
+        y_within[mask] = y[mask] .- mean(y[mask])
+    end
+    tss_within = sum(abs2, y_within)
+    r2_within = tss_within > 0 ? 1.0 - rss / tss_within : 0.0
+
+    # 组间 R²：在组均值空间中计算
+    y_means = zeros(n_ids_val)
+    fitted_means = zeros(n_ids_val)
+    for (idx, id) in enumerate(unique_ids)
+        mask = filtered_df[!, id_col] .== id
+        y_means[idx] = mean(y[mask])
+        fitted_means[idx] = mean(fitted[mask])
+    end
+    tss_between = sum(abs2, y_means .- mean(y_means))
+    rss_between = sum(abs2, y_means .- fitted_means)
+    r2_between = tss_between > 0 ? 1.0 - rss_between / tss_between : 0.0
+
+    # 整体 R²
+    r2_overall = tss > 0 ? 1.0 - rss / tss : 0.0
+
+    merge!(stats.glance_table.metrics, Dict{Symbol, MetricaBase.MetricValue}(
+        :r2_within => r2_within,
+        :r2_between => r2_between,
+        :r2_overall => r2_overall,
+    ))
+
     return PanelFitResult(formula, stats.glance_table, stats.tidy_table,
                           panel_data, fitted, residuals, coef_names, result_method)
 end

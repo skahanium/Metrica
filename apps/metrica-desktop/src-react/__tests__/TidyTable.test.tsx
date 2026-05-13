@@ -37,6 +37,6 @@ describe('TidyTable', () => {
     expect(screen.queryByText('0.000000')).toBeNull();
     // 破折号表示缺失值
     const dashes = screen.getAllByText('—');
-    expect(dashes.length).toBe(3); // std_error, statistic, p_value
+    expect(dashes.length).toBe(5); // std_error, statistic, p_value, ci_lower, ci_upper
   });
 });

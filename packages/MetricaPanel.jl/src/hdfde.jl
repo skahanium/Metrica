@@ -65,8 +65,15 @@ function fit_hdfde(panel_data::MetricaBase.PanelData, formula::String;
     tss = sum(abs2, Float64.(data[!, Symbol(response_name)]) .- mean(Float64.(data[!, Symbol(response_name)])))
     sigma = dof_val > 0 ? sqrt(rss / dof_val) : NaN
 
+    # 对数似然、AIC、BIC
+    loglik = -nobs_val / 2.0 * (1.0 + log(2π) + log(rss / nobs_val))
+    k_params = length(coefficients) + 1
+    aic_val = -2.0 * loglik + 2.0 * k_params
+    bic_val = -2.0 * loglik + k_params * log(nobs_val)
+
     metrics = Dict{Symbol, MetricaBase.MetricValue}(
         :r2 => r2_val, :adj_r2 => adj_r2_val, :sigma => sigma, :rss => rss, :tss => tss,
+        :loglikelihood => loglik, :aic => aic_val, :bic => bic_val,
         :n_ids => length(unique(data[!, id_col])),
         :n_times => length(unique(data[!, time_col])),
     )
@@ -75,7 +82,10 @@ function fit_hdfde(panel_data::MetricaBase.PanelData, formula::String;
 
     t_stats = coefficients ./ std_errors
     p_values = 2.0 .* (1.0 .- cdf.(TDist(dof_val), abs.(t_stats)))
-    tidy_rows = [MetricaBase.CoefRow(coef_names[i], coefficients[i], std_errors[i], t_stats[i], p_values[i]) for i in eachindex(coef_names)]
+    t_crit = quantile(TDist(dof_val), 0.975)
+    ci_lowers = coefficients .- t_crit .* std_errors
+    ci_uppers = coefficients .+ t_crit .* std_errors
+    tidy_rows = [MetricaBase.CoefRow(coef_names[i], coefficients[i], std_errors[i], t_stats[i], p_values[i], ci_lowers[i], ci_uppers[i]) for i in eachindex(coef_names)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "hdfde")
 
     return PanelFitResult(formula, glance_table, tidy_table, panel_data,

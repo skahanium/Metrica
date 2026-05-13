@@ -434,7 +434,7 @@ function MetricaBase.fit(model::CointegrationModel, data::DataFrame)
                 push!(coef_rows, MetricaBase.CoefRow(
                     Symbol(var_name),
                     result.cointegrating_vector[i],
-                    nothing, nothing, nothing
+                    nothing, nothing, nothing, nothing, nothing
                 ))
             end
         end
@@ -496,7 +496,7 @@ function MetricaBase.fit(model::CointegrationModel, data::DataFrame)
                 push!(coef_rows, MetricaBase.CoefRow(
                     Symbol("$(var_name)_vec$j"),
                     result.eigenvectors[i, j],
-                    nothing, nothing, nothing
+                    nothing, nothing, nothing, nothing, nothing
                 ))
             end
         end

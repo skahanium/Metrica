@@ -46,9 +46,72 @@ function result_to_payload(result::PanelFitResult; include_augment::Bool=true)
                     "stderror" => row.stderror,
                     "statistic" => row.statistic,
                     "pvalue" => row.pvalue,
+                    "ci_lower" => row.ci_lower,
+                    "ci_upper" => row.ci_upper,
                 )
                 for row in tidy_table.rows
             ],
+            "warnings" => warnings,
+        ),
+    )
+
+    if include_augment
+        augment_table = MetricaBase.augment(result)
+        max_preview = min(100, augment_table.nobs)
+        augment_preview = Dict(
+            String(key) => values[1:max_preview]
+            for (key, values) in augment_table.columns
+        )
+        payload["result_payload"]["augment_preview"] = augment_preview
+    end
+
+    return payload
+end
+
+function result_to_payload(result::PanelIVFitResult; include_augment::Bool=true)
+    glance_table = MetricaBase.glance(result)
+    tidy_table = MetricaBase.tidy(result)
+    warnings = [warning_to_dict(warning) for warning in glance_table.warnings]
+
+    first_stage = Dict(
+        String(k) => v for (k, v) in result.first_stage_stats
+    )
+    weak_warnings = [warning_to_dict(w) for w in result.weak_instrument_warnings]
+
+    payload = Dict(
+        "status" => "success",
+        "messages" => [
+            Dict(
+                "level" => severity_to_string(warning.severity),
+                "code" => String(warning.code),
+                "text" => warning.detail,
+                "hint" => warning.hint,
+            )
+            for warning in glance_table.warnings
+        ],
+        "result_payload" => Dict(
+            "glance" => Dict(
+                "model" => String(glance_table.model),
+                "nobs" => glance_table.nobs,
+                "dof" => glance_table.dof,
+                "metrics" => Dict(String(key) => value for (key, value) in glance_table.metrics),
+                "warnings" => warnings,
+            ),
+            "vcov_label" => tidy_table.vcov_label,
+            "tidy" => [
+                Dict(
+                    "name" => String(row.name),
+                    "estimate" => row.estimate,
+                    "stderror" => row.stderror,
+                    "statistic" => row.statistic,
+                    "pvalue" => row.pvalue,
+                    "ci_lower" => row.ci_lower,
+                    "ci_upper" => row.ci_upper,
+                )
+                for row in tidy_table.rows
+            ],
+            "first_stage_stats" => first_stage,
+            "weak_instrument_warnings" => weak_warnings,
             "warnings" => warnings,
         ),
     )

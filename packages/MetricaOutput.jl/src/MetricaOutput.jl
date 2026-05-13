@@ -198,6 +198,8 @@ function markdown_run_report(run_record, result)
                 get(row, "std_error", get(row, "stderror", nothing)),
                 get(row, "statistic", nothing),
                 get(row, "p_value", get(row, "pvalue", nothing)),
+                get(row, "ci_lower", nothing),
+                get(row, "ci_upper", nothing),
             )
             for row in result["tidy"]
         ]

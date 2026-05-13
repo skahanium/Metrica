@@ -343,6 +343,17 @@ pub fn run() {
     // macOS 需要原生菜单才能让标准编辑快捷键进入 responder chain。
     macos_install_app_menu();
 
+    // 禁用 macOS 自动终止，防止系统在窗口不可见时杀掉进程
+    #[cfg(target_os = "macos")]
+    {
+        use objc::{class, msg_send, sel, sel_impl};
+        unsafe {
+            let process_info: *mut objc::runtime::Object = msg_send![class!(NSProcessInfo), processInfo];
+            let reason: *mut objc::runtime::Object = msg_send![class!(NSString), stringWithUTF8String: std::ffi::CString::new("user-facing desktop app").unwrap().as_ptr()];
+            let _: () = msg_send![process_info, disableAutomaticTermination: reason];
+        }
+    }
+
     let window = window_builder.build(&event_loop).expect("创建窗口失败");
 
     // 后台线程：监听激活请求（第二个实例启动时发送），回复 ACK 证明存活

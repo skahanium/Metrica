@@ -22,6 +22,8 @@ export function DiscreteGlanceCards({ result }: DiscreteGlanceCardsProps) {
         {m.loglik !== undefined && <Col span={6}><Statistic title="Log-Likelihood" value={m.loglik.toFixed(2)} /></Col>}
         {m.aic !== undefined && <Col span={6}><Statistic title="AIC" value={m.aic.toFixed(2)} /></Col>}
         {m.bic !== undefined && <Col span={6}><Statistic title="BIC" value={m.bic.toFixed(2)} /></Col>}
+        {m.lr_chi2 !== undefined && <Col span={6}><Statistic title="LR χ²" value={m.lr_chi2.toFixed(4)} /></Col>}
+        {m.lr_pvalue !== undefined && <Col span={6}><Statistic title="LR p 值" value={m.lr_pvalue.toFixed(4)} /></Col>}
       </Row>
     </Card>
   );

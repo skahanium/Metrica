@@ -39,6 +39,8 @@ function build_survey_payload(
             "std_error" => row.stderror,
             "statistic" => row.statistic,
             "p_value" => row.pvalue,
+            "ci_lower" => row.ci_lower,
+            "ci_upper" => row.ci_upper,
         ) for row in t.rows],
         "design_effects" => design_effects_payload,
         "warnings" => [Dict(

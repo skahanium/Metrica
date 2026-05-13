@@ -57,6 +57,40 @@ function fit_fe(panel_data::MetricaBase.PanelData, formula::String)
     fitted_original = y_means .+ X_demeaned_noint * stats.coefficients
     residuals_original = y - fitted_original
 
+    # === Task 11: within/between/overall R² ====================================
+    rss = sum(abs2, residuals_original)
+    tss = sum(abs2, y .- mean(y))
+
+    # 组内 TSS
+    y_within = zeros(nobs)
+    for id in unique_ids
+        mask = filtered_df[!, id_col] .== id
+        y_within[mask] = y[mask] .- mean(y[mask])
+    end
+    tss_within = sum(abs2, y_within)
+    r2_within = tss_within > 0 ? 1.0 - rss / tss_within : 0.0
+
+    # 组间 R²
+    y_means_vec = zeros(n_ids)
+    fitted_means_vec = zeros(n_ids)
+    for (idx, id) in enumerate(unique_ids)
+        mask = filtered_df[!, id_col] .== id
+        y_means_vec[idx] = mean(y[mask])
+        fitted_means_vec[idx] = mean(fitted_original[mask])
+    end
+    tss_between = sum(abs2, y_means_vec .- mean(y_means_vec))
+    rss_between = sum(abs2, y_means_vec .- fitted_means_vec)
+    r2_between = tss_between > 0 ? 1.0 - rss_between / tss_between : 0.0
+
+    # 整体 R²
+    r2_overall = tss > 0 ? 1.0 - rss / tss : 0.0
+
+    merge!(stats.glance_table.metrics, Dict{Symbol, MetricaBase.MetricValue}(
+        :r2_within => r2_within,
+        :r2_between => r2_between,
+        :r2_overall => r2_overall,
+    ))
+
     return PanelFitResult(
         formula,
         stats.glance_table,

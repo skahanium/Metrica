@@ -64,6 +64,8 @@ function result_to_payload(result::OLSFitResult; include_augment::Bool=true)
                     "stderror" => row.stderror,
                     "statistic" => row.statistic,
                     "pvalue" => row.pvalue,
+                    "ci_lower" => row.ci_lower,
+                    "ci_upper" => row.ci_upper,
                 )
                 for row in tidy_table.rows
             ],

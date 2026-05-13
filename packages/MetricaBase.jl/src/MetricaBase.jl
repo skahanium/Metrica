@@ -1,6 +1,7 @@
 module MetricaBase
 
 using Dates
+using Distributions: TDist, quantile
 
 # === 导出列表 ================================================================
 
@@ -151,6 +152,32 @@ const MetricValue = Union{Float64, Int}
 一个 `ModelGlance` 包含拟合后单模型的关键数字，供 Runtime 序列化及
 App 结果卡片渲染。不携带系数表、诊断图或逐行预测数据。
 """
+# ModelGlance.metrics 标准键名约定：
+#
+# 线性模型（OLS/WLS/IV/GLS）：
+#   :r2, :adj_r2, :rss, :tss, :sigma, :f_stat, :f_pvalue,
+#   :model_ss, :model_df, :model_ms, :resid_ss, :resid_df, :resid_ms,
+#   :total_ss, :total_df, :total_ms
+#
+# 面板模型（FE/RE/FD/Between/CRE/HDFE）：
+#   :r2, :adj_r2, :rss, :tss, :sigma, :f_stat, :f_pvalue,
+#   :n_ids, :n_times, :r2_within, :r2_between, :r2_overall,
+#   :rho, :sigma_u, :sigma_e
+#
+# 离散模型（Logit/Probit/Poisson/NegBin）：
+#   :pseudo_r2, :loglik, :aic, :bic, :deviance,
+#   :lr_chi2, :lr_pvalue, :iterations, :converged
+#
+# 时间序列（ARIMA/VAR）：
+#   :loglik, :aic, :bic, :sigma2,
+#   :ljung_box_stat, :ljung_box_pvalue
+#
+# 因果推断（DID/IPW/PSM/AIPW）：
+#   :ate, :att, :atu, :ate_se, :att_se, :atu_se
+#
+# 调查模型（Survey OLS/Logit/Probit/Poisson）：
+#   :r2/:pseudo_r2, :loglik, :aic, :bic, :mean_deff,
+#   :wald_f, :wald_pvalue
 struct ModelGlance
     model::Symbol
     nobs::Int
@@ -162,8 +189,9 @@ end
 """
 结构化参数表中的一行系数。
 
-`stderror`、`statistic`、`pvalue` 可为 `nothing`——当某模型未输出
-相应列（例如仅提供标准误而不计算 t 统计量）时，下游应据此省略展示。
+`stderror`、`statistic`、`pvalue`、`ci_lower`、`ci_upper` 可为 `nothing`——
+当某模型未输出相应列（例如仅提供标准误而不计算 t 统计量或置信区间）时，
+下游应据此省略展示。
 """
 struct CoefRow
     name::Symbol
@@ -171,6 +199,8 @@ struct CoefRow
     stderror::Union{Nothing, Float64}
     statistic::Union{Nothing, Float64}
     pvalue::Union{Nothing, Float64}
+    ci_lower::Union{Nothing, Float64}
+    ci_upper::Union{Nothing, Float64}
 end
 
 """
@@ -313,9 +343,29 @@ function augment end
 function stderror end
 
 """
-计算系数的置信区间。默认置信水平为 0.95。
+    confint(result; level=0.95)
+
+计算系数的置信区间。返回 `(ci_lower, ci_upper)` 向量。
+默认 95% 置信水平。
+
+若 `stderror(result)` 返回 `nothing`，则返回两个由 `nothing` 填充的向量。
 """
-function confint end
+function confint(result; level::Float64=0.95)
+    coef_vals = coef(result)
+    se_vals = stderror(result)
+    dof_val = dof(result)
+
+    if isnothing(se_vals)
+        return (fill(nothing, length(coef_vals)), fill(nothing, length(coef_vals)))
+    end
+
+    α = 1 - level
+    t_crit = quantile(TDist(dof_val), 1 - α / 2)
+
+    ci_lower = coef_vals .- t_crit .* se_vals
+    ci_upper = coef_vals .+ t_crit .* se_vals
+    return (ci_lower, ci_upper)
+end
 
 """
 返回拟合所用的有效观测数。

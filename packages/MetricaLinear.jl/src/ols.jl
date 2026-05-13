@@ -365,6 +365,9 @@ function assemble_tidy_table(coefficients::Vector{Float64}, stderror::Vector{Flo
     statistics = coefficients ./ stderror
     pvalues = compute_pvalues(statistics, dof)
 
+    α = 0.05
+    t_crit = quantile(TDist(dof), 1 - α / 2)
+
     tidy_rows = [
         MetricaBase.CoefRow(
             coefficient_names[index],
@@ -372,6 +375,8 @@ function assemble_tidy_table(coefficients::Vector{Float64}, stderror::Vector{Flo
             stderror[index],
             statistics[index],
             pvalues[index],
+            coefficients[index] - t_crit * stderror[index],
+            coefficients[index] + t_crit * stderror[index],
         )
         for index in eachindex(coefficients)
     ]
@@ -441,6 +446,20 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
     r2, adj_r2, rss, tss, sigma = compute_glance_stats(y, effective_residuals, weight_values, dof, nobs)
     coefficient_names = Symbol.(coefnames(model_frame))
 
+    # F 检验与 ANOVA 表
+    has_intercept = Symbol("(Intercept)") in coefficient_names
+    k = length(coefficients)
+    model_df = has_intercept ? k - 1 : k
+    model_ss = tss - rss
+    model_ms = model_df > 0 ? model_ss / model_df : 0.0
+    resid_df = dof
+    resid_ms = rss / resid_df
+    total_ss = tss
+    total_df = nobs - 1
+    total_ms = tss / total_df
+    f_stat = (model_ms / resid_ms)
+    f_pvalue = 1 - cdf(FDist(model_df, resid_df), f_stat)
+
     warnings = MetricaBase.ModelWarning[]
     dropped_rows = n_total - n_effective
     dropped_rows > 0 && push!(warnings, build_rows_dropped_warning(dropped_rows))
@@ -451,6 +470,10 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
         dof,
         Dict{Symbol, MetricaBase.MetricValue}(
             :r2 => r2, :adj_r2 => adj_r2, :rss => rss, :tss => tss, :sigma => sigma,
+            :f_stat => f_stat, :f_pvalue => f_pvalue,
+            :model_ss => model_ss, :model_df => model_df, :model_ms => model_ms,
+            :resid_ss => rss, :resid_df => resid_df, :resid_ms => resid_ms,
+            :total_ss => total_ss, :total_df => total_df, :total_ms => total_ms,
         ),
         warnings,
     )

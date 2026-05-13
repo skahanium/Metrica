@@ -58,6 +58,15 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     nobs = twfe_result.nobs
     ncoef_es = length(coefficients)
 
+    # Within-R² 和 F 统计量
+    y_demeaned = twfe_result.residuals + twfe_result.fitted
+    tss = sum(abs2, y_demeaned .- mean(y_demeaned))
+    rss = sum(abs2, twfe_result.residuals)
+    r2_within = iszero(tss) ? 1.0 : 1.0 - rss / tss
+    model_ss = tss - rss
+    f_stat_overall = dof > 0 && ncoef_es > 0 ? (model_ss / ncoef_es) / (rss / dof) : 0.0
+    f_pvalue_overall = dof > 0 && ncoef_es > 0 ? 1 - cdf(FDist(ncoef_es, dof), f_stat_overall) : 1.0
+
     # 个体聚类标准误（使用吸收后的设计矩阵和残差）
     if vcov == :cluster
         X_absorbed = twfe_result.X_demeaned
@@ -108,6 +117,8 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
         Dict{Symbol, MetricaBase.MetricValue}(
             :n_periods => length(period_labels),
             :pre_trend_pvalue => pre_trend_pvalue,
+            :r2 => r2_within, :adj_r2 => 1.0 - (1.0 - r2_within) * (nobs - 1) / max(dof, 1),
+            :f_stat => f_stat_overall, :f_pvalue => f_pvalue_overall,
         ),
         MetricaBase.ModelWarning[
             MetricaBase.ModelWarning(:parallel_trends_check,
@@ -122,7 +133,9 @@ function MetricaBase.fit(::Type{EventStudyModel}, formula::AbstractString, data;
     tidy_rows = [let
         t_stat = stderrors[i] > 1e-15 ? coefficients[i]/stderrors[i] : 0.0
         p_val = t_stat != 0.0 ? 2*(1-cdf(TDist(max(dof,1)), abs(t_stat))) : 1.0
-        MetricaBase.CoefRow(coef_names[i], coefficients[i], stderrors[i], t_stat, p_val)
+        ci_l = coefficients[i] - quantile(TDist(max(dof,1)), 0.975) * stderrors[i]
+        ci_u = coefficients[i] + quantile(TDist(max(dof,1)), 0.975) * stderrors[i]
+        MetricaBase.CoefRow(coef_names[i], coefficients[i], stderrors[i], t_stat, p_val, ci_l, ci_u)
     end for i in 1:length(coef_names)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "TWFE")
 
@@ -137,5 +150,5 @@ MetricaBase.tidy(result::EventStudyFitResult) = result.tidy_table
 MetricaBase.coef(result::EventStudyFitResult) = result.coefficient_names .=> result.coefficient_values
 MetricaBase.nobs(result::EventStudyFitResult) = result.glance_table.nobs
 MetricaBase.dof(result::EventStudyFitResult) = result.glance_table.dof
-MetricaBase.r2(result::EventStudyFitResult) = NaN
+MetricaBase.r2(result::EventStudyFitResult) = result.glance_table.metrics[:r2]
 MetricaBase.stderror(result::EventStudyFitResult) = result.tidy_table.rows .|> r -> r.stderror |> Float64

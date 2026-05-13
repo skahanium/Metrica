@@ -284,6 +284,30 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
             # ACF 滞后 0 应为 1
             @test payload["acf_values"][1] ≈ 1.0
 
+            # Ljung-Box 检验应包含在 payload 中
+            @test haskey(payload, "ljung_box")
+            @test haskey(payload["ljung_box"], "test_statistic")
+            @test haskey(payload["ljung_box"], "p_value")
+            @test haskey(payload["ljung_box"], "conclusion")
+            @test payload["ljung_box"]["test_statistic"] > 0
+            @test 0 <= payload["ljung_box"]["p_value"] <= 1
+
+            # tidy 行应包含置信区间
+            for row in payload["tidy"]["rows"]
+                @test haskey(row, "ci_lower")
+                @test haskey(row, "ci_upper")
+                if row["stderror"] !== nothing && row["stderror"] > 0
+                    @test row["ci_lower"] !== nothing
+                    @test row["ci_upper"] !== nothing
+                    @test row["ci_lower"] < row["estimate"]
+                    @test row["ci_upper"] > row["estimate"]
+                end
+            end
+
+            # glance 应包含 Ljung-Box 指标
+            @test haskey(payload["glance"]["metrics"], "ljung_box_Q")
+            @test haskey(payload["glance"]["metrics"], "ljung_box_p")
+
             # 测试 include_augment
             payload_with_aug = MetricaTimeSeries.result_to_payload(result, include_augment=true)
             @test haskey(payload_with_aug, "augment_preview")
@@ -417,6 +441,36 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
             @test haskey(payload, "coefficients")
             @test haskey(payload, "glance")
             @test haskey(payload, "tidy")
+
+            # Granger 因果检验应包含在 payload 中
+            @test haskey(payload, "granger_causality")
+            @test haskey(payload["granger_causality"], "x1_to_x2")
+            @test haskey(payload["granger_causality"], "x2_to_x1")
+            gc = payload["granger_causality"]["x1_to_x2"]
+            @test haskey(gc, "f_stat")
+            @test haskey(gc, "p_value")
+            @test haskey(gc, "conclusion")
+            @test gc["f_stat"] > 0
+
+            # 脉冲响应应包含在 payload 中
+            @test haskey(payload, "irf")
+            @test size(payload["irf"]) == (21, 2, 2)
+
+            # 方差分解应包含在 payload 中
+            @test haskey(payload, "variance_decomposition")
+            @test size(payload["variance_decomposition"]) == (21, 2, 2)
+
+            # tidy 行应包含置信区间
+            for row in payload["tidy"]["rows"]
+                @test haskey(row, "ci_lower")
+                @test haskey(row, "ci_upper")
+                if row["stderror"] !== nothing && row["stderror"] > 0
+                    @test row["ci_lower"] !== nothing
+                    @test row["ci_upper"] !== nothing
+                    @test row["ci_lower"] < row["estimate"]
+                    @test row["ci_upper"] > row["estimate"]
+                end
+            end
 
             # 测试 include_augment
             payload_with_aug = MetricaTimeSeries.result_to_payload(result, include_augment=true)

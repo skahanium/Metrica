@@ -488,7 +488,7 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
 
 [[deps.MetricaBase]]
-deps = ["Dates"]
+deps = ["Dates", "Distributions"]
 path = "packages/MetricaBase.jl"
 uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 version = "0.1.0"

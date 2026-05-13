@@ -298,25 +298,10 @@ function fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int)
     aic = -2 * loglik + 2 * k
     bic = -2 * loglik + k * log(n_diff)
 
-    # 构建 glance 表
-    P, D, Q, s = model.seasonal_order
-    glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
-        :nobs => n, :sigma2 => sigma2_hat, :loglik => loglik,
-        :aic => aic, :bic => bic, :p => p, :d => d, :q => q,
-        :P => P, :D => D, :Q => Q, :s => s,
-    )
-    model_label = Symbol("ARIMA($(p),$(d),$(q))" * (s > 0 ? "×($(P),$(D),$(Q),$(s))" : ""))
-    glance_table = MetricaBase.ModelGlance(model_label, n, 0, glance_metrics, MetricaBase.ModelWarning[])
-
-    # 构建 tidy 表
-    coef_rows = MetricaBase.CoefRow[]
-    for (name, value) in coefficients
-        se = get(std_errors, name, 0.0)
-        t_stat = se > 0 ? value / se : 0.0
-        p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
-        push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value))
-    end
-    tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
+    # Ljung-Box 检验
+    lb_lags = min(20, n_diff ÷ 5)
+    lb_lags = max(lb_lags, 1)
+    lb = ljung_box_test(residuals, lags=lb_lags)
 
     # 警告
     warnings = MetricaBase.ModelWarning[]
@@ -334,6 +319,30 @@ function fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int)
             "考虑使用 CSS 方法", MetricaBase.warning
         ))
     end
+
+    # 构建 glance 表（含 Ljung-Box）
+    P, D, Q, s = model.seasonal_order
+    glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
+        :nobs => n, :sigma2 => sigma2_hat, :loglik => loglik,
+        :aic => aic, :bic => bic, :p => p, :d => d, :q => q,
+        :P => P, :D => D, :Q => Q, :s => s,
+        :ljung_box_Q => lb.test_statistic, :ljung_box_p => lb.p_value,
+    )
+    model_label = Symbol("ARIMA($(p),$(d),$(q))" * (s > 0 ? "×($(P),$(D),$(Q),$(s))" : ""))
+    glance_table = MetricaBase.ModelGlance(model_label, n, 0, glance_metrics, warnings)
+
+    # 构建 tidy 表（含 95% 置信区间）
+    z_95 = 1.96
+    coef_rows = MetricaBase.CoefRow[]
+    for (name, value) in coefficients
+        se = get(std_errors, name, 0.0)
+        t_stat = se > 0 ? value / se : 0.0
+        p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
+        ci_l = se > 0 ? value - z_95 * se : nothing
+        ci_u = se > 0 ? value + z_95 * se : nothing
+        push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value, ci_l, ci_u))
+    end
+    tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
 
     return ARIMAFitResult(
         string(model.variable), model.order, model.seasonal_order,
@@ -576,6 +585,11 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
     aic = -2 * loglik + 2 * k
     bic = -2 * loglik + k * log(n_diff)
 
+    # Ljung-Box 检验
+    lb_lags = min(20, n_diff ÷ 5)
+    lb_lags = max(lb_lags, 1)
+    lb = ljung_box_test(residuals, lags=lb_lags)
+
     # 构建 glance 表
     P, D, Q, s = model.seasonal_order
     glance_metrics = Dict{Symbol, MetricaBase.MetricValue}(
@@ -587,6 +601,8 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
         :p => p,
         :d => d,
         :q => q,
+        :ljung_box_Q => lb.test_statistic,
+        :ljung_box_p => lb.p_value,
     )
 
     glance_table = MetricaBase.ModelGlance(
@@ -594,16 +610,19 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
         n,
         0,
         glance_metrics,
-        MetricaBase.ModelWarning[]
+        warnings
     )
 
-    # 构建 tidy 表
+    # 构建 tidy 表（含 95% 置信区间）
+    z_95 = 1.96
     coef_rows = MetricaBase.CoefRow[]
     for (name, value) in coefficients
         se = get(std_errors, name, 0.0)
         t_stat = se > 0 ? value / se : 0.0
         p_value = 2 * (1 - cdf(Normal(0, 1), abs(t_stat)))
-        push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value))
+        ci_l = se > 0 ? value - z_95 * se : nothing
+        ci_u = se > 0 ? value + z_95 * se : nothing
+        push!(coef_rows, MetricaBase.CoefRow(name, value, se, t_stat, p_value, ci_l, ci_u))
     end
 
     tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
@@ -692,6 +711,18 @@ function result_to_payload(result::ARIMAFitResult; include_augment::Bool=true)
         "fitted_values" => result.fitted_values,
     )
 
+    # Ljung-Box 检验结果
+    n_resid = length(result.residuals)
+    lb_lags = min(20, n_resid ÷ 5)
+    lb_lags = max(lb_lags, 1)
+    lb = ljung_box_test(result.residuals, lags=lb_lags)
+    payload["ljung_box"] = Dict(
+        "test_statistic" => lb.test_statistic,
+        "p_value" => lb.p_value,
+        "conclusion" => lb.conclusion,
+        "lags" => lb_lags,
+    )
+
     # ACF 和 PACF（用于诊断图）
     payload["acf_values"] = MetricaTimeSeries.acf(result.residuals)
     payload["pacf_values"] = MetricaTimeSeries.pacf(result.residuals)
@@ -709,7 +740,9 @@ function result_to_payload(result::ARIMAFitResult; include_augment::Bool=true)
                 "estimate" => row.estimate,
                 "stderror" => row.stderror,
                 "statistic" => row.statistic,
-                "p_value" => row.pvalue
+                "p_value" => row.pvalue,
+                "ci_lower" => row.ci_lower,
+                "ci_upper" => row.ci_upper,
             )
             for row in result.tidy_table.rows
         ]

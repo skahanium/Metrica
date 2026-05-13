@@ -20,6 +20,10 @@ interface CompletionBoxState {
   placement: 'inline' | 'flip' | 'compact';
 }
 
+function isCompleteCommand(trimmed: string): boolean {
+  return COMMAND_LIST.includes(trimmed.toLowerCase().split(/\s+/)[0]);
+}
+
 function getTokenStart(value: string, cursorPos: number): number {
   const beforeCursor = value.slice(0, cursorPos);
   return Math.max(
@@ -78,7 +82,7 @@ interface CommandLineProps {
 }
 
 export interface CliFeedback {
-  level: 'error' | 'warning';
+  level: 'error' | 'warning' | 'success';
   message: string;
 }
 
@@ -417,6 +421,13 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
         return;
       }
       if (e.key === 'Enter') {
+        const trimmed = input.trim();
+        if (trimmed && isCompleteCommand(trimmed)) {
+          e.preventDefault();
+          hideCompletions();
+          submitCommand(trimmed);
+          return;
+        }
         e.preventDefault();
         const item = acceptCompletion();
         if (item) {
@@ -634,7 +645,14 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
     </div>,
     document.body,
   ) : null;
-  const feedbackColors = feedback?.level === 'warning'
+  const feedbackColors = feedback?.level === 'success'
+    ? {
+      border: '#b7eb8f',
+      background: '#f6ffed',
+      text: '#135200',
+      iconBackground: '#52c41a',
+    }
+    : feedback?.level === 'warning'
     ? {
       border: '#ffd591',
       background: '#fff7e6',
@@ -703,7 +721,7 @@ export const CommandLine: React.FC<CommandLineProps> = ({ onExecute, feedback = 
               lineHeight: 1,
             }}
           >
-            {feedback.level === 'warning' ? '!' : '×'}
+            {feedback.level === 'success' ? '✓' : feedback.level === 'warning' ? '!' : '×'}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {feedback.message}

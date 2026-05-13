@@ -1,10 +1,12 @@
 name = "MetricaBase"
 uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
-authors = ["Metrica Contributors"]
 version = "0.1.0"
+authors = ["Metrica Contributors"]
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 
 [compat]
+Distributions = "0.25.125"
 julia = "1.12"

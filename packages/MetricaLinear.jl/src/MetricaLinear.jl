@@ -9,6 +9,7 @@ using Statistics
 using StatsModels
 using MetricaBase
 using MetricaOutput
+using MetricaData
 
 export OLSModel, OLSFitResult, IVModel, IVFitResult, GLSModel, GLSFitResult,
     PHASE_1_MODELS, fit, inspect_dataset, result_to_payload

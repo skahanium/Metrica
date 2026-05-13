@@ -123,16 +123,33 @@ function ols_statistics(X::Matrix{Float64}, y::Vector{Float64},
         std_errors = sqrt.(max.(diag(XtX_inv) .* sigma^2, 0.0))
         t_stats = coefficients ./ std_errors
         p_values = 2.0 .* (1.0 .- cdf.(TDist(dof), abs.(t_stats)))
+        t_crit = quantile(TDist(dof), 0.975)
+        ci_lowers = coefficients .- t_crit .* std_errors
+        ci_uppers = coefficients .+ t_crit .* std_errors
     else
         std_errors = fill(NaN, k)
         t_stats = fill(NaN, k)
         p_values = fill(NaN, k)
+        ci_lowers = fill(NaN, k)
+        ci_uppers = fill(NaN, k)
     end
 
     tidy_rows = MetricaBase.CoefRow[
-        MetricaBase.CoefRow(coef_names[i], coefficients[i], std_errors[i], t_stats[i], p_values[i])
+        MetricaBase.CoefRow(coef_names[i], coefficients[i], std_errors[i], t_stats[i], p_values[i], ci_lowers[i], ci_uppers[i])
         for i in 1:k
     ]
+
+    # 对数似然、AIC、BIC
+    loglik = -nobs / 2.0 * (1.0 + log(2π) + log(rss / nobs))
+    k_params = k + 1  # 系数 + 方差参数
+    aic = -2.0 * loglik + 2.0 * k_params
+    bic = -2.0 * loglik + k_params * log(nobs)
+
+    merge!(metrics, Dict{Symbol, MetricaBase.MetricValue}(
+        :loglikelihood => loglik,
+        :aic => aic,
+        :bic => bic,
+    ))
 
     glance_table = MetricaBase.ModelGlance(model_sym, nobs, dof, metrics, MetricaBase.ModelWarning[])
     tidy_table = MetricaBase.TidyTable(tidy_rows, "classical")

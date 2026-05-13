@@ -419,7 +419,8 @@ function MetricaBase.fit(model::UnitRootModel, data::DataFrame)
         adf_result.test_statistic,
         adf_result.critical_values[0.05],  # 使用 5% 临界值作为参考
         nothing,  # t 统计量不适用
-        adf_result.p_value
+        adf_result.p_value,
+        nothing, nothing,
     ))
 
     # PP 结果行
@@ -428,7 +429,8 @@ function MetricaBase.fit(model::UnitRootModel, data::DataFrame)
         pp_result.test_statistic,
         pp_result.critical_values[0.05],
         nothing,
-        pp_result.p_value
+        pp_result.p_value,
+        nothing, nothing,
     ))
 
     # KPSS 结果行
@@ -437,7 +439,8 @@ function MetricaBase.fit(model::UnitRootModel, data::DataFrame)
         kpss_result.test_statistic,
         kpss_result.critical_values[0.05],
         nothing,
-        kpss_result.p_value
+        kpss_result.p_value,
+        nothing, nothing,
     ))
 
     tidy_table = MetricaBase.TidyTable(

@@ -260,20 +260,35 @@ function MetricaBase.fit(::Type{IVModel}, formula::AbstractString, data;
     adj_r2 = iszero(tss) ? 1.0 : 1 - (rss / dof_val) / (tss / (nobs - 1))
     sigma = sqrt(rss / dof_val)
 
+    # 结构方程整体 F 检验
+    model_ss = tss - rss
+    model_df = length(coefficients) - 1
+    resid_df = dof_val
+    f_stat = iszero(rss) ? Inf : (model_ss / model_df) / (rss / resid_df)
+    f_pvalue = 1 - cdf(FDist(model_df, resid_df), f_stat)
+
     warnings = MetricaBase.ModelWarning[]
     dropped_rows = n_total - n_effective
     dropped_rows > 0 && push!(warnings, build_rows_dropped_warning(dropped_rows))
     append!(warnings, weak_warnings)
 
     glance_table = MetricaBase.ModelGlance(:iv, nobs, dof_val,
-        Dict{Symbol, MetricaBase.MetricValue}(:r2 => r2_val, :adj_r2 => adj_r2, :rss => rss, :tss => tss, :sigma => sigma),
+        Dict{Symbol, MetricaBase.MetricValue}(
+            :r2 => r2_val, :adj_r2 => adj_r2, :rss => rss, :tss => tss,
+            :sigma => sigma, :f_stat => f_stat, :f_pvalue => f_pvalue),
         warnings)
 
     statistics = coefficients ./ stderror
     pvalues = 2 .* (1 .- cdf.(TDist(dof_val), abs.(statistics)))
+    α = 0.05
+    t_crit = quantile(TDist(dof_val), 1 - α / 2)
     vcov_label = vcov === :HC1 ? "HC1" : vcov === :cluster ? "cluster" : "classical"
     tidy_table = MetricaBase.TidyTable([
-        MetricaBase.CoefRow(coefficient_names_sym[i], coefficients[i], stderror[i], statistics[i], pvalues[i])
+        MetricaBase.CoefRow(
+            coefficient_names_sym[i], coefficients[i], stderror[i],
+            statistics[i], pvalues[i],
+            coefficients[i] - t_crit * stderror[i],
+            coefficients[i] + t_crit * stderror[i])
         for i in eachindex(coefficients)
     ], vcov_label)
 

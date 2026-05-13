@@ -166,6 +166,9 @@ function MetricaBase.fit(::Type{MultinomialLogitModel}, formula::AbstractString,
     z_matrix = coeff_matrix ./ max.(se_matrix, 1e-10)
     p_matrix = 2 .* (1 .- cdf.(Normal(), abs.(z_matrix)))
 
+    α_ci = 0.05
+    z_crit = quantile(Normal(), 1 - α_ci / 2)
+
     # 整理 tidy 表
     tidy_rows = MetricaBase.CoefRow[]
     for k in 1:n_nonref
@@ -174,6 +177,8 @@ function MetricaBase.fit(::Type{MultinomialLogitModel}, formula::AbstractString,
                 Symbol("cat$(other_cats[k])_$(coefficient_names[j])"),
                 coeff_matrix[k, j], se_matrix[k, j],
                 z_matrix[k, j], p_matrix[k, j],
+                coeff_matrix[k, j] - z_crit * se_matrix[k, j],
+                coeff_matrix[k, j] + z_crit * se_matrix[k, j],
             ))
         end
     end

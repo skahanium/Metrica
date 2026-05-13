@@ -122,8 +122,14 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
     z_stats = coefficients ./ se_values
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 
+    α_ci = 0.05
+    z_crit = quantile(Normal(), 1 - α_ci / 2)
+
     null_ll = nb_loglikelihood(y, fill(mean(y), nobs), α)
     pseudo_r2 = 1 - (-loglik) / max(-null_ll, 1e-10)
+
+    lr_chi2 = 2 * (loglik - null_ll)
+    lr_pvalue = 1 - cdf(Chisq(ncoef), lr_chi2)
 
     warnings = MetricaBase.ModelWarning[]
     dropped_rows = n_total - n_effective
@@ -142,12 +148,12 @@ function MetricaBase.fit(::Type{NegBinModel}, formula::AbstractString, data;
         :negbin, nobs, dof,
         Dict{Symbol, MetricaBase.MetricValue}(
             :pseudo_r2 => pseudo_r2, :loglik => loglik, :aic => aic, :bic => bic,
-            :dispersion => α,
+            :dispersion => α, :lr_chi2 => lr_chi2, :lr_pvalue => lr_pvalue,
         ),
         warnings,
     )
 
-    tidy_rows = [MetricaBase.CoefRow(coefficient_names[i], coefficients[i], se_values[i], z_stats[i], pvalues[i]) for i in 1:ncoef]
+    tidy_rows = [MetricaBase.CoefRow(coefficient_names[i], coefficients[i], se_values[i], z_stats[i], pvalues[i], coefficients[i] - z_crit * se_values[i], coefficients[i] + z_crit * se_values[i]) for i in 1:ncoef]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "MLE (profile likelihood)")
 
     return NegBinFitResult(

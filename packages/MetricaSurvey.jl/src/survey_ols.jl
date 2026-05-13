@@ -91,19 +91,29 @@ function MetricaBase.fit(
     z_stats[survey_se .< 1e-16] .= 0.0
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 
+    # Survey-adjusted Wald F 检验（排除截距）
+    coef_no_intercept = coef_vals[2:end]
+    vcov_no_intercept = survey_vcov[2:end, 2:end]
+    k = length(coef_no_intercept)
+    dof_residual = nobs - ncoef
+    wald_f = k > 0 ? (coef_no_intercept' * inv(vcov_no_intercept) * coef_no_intercept) / k : 0.0
+    wald_pvalue = k > 0 && dof_residual > 0 ? 1 - cdf(FDist(k, dof_residual), wald_f) : 1.0
+
     # 构建 glance
     glance = ols_result.glance_table
     survey_glance = MetricaBase.ModelGlance(
         Symbol("survey_$(glance.model)"),
         glance.nobs,
         glance.dof,
-        merge(glance.metrics, Dict(:mean_deff => mean(deff))),
+        merge(glance.metrics, Dict(:mean_deff => mean(deff), :wald_f => wald_f, :wald_pvalue => wald_pvalue)),
         glance.warnings,
     )
 
     # 构建 tidy（使用 survey 修正 SE）
+    z_crit = quantile(Normal(), 0.975)
     tidy_rows = MetricaBase.CoefRow[
-        MetricaBase.CoefRow(coef_names[i], coef_vals[i], survey_se[i], z_stats[i], pvalues[i])
+        MetricaBase.CoefRow(coef_names[i], coef_vals[i], survey_se[i], z_stats[i], pvalues[i],
+            coef_vals[i] - z_crit * survey_se[i], coef_vals[i] + z_crit * survey_se[i])
         for i in 1:ncoef
     ]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "z")

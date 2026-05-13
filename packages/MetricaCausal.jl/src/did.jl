@@ -78,6 +78,18 @@ function MetricaBase.fit(::Type{DIDModel}, formula::AbstractString, data;
             "公式中需包含 treated 和 post 的交互项。建议使用 treat * post。", "")
     end
 
+    # Within-R² 和 F 统计量
+    y_demeaned = twfe_result.residuals + twfe_result.fitted
+    tss = sum(abs2, y_demeaned .- mean(y_demeaned))
+    rss = sum(abs2, twfe_result.residuals)
+    r2_within = iszero(tss) ? 1.0 : 1.0 - rss / tss
+    ncoef_did = length(coefficients)
+    model_df = ncoef_did
+    resid_df = dof
+    model_ss = tss - rss
+    f_stat = resid_df > 0 && model_df > 0 ? (model_ss / model_df) / (rss / resid_df) : 0.0
+    f_pvalue = resid_df > 0 && model_df > 0 ? 1 - cdf(FDist(model_df, resid_df), f_stat) : 1.0
+
     treat_effect = coefficients[treat_idx]
     treat_se = se_values[treat_idx]
     treat_t = treat_effect / treat_se
@@ -104,12 +116,16 @@ function MetricaBase.fit(::Type{DIDModel}, formula::AbstractString, data;
         Dict{Symbol, MetricaBase.MetricValue}(
             :treat_effect => treat_effect, :n_treated => n_treated, :n_control => n_control,
             :n_pre => n_pre, :n_post => n_post,
+            :r2 => r2_within, :adj_r2 => 1.0 - (1.0 - r2_within) * (nobs - 1) / max(dof, 1),
+            :f_stat => f_stat, :f_pvalue => f_pvalue,
         ), warnings)
 
     tidy_rows = [let
         t_stat = se_values[i] > 1e-15 ? coefficients[i]/se_values[i] : 0.0
         p_val = t_stat != 0.0 ? 2*(1-cdf(TDist(max(dof,1)), abs(t_stat))) : 1.0
-        MetricaBase.CoefRow(coef_names[i], coefficients[i], se_values[i], t_stat, p_val)
+        ci_l = coefficients[i] - quantile(TDist(max(dof,1)), 0.975) * se_values[i]
+        ci_u = coefficients[i] + quantile(TDist(max(dof,1)), 0.975) * se_values[i]
+        MetricaBase.CoefRow(coef_names[i], coefficients[i], se_values[i], t_stat, p_val, ci_l, ci_u)
     end for i in 1:length(coef_names)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "TWFE")
 
@@ -126,5 +142,5 @@ MetricaBase.coef(result::DIDFitResult) = result.coefficient_names .=> result.coe
 MetricaBase.vcov(result::DIDFitResult) = result.vcov_matrix
 MetricaBase.nobs(result::DIDFitResult) = result.glance_table.nobs
 MetricaBase.dof(result::DIDFitResult) = result.glance_table.dof
-MetricaBase.r2(result::DIDFitResult) = NaN  # DID uses within-R2
+MetricaBase.r2(result::DIDFitResult) = result.glance_table.metrics[:r2]
 MetricaBase.stderror(result::DIDFitResult) = result.tidy_table.rows .|> r -> r.stderror |> Float64

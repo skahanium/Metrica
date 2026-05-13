@@ -463,3 +463,102 @@ end
     @test haskey(MetricaBase.MODEL_REGISTRY, "ols")
     @test MetricaBase.MODEL_REGISTRY["logit"] == LogitModel
 end
+
+# === Task 14: 置信区间 ========================================================
+
+@testset "ConfidenceIntervals" begin
+    df = make_binary_data()
+
+    result = MetricaBase.fit(LogitModel, "y ~ x1 + x2", df)
+    for row in MetricaBase.tidy(result).rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate < row.ci_upper
+    end
+
+    result = MetricaBase.fit(ProbitModel, "y ~ x1 + x2", df)
+    for row in MetricaBase.tidy(result).rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate < row.ci_upper
+    end
+
+    df_c = make_count_data()
+    result = MetricaBase.fit(PoissonModel, "y ~ x1 + x2", df_c)
+    for row in MetricaBase.tidy(result).rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate < row.ci_upper
+    end
+
+    result = MetricaBase.fit(OrderedLogitModel, "y ~ x + z", make_ordered_data())
+    for row in MetricaBase.tidy(result).rows
+        @test row.ci_lower !== nothing
+        @test row.ci_upper !== nothing
+        @test row.ci_lower < row.estimate < row.ci_upper
+    end
+end
+
+# === Task 15: LR chi2 =========================================================
+
+@testset "LikelihoodRatioChi2" begin
+    df = make_binary_data()
+
+    result = MetricaBase.fit(LogitModel, "y ~ x1 + x2", df)
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :lr_chi2)
+    @test haskey(g.metrics, :lr_pvalue)
+    @test g.metrics[:lr_chi2] > 0
+    @test 0 <= g.metrics[:lr_pvalue] <= 1
+
+    result = MetricaBase.fit(ProbitModel, "y ~ x1 + x2", df)
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :lr_chi2)
+    @test g.metrics[:lr_chi2] > 0
+
+    df_c = make_count_data()
+    result = MetricaBase.fit(PoissonModel, "y ~ x1 + x2", df_c)
+    g = MetricaBase.glance(result)
+    @test haskey(g.metrics, :lr_chi2)
+    @test g.metrics[:lr_chi2] > 0
+end
+
+# === Task 16: 新增 result_to_payload ==========================================
+
+@testset "PayloadNegBin" begin
+    Random.seed!(99)
+    n = 300; x = randn(n)
+    η = 1.0 .+ 0.5 * x
+    y_nb = [rand(NegativeBinomial(5, 0.5)) + round(Int, max(0, η_i * 2)) for η_i in η]
+    df = DataFrame(y=Float64.(y_nb), x=x, z=randn(n))
+    result = MetricaBase.fit(NegBinModel, "y ~ x + z", df)
+    payload = result_to_payload(result)
+    @test payload["status"] == "success"
+    @test haskey(payload["result_payload"], "dispersion")
+    @test haskey(payload["result_payload"], "augment_preview")
+end
+
+@testset "PayloadOrderedLogit" begin
+    df = make_ordered_data()
+    result = MetricaBase.fit(OrderedLogitModel, "y ~ x + z", df)
+    payload = result_to_payload(result)
+    @test payload["status"] == "success"
+    @test haskey(payload["result_payload"], "odds_ratios")
+    @test haskey(payload["result_payload"], "thresholds")
+    @test haskey(payload["result_payload"], "n_categories")
+    @test haskey(payload["result_payload"], "augment_preview")
+end
+
+@testset "PayloadMultinomialLogit" begin
+    df = make_ordered_data()
+    cats = sort(unique(df.y))
+    ref = cats[1]
+    result = MetricaBase.fit(MultinomialLogitModel, "y ~ x + z", df; reference_category=ref)
+    if !(result isa MetricaBase.ModelError)
+        payload = result_to_payload(result)
+        @test payload["status"] == "success"
+        @test haskey(payload["result_payload"], "categories")
+        @test haskey(payload["result_payload"], "reference")
+        @test haskey(payload["result_payload"], "augment_preview")
+    end
+end

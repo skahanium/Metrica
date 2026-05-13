@@ -46,7 +46,7 @@ function ame(result::LogitFitResult, data::DataFrame)
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 
     return MetricaBase.TidyTable(
-        [MetricaBase.CoefRow(coefficient_names[i], ame_values[i], ame_se[i], z_stats[i], pvalues[i]) for i in 1:ncoef],
+        [MetricaBase.CoefRow(coefficient_names[i], ame_values[i], ame_se[i], z_stats[i], pvalues[i], nothing, nothing) for i in 1:ncoef],
         "AME (Delta method)",
     )
 end
@@ -74,7 +74,7 @@ function mem(result::LogitFitResult, data::DataFrame)
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 
     return MetricaBase.TidyTable(
-        [MetricaBase.CoefRow(result.coefficient_names[i], mem_values[i], mem_se[i], z_stats[i], pvalues[i]) for i in 1:ncoef],
+        [MetricaBase.CoefRow(result.coefficient_names[i], mem_values[i], mem_se[i], z_stats[i], pvalues[i], nothing, nothing) for i in 1:ncoef],
         "MEM (Delta method)",
     )
 end
@@ -123,7 +123,7 @@ function ame(result::ProbitFitResult, data::DataFrame)
     z_stats = ame_values ./ ame_se
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
     return MetricaBase.TidyTable(
-        [MetricaBase.CoefRow(result.coefficient_names[i], ame_values[i], ame_se[i], z_stats[i], pvalues[i]) for i in 1:ncoef],
+        [MetricaBase.CoefRow(result.coefficient_names[i], ame_values[i], ame_se[i], z_stats[i], pvalues[i], nothing, nothing) for i in 1:ncoef],
         "AME (Probit, Delta method)",
     )
 end
@@ -146,7 +146,7 @@ function mem(result::ProbitFitResult, data::DataFrame)
     z_stats = mem_values ./ mem_se
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
     return MetricaBase.TidyTable(
-        [MetricaBase.CoefRow(result.coefficient_names[i], mem_values[i], mem_se[i], z_stats[i], pvalues[i]) for i in 1:ncoef],
+        [MetricaBase.CoefRow(result.coefficient_names[i], mem_values[i], mem_se[i], z_stats[i], pvalues[i], nothing, nothing) for i in 1:ncoef],
         "MEM (Probit, Delta method)",
     )
 end

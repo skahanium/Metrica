@@ -147,6 +147,9 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
     z_stats = β ./ se_values
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 
+    α_ci = 0.05
+    z_crit = quantile(Normal(), 1 - α_ci / 2)
+
     null_ll = ologit_null_loglikelihood(y_idx, J)
     pseudo_r2 = 1 - (-ll_final) / max(-null_ll, 1e-10)
     aic = 2 * n_total_params - 2 * ll_final
@@ -164,7 +167,7 @@ function MetricaBase.fit(::Type{OrderedLogitModel}, formula::AbstractString, dat
         warnings,
     )
 
-    tidy_rows = [MetricaBase.CoefRow(coefficient_names[i], β[i], se_values[i], z_stats[i], pvalues[i]) for i in 1:ncoef]
+    tidy_rows = [MetricaBase.CoefRow(coefficient_names[i], β[i], se_values[i], z_stats[i], pvalues[i], β[i] - z_crit * se_values[i], β[i] + z_crit * se_values[i]) for i in 1:ncoef]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "MLE (L-BFGS)")
 
     η = X * β

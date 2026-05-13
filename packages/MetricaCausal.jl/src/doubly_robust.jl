@@ -58,7 +58,9 @@ function MetricaBase.fit(::Type{AIPWModel}, formula::AbstractString, data;
         Dict{Symbol, MetricaBase.MetricValue}(:ate => ate, :att => att),
         MetricaBase.ModelWarning[])
 
-    tidy_rows = [MetricaBase.CoefRow(:ATE, ate, ate_se, ate/ate_se, 2*(1-cdf(Normal(), abs(ate/ate_se))))]
+    z_crit = quantile(Normal(), 0.975)
+    tidy_rows = [MetricaBase.CoefRow(:ATE, ate, ate_se, ate/ate_se, 2*(1-cdf(Normal(), abs(ate/ate_se))),
+        ate - z_crit * ate_se, ate + z_crit * ate_se)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "AIPW (doubly robust)")
 
     return AIPWFitResult(formula, glance_table, tidy_table,

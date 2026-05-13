@@ -82,11 +82,17 @@ function MetricaBase.fit(::Type{ProbitModel}, formula::AbstractString, data;
     z_stats = coefficients ./ se_values
     pvalues = 2 .* (1 .- cdf.(Normal(), abs.(z_stats)))
 
+    α = 0.05
+    z_crit = quantile(Normal(), 1 - α / 2)
+
     null_loglik = null_loglikelihood_bernoulli(y)
     loglik = irls_result.loglikelihood
     pseudo_r2 = 1 - (-loglik) / (-null_loglik)
     aic = 2 * ncoef - 2 * loglik
     bic = ncoef * log(nobs) - 2 * loglik
+
+    lr_chi2 = 2 * (loglik - null_loglik)
+    lr_pvalue = 1 - cdf(Chisq(ncoef), lr_chi2)
 
     warnings = MetricaBase.ModelWarning[]
     dropped_rows = n_total - n_effective
@@ -97,11 +103,12 @@ function MetricaBase.fit(::Type{ProbitModel}, formula::AbstractString, data;
         Dict{Symbol, MetricaBase.MetricValue}(
             :pseudo_r2 => pseudo_r2, :loglik => loglik,
             :aic => aic, :bic => bic, :deviance => irls_result.deviance,
+            :lr_chi2 => lr_chi2, :lr_pvalue => lr_pvalue,
         ),
         warnings,
     )
 
-    tidy_rows = [MetricaBase.CoefRow(coefficient_names[i], coefficients[i], se_values[i], z_stats[i], pvalues[i]) for i in eachindex(coefficients)]
+    tidy_rows = [MetricaBase.CoefRow(coefficient_names[i], coefficients[i], se_values[i], z_stats[i], pvalues[i], coefficients[i] - z_crit * se_values[i], coefficients[i] + z_crit * se_values[i]) for i in eachindex(coefficients)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "MLE")
 
     return ProbitFitResult(

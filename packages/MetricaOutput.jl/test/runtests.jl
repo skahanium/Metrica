@@ -12,8 +12,8 @@ using MetricaOutput
     )
     tidy = TidyTable(
         [
-            CoefRow(:Intercept, 1.0, 0.1, 10.0, 0.001),
-            CoefRow(:x1, 2.0, 0.2, 10.0, 0.001),
+            CoefRow(:Intercept, 1.0, 0.1, 10.0, 0.001, nothing, nothing),
+            CoefRow(:x1, 2.0, 0.2, 10.0, 0.001, nothing, nothing),
         ],
         "classical",
     )

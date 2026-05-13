@@ -151,46 +151,60 @@ using MetricaBase
     # === CoefRow ============================================================
 
     @testset "CoefRow 全部字段有值" begin
-        cr = CoefRow(:intercept, 1.5, 0.15, 10.0, 1e-6)
+        cr = CoefRow(:intercept, 1.5, 0.15, 10.0, 1e-6, nothing, nothing)
         @test cr.name == :intercept
         @test cr.estimate == 1.5
         @test cr.stderror == 0.15
         @test cr.statistic == 10.0
         @test cr.pvalue == 1e-6
+        @test cr.ci_lower === nothing
+        @test cr.ci_upper === nothing
     end
 
     @testset "CoefRow 可选字段为 nothing" begin
-        cr = CoefRow(:beta, 2.0, nothing, nothing, nothing)
+        cr = CoefRow(:beta, 2.0, nothing, nothing, nothing, nothing, nothing)
         @test cr.name == :beta
         @test cr.estimate == 2.0
         @test cr.stderror === nothing
         @test cr.statistic === nothing
         @test cr.pvalue === nothing
+        @test cr.ci_lower === nothing
+        @test cr.ci_upper === nothing
     end
 
     @testset "CoefRow 部分可选字段为 nothing" begin
-        cr = CoefRow(:gamma, 0.5, 0.05, nothing, 0.03)
+        cr = CoefRow(:gamma, 0.5, 0.05, nothing, 0.03, nothing, nothing)
         @test cr.stderror == 0.05
         @test cr.statistic === nothing
         @test cr.pvalue == 0.03
+        @test cr.ci_lower === nothing
+        @test cr.ci_upper === nothing
     end
 
     @testset "CoefRow 字段类型稳定" begin
-        cr = CoefRow(:x, 1.0, 0.2, 5.0, 0.01)
+        cr = CoefRow(:x, 1.0, 0.2, 5.0, 0.01, nothing, nothing)
         @test cr.name isa Symbol
         @test cr.estimate isa Float64
         @test cr.stderror isa Union{Nothing, Float64}
         @test cr.statistic isa Union{Nothing, Float64}
         @test cr.pvalue isa Union{Nothing, Float64}
+        @test cr.ci_lower isa Union{Nothing, Float64}
+        @test cr.ci_upper isa Union{Nothing, Float64}
+    end
+
+    @testset "CoefRow 置信区间有值" begin
+        cr = CoefRow(:x1, 1.5, 0.2, 7.5, 0.001, 1.1, 1.9)
+        @test cr.ci_lower === 1.1
+        @test cr.ci_upper === 1.9
     end
 
     # === TidyTable ==========================================================
 
     @testset "TidyTable 完整字段" begin
         rows = [
-            CoefRow(:intercept, 1.0, 0.1, 10.0, 0.001),
-            CoefRow(:x1, 2.0, 0.2, 10.0, 0.001),
-            CoefRow(:x2, -0.5, 0.15, nothing, nothing),
+            CoefRow(:intercept, 1.0, 0.1, 10.0, 0.001, nothing, nothing),
+            CoefRow(:x1, 2.0, 0.2, 10.0, 0.001, nothing, nothing),
+            CoefRow(:x2, -0.5, 0.15, nothing, nothing, nothing, nothing),
         ]
         td = TidyTable(rows, "classical")
 
@@ -209,7 +223,7 @@ using MetricaBase
     end
 
     @testset "TidyTable 单行" begin
-        td = TidyTable([CoefRow(:a, 1.0, nothing, nothing, nothing)], "robust")
+        td = TidyTable([CoefRow(:a, 1.0, nothing, nothing, nothing, nothing, nothing)], "robust")
         @test length(td.rows) == 1
         @test td.vcov_label == "robust"
     end
@@ -308,8 +322,8 @@ using MetricaBase
         )
         ols_tidy = TidyTable(
             [
-                CoefRow(:Intercept, 1.2, 0.10, 12.0, 0.0001),
-                CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001),
+                CoefRow(:Intercept, 1.2, 0.10, 12.0, 0.0001, nothing, nothing),
+                CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001, nothing, nothing),
             ],
             "classical",
         )
@@ -338,9 +352,93 @@ using MetricaBase
         @test ols_glance.warnings == [rows_dropped_warning]
 
         @test length(ols_tidy.rows) == 2
-        @test ols_tidy.rows[1] == CoefRow(:Intercept, 1.2, 0.10, 12.0, 0.0001)
-        @test ols_tidy.rows[2] == CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001)
+        @test ols_tidy.rows[1] == CoefRow(:Intercept, 1.2, 0.10, 12.0, 0.0001, nothing, nothing)
+        @test ols_tidy.rows[2] == CoefRow(:x1, 2.1, 0.18, 11.7, 0.0001, nothing, nothing)
         @test ols_tidy.vcov_label == "classical"
+    end
+
+    # === confint 通用实现 =====================================================
+
+    @testset "confint 通用实现" begin
+
+        # 模拟一个支持 coef / stderror / dof 协议的结果类型
+        struct MockFitResult <: AbstractFittedModel
+            _coef::Vector{Float64}
+            _stderror::Union{Nothing, Vector{Float64}}
+            _dof::Int
+        end
+        MetricaBase.coef(r::MockFitResult) = r._coef
+        MetricaBase.stderror(r::MockFitResult) = r._stderror
+        MetricaBase.dof(r::MockFitResult) = r._dof
+
+        @testset "返回值结构与对称性" begin
+            r = MockFitResult([1.0, 2.0, -0.5], [0.1, 0.2, 0.05], 95)
+            ci_lo, ci_hi = confint(r)
+
+            @test ci_lo isa Vector{Float64}
+            @test ci_hi isa Vector{Float64}
+            @test length(ci_lo) == 3
+            @test length(ci_hi) == 3
+            # 置信区间关于系数对称
+            for i in 1:3
+                @test ci_lo[i] < r._coef[i] < ci_hi[i]
+                @test (r._coef[i] - ci_lo[i]) ≈ (ci_hi[i] - r._coef[i])
+            end
+        end
+
+        @testset "95% 置信区间数值正确（dof=95）" begin
+            # t_{0.975, 95} ≈ 1.9852506
+            t_crit = 1.9852506
+            r = MockFitResult([1.0, 2.0, -0.5], [0.1, 0.2, 0.05], 95)
+            ci_lo, ci_hi = confint(r)
+
+            @test ci_lo[1] ≈ 1.0 - t_crit * 0.1 atol=1e-5
+            @test ci_hi[1] ≈ 1.0 + t_crit * 0.1 atol=1e-5
+            @test ci_lo[2] ≈ 2.0 - t_crit * 0.2 atol=1e-5
+            @test ci_hi[2] ≈ 2.0 + t_crit * 0.2 atol=1e-5
+            @test ci_lo[3] ≈ -0.5 - t_crit * 0.05 atol=1e-5
+            @test ci_hi[3] ≈ -0.5 + t_crit * 0.05 atol=1e-5
+        end
+
+        @testset "自定义置信水平 0.99（dof=50）" begin
+            # t_{0.995, 50} ≈ 2.6777930
+            t_crit = 2.6777930
+            r = MockFitResult([1.0], [0.1], 50)
+            ci_lo, ci_hi = confint(r; level=0.99)
+
+            @test ci_lo[1] ≈ 1.0 - t_crit * 0.1 atol=1e-5
+            @test ci_hi[1] ≈ 1.0 + t_crit * 0.1 atol=1e-5
+        end
+
+        @testset "stderror 为 nothing 时返回 nothing 填充" begin
+            r = MockFitResult([1.0, 2.0], nothing, 10)
+            ci_lo, ci_hi = confint(r)
+
+            @test length(ci_lo) == 2
+            @test length(ci_hi) == 2
+            @test all(isnothing, ci_lo)
+            @test all(isnothing, ci_hi)
+        end
+
+        @testset "自由度影响区间宽度" begin
+            r_narrow = MockFitResult([1.0], [0.1], 1000)
+            r_wide   = MockFitResult([1.0], [0.1], 5)
+
+            ci_lo_n, ci_hi_n = confint(r_narrow)
+            ci_lo_w, ci_hi_w = confint(r_wide)
+
+            @test (ci_hi_n - ci_lo_n) < (ci_hi_w - ci_lo_w)
+        end
+
+        @testset "更高置信水平产生更宽区间" begin
+            r = MockFitResult([1.0], [0.1], 50)
+            ci_lo_90, ci_hi_90 = confint(r; level=0.90)
+            ci_lo_95, ci_hi_95 = confint(r; level=0.95)
+            ci_lo_99, ci_hi_99 = confint(r; level=0.99)
+
+            @test (ci_hi_90 - ci_lo_90) < (ci_hi_95 - ci_lo_95)
+            @test (ci_hi_95 - ci_lo_95) < (ci_hi_99 - ci_lo_99)
+        end
     end
 
 end

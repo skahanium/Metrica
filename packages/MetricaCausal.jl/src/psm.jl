@@ -92,7 +92,9 @@ function MetricaBase.fit(::Type{PSMModel}, formula::AbstractString, data;
         Dict{Symbol, MetricaBase.MetricValue}(:att => att, :n_matched => n_matched),
         MetricaBase.ModelWarning[])
 
-    tidy_rows = [MetricaBase.CoefRow(:ATT, att, att_se, att/att_se, 2*(1-cdf(Normal(), abs(att/att_se))))]
+    z_crit = quantile(Normal(), 0.975)
+    tidy_rows = [MetricaBase.CoefRow(:ATT, att, att_se, att/att_se, 2*(1-cdf(Normal(), abs(att/att_se))),
+        att - z_crit * att_se, att + z_crit * att_se)]
     tidy_table = MetricaBase.TidyTable(tidy_rows, "PSM (nearest neighbor)")
 
     return PSMFitResult(formula, glance_table, tidy_table,
