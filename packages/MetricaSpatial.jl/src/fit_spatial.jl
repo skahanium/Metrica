@@ -213,12 +213,57 @@ function fit_spatial(
             warnings,
             nothing,
         )
+    elseif model_type == "spatial_sdm"
+        out = fit_sdm_2sls(ys, Xs, W, x_colnames; vcov_kind=vcov_sym == :HC1 ? :HC1 : :classical)
+        out isa MetricaBase.ModelError && return out
+        pairs, se, fitted, resid, rho, theta = out
+        mor = moran_residuals(resid, W)
+        merge!(diag, mor)
+        diag[:rho] = rho
+        theta_dict = Dict{String, Float64}()
+        for (k, cn) in enumerate(x_colnames[2:end])
+            theta_dict[String(cn)] = k <= length(theta) ? theta[k] : 0.0
+        end
+        eff = sdm_effects(rho, theta_dict, W, x_colnames[2:end])
+        if !(eff isa MetricaBase.ModelError)
+            direct_eff, indirect_eff, total_eff, method_eff = eff
+            diag[:direct_effects] = direct_eff
+            diag[:indirect_effects] = indirect_eff
+            diag[:total_effects] = total_eff
+            diag[:effects_method] = method_eff
+        end
+        dof = max(1, n - length(pairs))
+        return SpatialFitResult(:spatial_sdm, pairs, se, vcov_label,
+                               resid, fitted, n, dof, rho, :rho, diag, warnings, nothing)
+    elseif model_type == "spatial_sdem"
+        out = fit_sdem_ml(ys, Xs, W, x_colnames)
+        out isa MetricaBase.ModelError && return out
+        pairs, se, fitted, resid, lambda, ll = out
+        mor = moran_residuals(resid, W)
+        merge!(diag, mor)
+        diag[:lambda] = lambda
+        dof = max(1, n - length(pairs))
+        return SpatialFitResult(:spatial_sdem, pairs, se,
+            "Gaussian ML（SDEM）", resid, fitted, n, dof,
+            lambda, :lambda, diag, warnings, ll)
+    elseif model_type == "spatial_sac"
+        out = fit_sac_gs2sls(ys, Xs, W, x_colnames)
+        out isa MetricaBase.ModelError && return out
+        pairs, se, fitted, resid, rho, lambda = out
+        mor = moran_residuals(resid, W)
+        merge!(diag, mor)
+        diag[:rho] = rho
+        diag[:lambda] = lambda
+        dof = max(1, n - length(pairs))
+        return SpatialFitResult(:spatial_sac, pairs, se,
+            "GS2SLS（SAC）", resid, fitted, n, dof,
+            rho, :rho, diag, warnings, nothing)
     else
         return MetricaBase.ModelError(
             :spatial_unknown_model,
             "未知空间模型类型",
             model_type,
-            "仅支持 spatial_lag、spatial_error 与 spatial_slx。",
+            "支持 spatial_lag、spatial_error、spatial_slx、spatial_sdm、spatial_sdem、spatial_sac。",
         )
     end
 end

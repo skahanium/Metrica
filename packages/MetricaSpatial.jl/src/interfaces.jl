@@ -69,15 +69,28 @@ function MetricaBase.model_capabilities(r::SpatialFitResult)::MetricaBase.ModelC
     else
         Symbol[]
     end
+    estimator_display = if r.model_kind == :spatial_error
+        ["Gaussian ML"]
+    elseif r.model_kind == :spatial_slx
+        ["OLS"]
+    elseif r.model_kind == :spatial_sdm
+        ["2SLS (Durbin)"]
+    elseif r.model_kind == :spatial_sdem
+        ["Gaussian ML (Durbin)"]
+    elseif r.model_kind == :spatial_sac
+        ["GS2SLS"]
+    else
+        ["2SLS"]
+    end
     return MetricaBase.ModelCapabilities(
         :implemented,
         :spatial,
-        [:spatial_lag, :spatial_error, :spatial_slx],
-        r.model_kind == :spatial_error ? ["Gaussian ML"] : (r.model_kind == :spatial_slx ? ["OLS"] : ["2SLS"]),
+        [:spatial_lag, :spatial_error, :spatial_slx, :spatial_sdm, :spatial_sdem, :spatial_sac],
+        estimator_display,
         available,
         unavailable,
         effects,
         true,
-        ["SDM、SAC/SARAR、空间 Probit 与 GWR 尚未暴露为可调用模型。"],
+        ["空间 Probit 与 GWR/GTWR 尚未暴露为可调用模型。"],
     )
 end
