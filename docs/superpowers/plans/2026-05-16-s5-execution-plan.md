@@ -361,6 +361,95 @@
 
 ---
 
+## S5.7 空间计量
+
+### 1. 收口状态
+
+- **范围：** 新建 `MetricaSpatial.jl`；`model_type`：`spatial_lag`（SAR，空间滞后）、`spatial_error`（SEM，空间误差）；外部稀疏权重边表 + 主数据 **ID 列 join**；Runtime 字段与规模上界；App `spreg` CLI + `SpatialDiagnosticsPanel`；协议与教程。
+- **权威对齐：** 总规 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) §10；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
+
+### 2. 范围与非目标
+
+| 阶段 | `model_type` | 首期纳入 | 明确不做（首期） |
+|------|----------------|----------|------------------|
+| **7a** | `spatial_lag` | 截面 `formula`；**2SLS / IV 型 SAR**（`y = ρ W y + X β + ε`，工具 `Z=[X, WX]` 经秩处理）；`glance` / `tidy` / `diagnostics` / `warnings` | SDM、SAC、SLX、GWR、地图编辑器 |
+| **7b** | `spatial_error` | **Gaussian 剖面 ML**（对 `λ` 一维 `Optim` 优化，`β` 与 `σ²` 集中）；同左结构化输出 | 一般矩 GMM、非高斯误差族 |
+
+**非目标：** 地图 UI、Shapefile 拓扑、稠密 \(n\times n\) 权重文件主路径、直接/间接效应分解（**字段预留**，见下）。
+
+### 3. S5.7-J0 设计定稿（单一事实来源）
+
+1. **权重文件（边表 CSV，首期唯一格式）**  
+   - 必填表头三列：**`id_i`**、**`id_j`**、**`w`**（均为 UTF-8 字符串 ID 与数值权重；`w` 须为有限非负）。  
+   - **重复边**：相同 `(id_i, id_j)` 多行时 **`w` 求和** 聚合。  
+   - **自环**：允许 `id_i == id_j`；无要求必须含对角线。  
+   - **有向**：按有向边入库；行标准化按**出度/行和**定义。  
+2. **主数据对齐**  
+   - `model_spec.spatial_id_column`：主 CSV 中与边表 ID **同一类型字符串** 的列名。  
+   - 仅用 `formula` 涉及列 + `spatial_id_column` 的 **complete cases**；按 **ID 升序** 固定行序构造 \(n\) 维 \(W\)。  
+   - **禁止**「无 ID、仅靠 CSV 行序对齐权重方阵」的隐式模式（Runtime 不接收方阵权重主路径）。  
+3. **行标准化**  
+   - `spatial_row_standardize`：布尔，**默认 `true`**。若为 `true`，在稀疏 \(W\) 上按行除以行和（行和为 0 的单元 → **错误**：孤立单元）。  
+   - `diagnostics.row_standardized_report`：`requested`（bool）、`applied`（bool）、`row_sums_min`、`row_sums_max`（应用后）。  
+4. **估计后端（已定稿）**  
+   - **不新增**专用空间计量 Julia 包依赖；使用 **`LinearAlgebra` + `SparseArrays` + `Optim`**（与 `MetricaTimeSeries` 对齐的 Optim 版本区间）。  
+   - SAR：**2SLS**，`β̂ = (X' P_Z X)^{-1} X' P_Z y`，`X=[Wy,X]`，`Z` 由 `X` 与 `W*X` 构造并剔除与 `X` 完全共线列（含截距时剔除 `W` 作用于常数列的冗余）。  
+   - SEM：剖面对数似然 \(L(λ)\)，含 **`logabsdet(I - λW)`**（复数返回取实部并记 `warnings`），`λ` 初值 0，**`Optim.NelderMead`** 一维搜索（参数化 `λ` 单实数）。  
+5. **Moran I（残差）**  
+   - 对 **中心化残差** \(z = e - \bar e\)：`moran_i`、`moran_ei`、`moran_var`、`moran_z`（随机化假设下经典公式；`S0 = sum(W)`）。  
+6. **规模上界**  
+   - \(n \le 5000\)；边表非零元 **nnz \(\le 200000\)**（Julia 与 Runtime 双侧校验路径与提示一致）。  
+7. **路径与隐私**  
+   - `diagnostics.spatial_weights_basename`：仅文件名；**不**在 diagnostics 中回传绝对路径。  
+8. **效应分解**  
+   - `direct_effects` / `indirect_effects` / `total_effects`：**首期恒为 JSON `null`**，教程说明二期。
+
+### 4. 协议定稿表（`model_spec`）
+
+**共同必填：** `formula`；`spatial_weights_path`；`spatial_id_column`。
+
+| 字段 | `spatial_lag` | `spatial_error` | 说明 |
+|------|----------------|-----------------|------|
+| `vcov` | 可选 `classical` / `hc1`（默认 classical） | 同左 | SAR 的 `tidy` 标准误：classical 为 2SLS 渐近默认实现；hc1 为异方差稳健（三明治，简化实现） |
+| `spatial_row_standardize` | 可选，默认 true | 同左 | `false` 时使用用户原始行权重（仍须无孤立行） |
+
+### 5. CLI 与 App（CLI-first）
+
+- **动词：** `spreg`  
+- **公式：** 与 `reg` 一致，`y ~ x1 + x2`。  
+- **必选选项：** `spatial_weights("相对或绝对路径")`；`spatial_id(列名)`；`model(lag)` 或 `model(error)`。  
+- **总规兼容别名：** `weights("path")` 在 **`spreg` 且未出现 `spatial_weights` 时** 视为 **空间权重文件**（非回归频数权重）。若同时出现二者 → 解析错误。
+
+### 6. Task 表
+
+| ID | 位置 | 一句话目标 |
+|----|------|------------|
+| S5.7-D0 | 本专节 + `s5-advanced-research-topics.md` | S5.7 专节 + 路线图验收锚点 |
+| S5.7-J0 | 本专节 §3 | 见上 J0 定稿 |
+| S5.7-J1 | `packages/MetricaSpatial.jl` | 权重 IO、`fit_spatial`、`glance`/`tidy`、`result_to_payload` |
+| S5.7-J2 | `runtests.jl` + `datasets/demo/spatial_demo*.csv` | 成功 + ID 缺失 + 孤立点 |
+| S5.7-B1 | `julia_bridge_entry.jl`、`julia_daemon.jl` | `spatial_lag` / `spatial_error` 分支 |
+| S5.7-R1 | `lib.rs`、`server.rs` | 白名单、必填、`n`/nnz 上界 |
+| S5.7-R2 | `vertical_slice.rs` | 两模型各一条成功 + diagnostics 键 |
+| S5.7-A1 | App `command*`、`protocol`、`SpatialDiagnosticsPanel`、`ResultBlock` | CLI-first 展示 |
+| S5.7-A2 | Vitest | 解析与 `buildFitModelRequest` |
+| S5.7-D1 | `runtime-protocol.md`、`tutorials/s5-spatial.md` | 协议 + 教学 |
+| S5.7-D2 | 总规 §10 | 字段名与 CLI 映射一致 |
+
+### 7. 验收
+
+- `Pkg.test(MetricaSpatial)`：边表聚合、行标准化、Moran、SAR/SEM 成功路径 + 至少两类用户错误（孤立行、ID 不在边表）。  
+- `cargo test vertical_slice`：`spatial_lag` 与 `spatial_error` 各一条，`diagnostics` 含 `row_standardized_report`、`moran_i`、basename。  
+- App：Vitest 覆盖 `spreg` 解析与请求构造。
+
+### 8. 风险
+
+- `logabsdet(I-λW)` 数值不稳 → `failure_code` + `warnings`。  
+- 工具矩阵秩亏 → `ModelError` 明确码。  
+- 用户混淆 `weights()` 与 `spatial_weights()` → 解析器与教程双重说明。
+
+---
+
 ## 验证与未覆盖风险（`S5.0`）
 
 - **已做：** 全仓 `grep` 旧 `spec`/`plan` 路径与 `ui-project-button-system-plan.md`；`docs/superpowers` 目录仅剩本计划与主设计；Runtime 路由与 `julia_bridge_entry.jl` / `julia_daemon.jl` 对照更新协议文档。

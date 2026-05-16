@@ -86,6 +86,10 @@ export interface FitModelParams {
   garchQ?: number;
   garchMaxIter?: number;
   garchTol?: number;
+  /** 仅 `spatial_lag` / `spatial_error` */
+  spatialWeightsPath?: string;
+  spatialIdColumn?: string;
+  spatialRowStandardize?: boolean;
 }
 
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
@@ -142,6 +146,9 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     garchQ,
     garchMaxIter,
     garchTol,
+    spatialWeightsPath,
+    spatialIdColumn,
+    spatialRowStandardize,
   } = params;
 
   const modelSpec: FitModelRequest['model_spec'] = {
@@ -251,6 +258,17 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (thresholdGrid && thresholdGrid.length >= 2) modelSpec.threshold_grid = thresholdGrid;
     if (typeof thresholdTrimFrac === 'number' && Number.isFinite(thresholdTrimFrac)) {
       modelSpec.threshold_trim_frac = thresholdTrimFrac;
+    }
+  } else if (modelType === 'spatial_lag' || modelType === 'spatial_error') {
+    const sw = spatialWeightsPath?.trim();
+    if (sw) modelSpec.spatial_weights_path = sw;
+    const sid = spatialIdColumn?.trim();
+    if (sid) modelSpec.spatial_id_column = sid;
+    if (typeof spatialRowStandardize === 'boolean') {
+      modelSpec.spatial_row_standardize = spatialRowStandardize;
+    }
+    if (modelType === 'spatial_lag') {
+      modelSpec.vcov = { type: vcovType };
     }
   } else {
     modelSpec.vcov = { type: vcovType };

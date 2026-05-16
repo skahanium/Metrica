@@ -163,6 +163,49 @@ fn fit_model_runs_arch_with_diagnostics() {
 }
 
 #[test]
+fn fit_model_runs_spatial_lag_with_spatial_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
+    request.model_spec.model_type = "spatial_lag".to_string();
+    request.model_spec.formula = "y ~ x1".to_string();
+    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
+    request.model_spec.spatial_id_column = Some("region".to_string());
+    request.model_spec.spatial_row_standardize = Some(true);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("row_standardized_report").is_some());
+    assert!(diag.get("moran_i").is_some());
+    assert_eq!(
+        diag.get("spatial_weights_basename").and_then(|v| v.as_str()),
+        Some("spatial_demo_W.csv")
+    );
+    assert!(diag.get("rho").is_some());
+}
+
+#[test]
+fn fit_model_runs_spatial_error_with_spatial_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
+    request.model_spec.model_type = "spatial_error".to_string();
+    request.model_spec.formula = "y ~ x1".to_string();
+    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
+    request.model_spec.spatial_id_column = Some("region".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("row_standardized_report").is_some());
+    assert!(diag.get("moran_i").is_some());
+    assert!(diag.get("lambda").is_some());
+}
+
+#[test]
 fn fit_model_runs_gmm_linear_with_diagnostics() {
     let mut request = sample_fit_model_request();
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();

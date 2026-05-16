@@ -768,6 +768,9 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         garchQ: spec.garch_q,
         garchMaxIter: spec.garch_max_iter,
         garchTol: spec.garch_tol,
+        spatialWeightsPath: spec.spatial_weights_path ?? '',
+        spatialIdColumn: spec.spatial_id_column ?? '',
+        spatialRowStandardize: spec.spatial_row_standardize,
       });
       const payload = (result as TaskResponse).result_payload as Record<string, unknown> | undefined;
       const rr = (result as TaskResponse).run_record;

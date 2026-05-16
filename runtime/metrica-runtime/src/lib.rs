@@ -83,6 +83,8 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("sur", vec!["equations"]),
         ("system_2sls", vec!["equations", "system_endogenous", "system_instruments"]),
         ("system_3sls", vec!["equations", "system_endogenous", "system_instruments"]),
+        ("spatial_lag", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("spatial_error", vec!["spatial_weights_path", "spatial_id_column"]),
     ])
 }
 
@@ -167,6 +169,8 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                         .system_instruments
                         .as_ref()
                         .map(|v| if v.is_empty() { "" } else { "present" }),
+                    "spatial_weights_path" => spec.spatial_weights_path.as_deref(),
+                    "spatial_id_column" => spec.spatial_id_column.as_deref(),
                     _ => Some("present"),
                 };
                 match value {
@@ -386,6 +390,40 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
     }
 }
 
+/// 空间模型：校验权重边表文件在磁盘上存在（相对 `working_dir` 解析）。
+pub fn validate_spatial_weights_on_disk(request: &TaskRequest) -> Option<ValidationError> {
+    if !matches!(
+        request.model_spec.model_type.as_str(),
+        "spatial_lag" | "spatial_error"
+    ) {
+        return None;
+    }
+    let wp = request
+        .model_spec
+        .spatial_weights_path
+        .as_deref()
+        .unwrap_or("")
+        .trim();
+    if wp.is_empty() {
+        return None;
+    }
+    let wd = resolve_working_dir(&request.project_context.working_dir);
+    let p = std::path::Path::new(wp);
+    let full = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        wd.join(wp)
+    };
+    if !full.exists() {
+        return Some(ValidationError {
+            code: "RUNTIME_SPATIAL_WEIGHTS_NOT_FOUND",
+            message: format!("空间权重文件不存在：{}", full.display()),
+            hint: Some("请检查 spatial_weights_path 与 project_context.working_dir。".to_string()),
+        });
+    }
+    None
+}
+
 // === 标准化常量 ===============================================================
 
 /// 支持的 action 类型常量，避免字符串字面量散落各处。
@@ -584,6 +622,15 @@ pub struct ModelSpec {
     /// `arch` / `garch`：优化 f_reltol。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub garch_tol: Option<f64>,
+    /// `spatial_lag` / `spatial_error`：边表 CSV 路径（相对 `working_dir` 或绝对路径）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spatial_weights_path: Option<String>,
+    /// 主数据中与边表 `id_i`/`id_j` 对齐的列名。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spatial_id_column: Option<String>,
+    /// 是否对 \(W\) 行标准化；默认 `true`（省略时 Julia 端按 true 处理）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spatial_row_standardize: Option<bool>,
 }
 
 // === 模型族类型（从 ModelSpec 转换，提供类型安全访问）=============================
@@ -1051,6 +1098,9 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             garch_q: None,
             garch_max_iter: None,
             garch_tol: None,
+            spatial_weights_path: None,
+            spatial_id_column: None,
+            spatial_row_standardize: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -1146,6 +1196,9 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         garch_q: None,
         garch_max_iter: None,
         garch_tol: None,
+        spatial_weights_path: None,
+        spatial_id_column: None,
+        spatial_row_standardize: None,
     };
     request.options.return_augment = true;
     request

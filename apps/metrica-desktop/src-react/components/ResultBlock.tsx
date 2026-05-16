@@ -18,7 +18,8 @@ import { NlsDiagnosticsPanel } from './NlsDiagnosticsPanel';
 import { ThresholdSummaryPanel } from './ThresholdSummaryPanel';
 import { SystemEquationsPanel } from './SystemEquationsPanel';
 import { VolatilitySummaryPanel } from './VolatilitySummaryPanel';
-import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics } from '../types/protocol';
+import { SpatialDiagnosticsPanel } from './SpatialDiagnosticsPanel';
+import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -59,6 +60,11 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
     ? (result.diagnostics as VolatilityDiagnostics | undefined)
     : undefined;
 
+  const showSpatialDiagnostics = modelType === 'spatial_lag' || modelType === 'spatial_error';
+  const spatialDiagnostics = showSpatialDiagnostics
+    ? (result.diagnostics as SpatialDiagnostics | undefined)
+    : undefined;
+
   const showSystemEquations =
     modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls';
 
@@ -83,6 +89,7 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       {showThresholdSummary && <ThresholdSummaryPanel diagnostics={thresholdDiagnostics} />}
       {showVolatilitySummary && <VolatilitySummaryPanel diagnostics={volatilityDiagnostics} />}
       {showSystemEquations && <SystemEquationsPanel result={result} />}
+      {showSpatialDiagnostics && <SpatialDiagnosticsPanel diagnostics={spatialDiagnostics} />}
       {isDiscrete && <DiscreteGlanceCards result={result} />}
       {modelType === 'did' && <DIDResultCards result={result} />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}

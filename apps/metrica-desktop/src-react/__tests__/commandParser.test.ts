@@ -416,6 +416,27 @@ describe('parseToModelSpec', () => {
     expect('error' in spec).toBe(true);
   });
 
+  it('parses spreg to spatial_lag with weights alias', () => {
+    const r = parse('spreg y x1, weights("datasets/demo/spatial_demo_W.csv") id(region) model(lag)');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(false);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('spatial_lag');
+      expect(spec.formula).toBe('y ~ x1');
+      expect(spec.spatial_weights_path).toBe('datasets/demo/spatial_demo_W.csv');
+      expect(spec.spatial_id_column).toBe('region');
+    }
+  });
+
+  it('parses spreg to spatial_error', () => {
+    const r = parse('spreg y x1, spatial_weights("w.csv") id(region) model(error)');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(false);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('spatial_error');
+    }
+  });
+
   it('summarize does not produce a ModelSpec', () => {
     const parsed = parse('summarize y x1');
     const spec = parseToModelSpec(parsed);

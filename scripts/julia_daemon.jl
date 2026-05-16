@@ -21,6 +21,7 @@ using MetricaDiscrete
 using MetricaCausal
 using MetricaDiagnostics
 using MetricaPanel
+using MetricaSpatial
 using MetricaData
 using MetricaSurvey
 using MetricaSystem
@@ -124,6 +125,25 @@ function handle_request(req::Dict{String, Any})
                 payload = runtime_fit_envelope(
                     MetricaTimeSeries.result_to_payload(result; include_augment=include_augment),
                 )
+            elseif model_type in ("spatial_lag", "spatial_error")
+                data = CSV.read(dataset_path, DataFrame)
+                wd = String(get(params, "working_dir", ""))
+                spec = Dict{String, Any}(
+                    "spatial_weights_path" => String(get(params, "spatial_weights_path", "")),
+                    "spatial_id_column" => String(get(params, "spatial_id_column", "")),
+                )
+                if haskey(params, "spatial_row_standardize") && params["spatial_row_standardize"] !== nothing
+                    spec["spatial_row_standardize"] = Bool(params["spatial_row_standardize"])
+                end
+                if haskey(params, "vcov") && params["vcov"] !== nothing
+                    spec["vcov"] = String(params["vcov"])
+                end
+                result = MetricaSpatial.fit_spatial(model_type, formula, data, spec, wd)
+                payload = if result isa MetricaBase.ModelError
+                    MetricaSpatial.error_to_payload(result)
+                else
+                    MetricaSpatial.result_to_payload(result; include_augment=include_augment)
+                end
             elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]
 

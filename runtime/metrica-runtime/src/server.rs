@@ -18,6 +18,7 @@ use crate::{
     ProjectManifest, RerunTaskRequest, RunRecord, SaveProjectRequest, TaskRequest, TaskResponse,
     TransformTaskRequest, ValidationError,
     validate_model_request,
+    validate_spatial_weights_on_disk,
     resolve_working_dir, resolve_dataset_path,
     sanitize_id, safe_runs_path,
     actions,
@@ -390,6 +391,16 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
         }
     }
 
+    if let Some(ref p) = request.model_spec.spatial_weights_path {
+        params["spatial_weights_path"] = json!(p);
+    }
+    if let Some(ref p) = request.model_spec.spatial_id_column {
+        params["spatial_id_column"] = json!(p);
+    }
+    if let Some(b) = request.model_spec.spatial_row_standardize {
+        params["spatial_row_standardize"] = json!(b);
+    }
+
     params
 }
 
@@ -452,6 +463,7 @@ async fn handle_model_request(
 
     let mut params = build_model_params(&request);
     params["dataset_path"] = json!(dataset_path.clone());
+    params["working_dir"] = json!(working_dir.to_string_lossy().to_string());
 
     let result = dispatch_via_channel(&state.cmd_tx, expected_action, params).await;
 
@@ -1171,8 +1183,13 @@ fn validation_error_to_response(err: &ValidationError, task_id: &str) -> axum::r
 }
 
 fn validate_fit_model_request(request: &TaskRequest) -> Option<axum::response::Response> {
-    validate_model_request(&request.model_spec)
-        .map(|err| validation_error_to_response(&err, &request.task_id))
+    if let Some(err) = validate_model_request(&request.model_spec) {
+        return Some(validation_error_to_response(&err, &request.task_id));
+    }
+    if let Some(err) = validate_spatial_weights_on_disk(request) {
+        return Some(validation_error_to_response(&err, &request.task_id));
+    }
+    None
 }
 
 // === 错误响应 ==================================================================

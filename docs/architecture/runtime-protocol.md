@@ -53,7 +53,7 @@
 
 ## `fit_model` 与 `model_type`（`S4` 当前枚举）
 
-`model_spec.model_type` 为**白名单字符串**，由 `scripts/julia_bridge_entry.jl` 与 `MetricaBase.MODEL_REGISTRY` 注册表共同约束；Runtime 仅做 schema 与字段完整性校验，不解释计量语义。
+`model_spec.model_type` 为**白名单字符串**，由 `scripts/julia_bridge_entry.jl`（及时间序列独立桥接、**空间专用分支**等）与 `MetricaBase.MODEL_REGISTRY`（若适用）共同约束；Runtime 仅做 schema 与字段完整性校验，不解释计量语义。
 
 | 模型族 | `model_type` 取值（当前） |
 |--------|---------------------------|
@@ -65,12 +65,13 @@
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
 | 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
 | 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
+| 空间（S5.7） | `spatial_lag`（SAR）、`spatial_error`（SEM）（`packages/MetricaSpatial.jl`；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` 专用分支） |
 
 ### `S5` 扩展规则（摘要）
 
 - 新高级专题（如 `gmm_linear`）仍须走 **`fit_model` 信封**（或未来经设计新增的白名单 `action`，不得使用自由文本替代结构化 `model_spec`）。
 - 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
-- 在 Julia 侧注册 `MODEL_REGISTRY`（若适用）并在桥接入口增加派发分支；同步更新本文件上表与 CLI 语法文档。
+- 在 Julia 侧注册 `MODEL_REGISTRY`（**若适用**；空间模型等可走专用分支）并在桥接入口增加派发；同步更新本文件上表与 CLI 语法文档。
 - 详见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
 
 ### `quantile`（线性分位数回归，单 τ）
@@ -150,6 +151,27 @@
 **`result_payload.diagnostics`（约定键）：** `converged`、`iterations`、`optimizer`、`loglik`、`persistence`、`unconditional_variance`、`conditional_volatility_preview`、`volatility_length`、`arch_order` 或 `garch_p`/`garch_q`、`failure_code`（未收敛或拟合失败时）。
 
 **CLI（App）：** `arch y, time(date) arch(q)`；`garch y, time(date) [arch(p)] [garch(p q)]`（省略 `garch(...)` 时为 GARCH(1,1)；与总规兼容写法 `garch y, time(date) arch(1) garch(1)` 表示 \(p=1,q=1\)）。演示数据：`datasets/demo/garch_demo.csv`。教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
+
+### `spatial_lag` / `spatial_error`（截面 SAR / SEM，S5.7）
+
+**路径：** 与截面 `MODEL_REGISTRY` 并行；Runtime 校验 `model_type` 白名单与 **`spatial_weights_path` 在磁盘上存在**（相对 `project_context.working_dir` 解析）；HTTP 与守护进程均在 `params` 中附带 **`working_dir`**（绝对路径），供 Julia 解析权重相对路径。
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | `spatial_lag` 或 `spatial_error` |
+| `spatial_weights_path` | 字符串 | 是 | 边表 CSV 路径（列名固定 **`id_i`、`id_j`、`w`**）；相对工作目录或绝对路径 |
+| `spatial_id_column` | 字符串 | 是 | 主数据中与边表 ID 对齐的列名（**每行唯一**） |
+| `spatial_row_standardize` | 布尔 | 否 | 省略时 Julia 端默认 **`true`**（行标准化） |
+| `vcov` | `{ type }` | 否 | 仅 **`spatial_lag`** 使用：`classical` 或 **`hc1`**（三明治，首期简化）；`spatial_error` 忽略 |
+
+**首期约束：** 权重在 Julia 侧展开为 **稠密** \(n\times n\) 矩阵；要求 **`n ≤ 5000`**、边表行数 **`≤ 200000`**（与 Core 实现一致）；超出时返回结构化错误。
+
+**`result_payload.diagnostics`（约定 JSON 键）：** `n_obs`、`n_nonzero_links`、`symmetry_hint`、`id_join_unique`、`id_join_missing_count`、`spatial_weights_basename`、`row_standardized_report`（对象：`requested`、`applied`、`row_sums_min`、`row_sums_max`）、残差 **Moran**（`moran_i`、`moran_ei`、`moran_var`、`moran_z`）、SAR 的 **`rho`** 或 SEM 的 **`lambda`**；`direct_effects` / `indirect_effects` / `total_effects` 首期可为 **`null`**（二期分解）。
+
+**CLI（App）：** 动词 **`spreg`**，例如  
+`spreg y x1, spatial_weights("datasets/demo/spatial_demo_W.csv") id(region) model(lag)`；`weights("...")` 为 **`spatial_weights` 的别名**。教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
 
 ### 非参数 / 半参数（5c 预留，非实现）
 

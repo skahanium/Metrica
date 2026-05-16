@@ -123,7 +123,7 @@ export function parse(input: string): ParsedCommand {
 const MODEL_VERBS = new Set([
   'regress', 'ivregress', 'gmm', 'qreg', 'nls', 'threg', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
-  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3', 'garch', 'arch',
+  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3', 'garch', 'arch', 'spreg',
 ]);
 
 // ---- 动词 -> model_type 映射 ----
@@ -286,6 +286,10 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   // svy 前缀命令：提取子模型类型和选项
   if (verb === 'svy') {
     return parseSvyToModelSpec(positionals, optMap);
+  }
+
+  if (verb === 'spreg') {
+    return parseSpregToModelSpec(positionals, optMap);
   }
 
   const modelType = verbToModelType(verb);
@@ -531,6 +535,74 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     }
   }
 
+  return spec;
+}
+
+/** 去掉选项括号值的成对引号 */
+function stripOuterQuotes(raw: string | undefined): string {
+  if (raw === undefined) return '';
+  const s = String(raw).trim();
+  if (s.length >= 2) {
+    const a = s[0];
+    const b = s[s.length - 1];
+    if ((a === '"' && b === '"') || (a === "'" && b === "'")) {
+      return s.slice(1, -1);
+    }
+  }
+  return s;
+}
+
+/**
+ * spreg：截面 SAR / SEM。spatial_weights(...) 与 weights(...) 均映射到 spatial_weights_path。
+ */
+function parseSpregToModelSpec(
+  positionals: string[],
+  optMap: Map<string, string | undefined>,
+): ModelSpec | { error: string } {
+  if (positionals.length < 2) {
+    return { error: 'spreg 需要因变量与至少一个自变量（例如 spreg y x1 x2, ...）。' };
+  }
+  const rhs = positionals.slice(1).join(' + ');
+  const formula = optMap.has('noconstant')
+    ? `${positionals[0]} ~ 0 + ${rhs}`
+    : `${positionals[0]} ~ ${rhs}`;
+
+  const wRaw = optMap.get('spatial_weights') ?? optMap.get('weights');
+  if (!wRaw?.trim()) {
+    return { error: 'spreg 需要 spatial_weights("path/to/W.csv") 或 weights("...") 指定边表（列 id_i, id_j, w）。' };
+  }
+  const spatial_weights_path = stripOuterQuotes(wRaw);
+
+  const idRaw = optMap.get('id') ?? optMap.get('spatial_id');
+  if (!idRaw?.trim()) {
+    return { error: 'spreg 需要 id(列名) 或 spatial_id(列名) 指定主数据中与边表对齐的空间 ID 列。' };
+  }
+  const spatial_id_column = stripOuterQuotes(idRaw);
+
+  const modelRaw = (optMap.get('model') ?? 'lag').trim().toLowerCase();
+  let model_type: ModelSpec['model_type'];
+  if (modelRaw === 'lag' || modelRaw === 'sar') {
+    model_type = 'spatial_lag';
+  } else if (modelRaw === 'error' || modelRaw === 'sem') {
+    model_type = 'spatial_error';
+  } else {
+    return { error: `spreg 的 model(...) 须为 lag / sar / error / sem，收到：${modelRaw}` };
+  }
+
+  const spec: ModelSpec = {
+    model_type,
+    formula,
+    spatial_weights_path,
+    spatial_id_column,
+  };
+
+  if (optMap.has('rowstd')) {
+    const v = String(optMap.get('rowstd')).trim().toLowerCase();
+    spec.spatial_row_standardize = !(v === 'false' || v === '0' || v === 'no');
+  }
+  if (optMap.has('robust')) {
+    spec.vcov = { type: 'HC1' };
+  }
   return spec;
 }
 

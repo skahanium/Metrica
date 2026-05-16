@@ -16,6 +16,7 @@ using MetricaQuantile
 using MetricaNonlinear
 using MetricaOutput
 using MetricaPanel
+using MetricaSpatial
 using MetricaSurvey
 using MetricaSystem
 using MetricaTimeSeries
@@ -198,6 +199,33 @@ else
 
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
         MetricaSurvey.result_to_payload(result; include_augment=include_augment)
+    elseif model_type in ("spatial_lag", "spatial_error")
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+        wd = ""
+        if haskey(request, :project_context) && !isnothing(request.project_context)
+            pc = request.project_context
+            if haskey(pc, :working_dir) && !isnothing(pc.working_dir)
+                wd = String(pc.working_dir)
+            end
+        end
+        spec = Dict{String, Any}(
+            "spatial_weights_path" => String(request.model_spec.spatial_weights_path),
+            "spatial_id_column" => String(request.model_spec.spatial_id_column),
+        )
+        if haskey(request.model_spec, :spatial_row_standardize) && !isnothing(request.model_spec.spatial_row_standardize)
+            spec["spatial_row_standardize"] = Bool(request.model_spec.spatial_row_standardize)
+        end
+        if haskey(request.model_spec, :vcov) && !isnothing(request.model_spec.vcov) && haskey(request.model_spec.vcov, :type) && !isnothing(request.model_spec.vcov.type)
+            spec["vcov"] = String(request.model_spec.vcov.type)
+        end
+        result = MetricaSpatial.fit_spatial(model_type, formula, df, spec, wd)
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        if result isa MetricaBase.ModelError
+            MetricaLinear.error_to_payload(result)
+        else
+            MetricaSpatial.result_to_payload(result; include_augment=include_augment)
+        end
     else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()

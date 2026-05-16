@@ -97,6 +97,34 @@ export interface SystemEquationsDiagnostics {
   iterations?: number;
 }
 
+/** 行标准化结构化报告（空间模型 diagnostics 子对象） */
+export interface RowStandardizedReport {
+  requested?: boolean;
+  applied?: boolean;
+  row_sums_min?: number;
+  row_sums_max?: number;
+}
+
+/** S5.7 空间模型 diagnostics（与 Julia `MetricaSpatial` 序列化键对齐） */
+export interface SpatialDiagnostics {
+  n_obs?: number;
+  n_nonzero_links?: number;
+  symmetry_hint?: string;
+  id_join_unique?: boolean;
+  id_join_missing_count?: number;
+  spatial_weights_basename?: string;
+  row_standardized_report?: RowStandardizedReport;
+  moran_i?: number | null;
+  moran_ei?: number | null;
+  moran_var?: number | null;
+  moran_z?: number | null;
+  rho?: number;
+  lambda?: number;
+  direct_effects?: unknown;
+  indirect_effects?: unknown;
+  total_effects?: unknown;
+}
+
 /** 线性 GMM（Runtime `result_payload.diagnostics`） */
 export interface GmmDiagnostics {
   j_statistic?: number;
@@ -220,7 +248,7 @@ export interface ModelResult {
   /** 按方程的 glance（SUR / 系统 IV）；与顶层 `glance` 并存 */
   equation_glances?: GlanceResult[];
   tidy: TidyRow[];
-  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics | VolatilityDiagnostics;
+  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics | VolatilityDiagnostics | SpatialDiagnostics;
   odds_ratios?: OddsRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
@@ -460,7 +488,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -528,6 +556,10 @@ export interface ModelSpec {
   threshold_variable?: string;
   threshold_grid?: number[];
   threshold_trim_frac?: number;
+  /** 仅 `spatial_lag` / `spatial_error`：边表 CSV（列 id_i, id_j, w） */
+  spatial_weights_path?: string;
+  spatial_id_column?: string;
+  spatial_row_standardize?: boolean;
 }
 
 export interface FitModelRequest {

@@ -39,7 +39,8 @@
 - **S5.1–S5.4：** 见总规 §4–§7 各节「验收标准」；**S5.2** 实施任务清单见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md) 中「S5.2 动态面板 GMM」专节；教程见 [`tutorials/s5-dynamic-panel-gmm.md`](../../tutorials/s5-dynamic-panel-gmm.md)。**S5.3**（SUR / 联立方程）专节与 Task 表见同文件「S5.3 SUR 与联立方程」；教程见 [`tutorials/s5-sur-system.md`](../../tutorials/s5-sur-system.md)。**S5.4**（分位数回归）专节与 Task 表见同文件「S5.4 分位数回归」；教程见 [`tutorials/s5-quantile-regression.md`](../../tutorials/s5-quantile-regression.md)。
 - **S5.5**（非线性、门限；非参数/半参数预留）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.5」；教程见 [`tutorials/s5-nonlinear-threshold.md`](../../tutorials/s5-nonlinear-threshold.md)。
 - **S5.6**（ARCH / GARCH）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.6 ARCH / GARCH」；教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
-- **S5.7–S5.9：** 见总规 §10–§12。
+- **S5.7**（空间计量）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.7 空间计量」；教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
+- **S5.8–S5.9：** 见总规 §11–§12。
 
 ## 活跃实施计划
 

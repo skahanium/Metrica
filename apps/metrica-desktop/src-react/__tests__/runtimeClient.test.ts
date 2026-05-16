@@ -32,6 +32,23 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.panel_time).toBe('year');
   });
 
+  it('builds spatial_lag request with spatial fields', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'datasets/demo/spatial_demo.csv',
+      formula: 'y ~ x1',
+      modelType: 'spatial_lag',
+      workingDir: '/repo/root',
+      spatialWeightsPath: 'datasets/demo/spatial_demo_W.csv',
+      spatialIdColumn: 'region',
+      spatialRowStandardize: true,
+    });
+    expect(req.model_spec.model_type).toBe('spatial_lag');
+    expect(req.model_spec.spatial_weights_path).toBe('datasets/demo/spatial_demo_W.csv');
+    expect(req.model_spec.spatial_id_column).toBe('region');
+    expect(req.model_spec.spatial_row_standardize).toBe(true);
+    expect(req.model_spec.vcov?.type).toBe('classical');
+  });
+
   it('includes weights and cluster for OLS', () => {
     const req = buildFitModelRequest({
       datasetPath: '/tmp/demo.csv',

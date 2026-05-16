@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::{DataCommandRequest, Message, TaskRequest, TaskResponse, ValidationError,
     validate_model_request,
+    validate_spatial_weights_on_disk,
     resolve_working_dir, resolve_dataset_path};
 
 fn julia_bin() -> String {
@@ -219,8 +220,13 @@ fn validation_error_to_task_response(err: &ValidationError, request: &TaskReques
 }
 
 fn validate_fit_model_request(request: &TaskRequest) -> Option<TaskResponse> {
-    validate_model_request(&request.model_spec)
-        .map(|err| validation_error_to_task_response(&err, request))
+    if let Some(err) = validate_model_request(&request.model_spec) {
+        return Some(validation_error_to_task_response(&err, request));
+    }
+    if let Some(err) = validate_spatial_weights_on_disk(request) {
+        return Some(validation_error_to_task_response(&err, request));
+    }
+    None
 }
 
 fn runtime_error_response(
