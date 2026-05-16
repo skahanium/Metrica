@@ -29,8 +29,9 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
   const isDiscrete = ['logit', 'probit', 'poisson', 'ordered_logit', 'multinomial_logit', 'negbin'].includes(modelType || '');
   const isSurvey = typeof modelType === 'string' && modelType.startsWith('survey_');
 
-  const isGmmLinear = modelType === 'gmm_linear';
-  const gmmDiagnostics = isGmmLinear ? (result.diagnostics as GmmDiagnostics | undefined) : undefined;
+  const showGmmDiagnostics =
+    modelType === 'gmm_linear' || modelType === 'dynamic_panel_gmm';
+  const gmmDiagnostics = showGmmDiagnostics ? (result.diagnostics as GmmDiagnostics | undefined) : undefined;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(command).catch(() => {});
@@ -50,7 +51,7 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       {modelType === 'did' && <DIDResultCards result={result} />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}
       {isDiscrete && (result.odds_ratios || (result as any).irr_entries) && <OddsRatioTable result={result} />}
-      {isGmmLinear && gmmDiagnostics && <GmmDiagnosticsPanel diagnostics={gmmDiagnostics} />}
+      {showGmmDiagnostics && gmmDiagnostics && <GmmDiagnosticsPanel diagnostics={gmmDiagnostics} />}
       {result.tidy && result.tidy.length > 0 && <TidyTable result={result} />}
       {isSurvey && (
         <>

@@ -145,6 +145,28 @@ fn fit_model_runs_gmm_linear_with_diagnostics() {
 }
 
 #[test]
+fn fit_model_runs_dynamic_panel_gmm_with_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/dynamic_panel_gmm_demo.csv".to_string();
+    request.model_spec.model_type = "dynamic_panel_gmm".to_string();
+    request.model_spec.formula = "y ~ x".to_string();
+    request.model_spec.panel_id = Some("firm".to_string());
+    request.model_spec.panel_time = Some("year".to_string());
+    request.model_spec.instrument_lags = Some(vec![2, 4]);
+    request.model_spec.gmm_weight = Some("two_step".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("dpgmm diagnostics");
+    assert!(diag.get("j_statistic").is_some());
+    assert!(diag.get("ar1_test").is_some());
+    assert!(diag.get("ar2_test").is_some());
+}
+
+#[test]
 fn fit_model_runs_ipw_with_propensity_formula() {
     let path = std::env::temp_dir().join("metrica_ipw_bridge.csv");
     fs::write(

@@ -58,7 +58,7 @@
 | 模型族 | `model_type` 取值（当前） |
 |--------|---------------------------|
 | 线性 | `ols`、`iv`、`gmm_linear`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
-| 面板 | `panel`、`panel_iv` |
+| 面板 | `panel`、`panel_iv`、`dynamic_panel_gmm` |
 | 时间序列 | `arima`、`var`、`unitroot`、`cointegration` |
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
 | 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
@@ -100,6 +100,26 @@
 | `exactly_identified` | 布尔 | 为 true 时 J 检验不适用 |
 
 **数值说明：** 过识别两步 GMM 中样本矩协方差 \(\hat\Omega\) 可能接近奇异；实现可对 \(\hat\Omega\) 施加极小对角收缩后再求逆。恰识别且请求 `two_step` 时，若 \(\hat\Omega\) 不可逆则退回与一步相同的权重 \((Z'Z)^{-1}\)，并在 `weight_matrix_description` 中说明。
+
+### `dynamic_panel_gmm`（差分动态面板 GMM / Arellano–Bond）
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `dynamic_panel_gmm` |
+| `panel_id` | 字符串 | 是 | 截面个体列名 |
+| `panel_time` | 字符串 | 是 | 时间列名 |
+| `instrument_lags` | 整数数组，长度 2 | 是 | `[min_lag, max_lag]`，水平因变量滞后层作为工具（如 `[2, 4]` 对应 `lags(2 4)`） |
+| `gmm_weight` | 字符串，可选 | 否 | `one_step` / `two_step`，默认 `two_step` |
+| `dpgmm_style` | 字符串，可选 | 否 | 首期仅 `difference`；`system` 为二期预留 |
+| `collapse_instruments` | 布尔，可选 | 否 | 首期未实现，传 `true` 时 Julia 返回结构化错误 |
+
+**公式约定：** 左侧为水平因变量 \(y_{it}\)；右侧为**严格外生**解释变量（在差分方程中以 \(\Delta x\) 进入，并以自身为工具）。动态项 \(\Delta y_{i,t-1}\) 由实现自动加入，勿在公式中重复写滞后因变量列。
+
+**不转发字段：** 与 `gmm_linear` 相同，桥接对 `dynamic_panel_gmm` 不传 `vcov` / `weights` / `cluster`。
+
+**`result_payload.diagnostics`：** 含 S5.1 兼容键 `j_statistic`、`j_df`、`j_pvalue`、`n_moments`、`n_params`、`gmm_weight`、`weight_matrix_description`、`iterations`；并含 `ar1_test`、`ar2_test`（对象：`statistic`、`pvalue`、`description`）、`hansen_j`（对象）、`n_instruments`、`n_groups`、`n_periods`、`n_obs_diff`、`instrument_lags`、`dpgmm_style`。
 
 ## Julia 进程模型
 

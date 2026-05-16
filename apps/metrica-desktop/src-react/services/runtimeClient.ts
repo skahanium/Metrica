@@ -37,6 +37,9 @@ export interface FitModelParams {
   instruments?: string;
   endogColumns?: string;
   gmmWeight?: string;
+  instrumentLags?: [number, number];
+  dpgmmStyle?: string;
+  collapseInstruments?: boolean;
   treatmentColumn?: string;
   postColumn?: string;
   eventTimeColumn?: string;
@@ -77,6 +80,9 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     instruments = '',
     endogColumns = '',
     gmmWeight = '',
+    instrumentLags,
+    dpgmmStyle = '',
+    collapseInstruments,
     treatmentColumn = '',
     postColumn = '',
     eventTimeColumn = '',
@@ -124,6 +130,13 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
     if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
     if (gmmWeight.trim()) modelSpec.gmm_weight = gmmWeight.trim();
+  } else if (modelType === 'dynamic_panel_gmm') {
+    modelSpec.panel_id = panelId;
+    modelSpec.panel_time = panelTime;
+    modelSpec.instrument_lags = instrumentLags ?? [2, 4];
+    if (gmmWeight.trim()) modelSpec.gmm_weight = gmmWeight.trim();
+    if (dpgmmStyle.trim()) modelSpec.dpgmm_style = dpgmmStyle.trim();
+    if (typeof collapseInstruments === 'boolean') modelSpec.collapse_instruments = collapseInstruments;
   } else if (modelType === 'gls') {
     modelSpec.vcov = { type: vcovType };
   } else if (modelType === 'did' || modelType === 'event_study') {

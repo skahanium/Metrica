@@ -98,6 +98,16 @@ export interface GmmDiagnostics {
   weight_matrix_description?: string;
   iterations?: number;
   exactly_identified?: boolean;
+  /** `dynamic_panel_gmm`：一阶差分残差序列相关检验 */
+  ar1_test?: { statistic?: number; pvalue?: number; description?: string };
+  ar2_test?: { statistic?: number; pvalue?: number; description?: string };
+  hansen_j?: { j_statistic?: number; j_df?: number; j_pvalue?: number | null };
+  n_instruments?: number;
+  n_groups?: number;
+  n_periods?: number;
+  n_obs_diff?: number;
+  instrument_lags?: number[];
+  dpgmm_style?: string;
 }
 
 export interface OddsRatioEntry {
@@ -382,7 +392,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'gls' | 'panel' | 'panel_iv' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -392,8 +402,13 @@ export interface ModelSpec {
   panel_method?: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv';
   instruments?: string[];
   endog_columns?: string[];
-  /** 仅 `gmm_linear`：`one_step` | `two_step` */
+  /** 仅 `gmm_linear` / `dynamic_panel_gmm`：`one_step` | `two_step` */
   gmm_weight?: string;
+  /** 仅 `dynamic_panel_gmm`：首期 `difference`；`system` 二期 */
+  dpgmm_style?: string;
+  /** 仅 `dynamic_panel_gmm`：工具滞后层 `[min_lag, max_lag]` */
+  instrument_lags?: [number, number];
+  collapse_instruments?: boolean;
   omega_spec?: string;
   treatment_column?: string;
   treated_column?: string;

@@ -18,7 +18,7 @@ export const GmmDiagnosticsPanel: React.FC<GmmDiagnosticsPanelProps> = ({ diagno
   return (
     <div style={{ marginTop: 16 }}>
       <Text strong style={{ display: 'block', marginBottom: 8 }}>
-        GMM 诊断（过识别检验）
+        GMM 与序列相关诊断
       </Text>
       <Descriptions size="small" column={1} bordered>
         <Descriptions.Item label="Hansen J">
@@ -54,6 +54,27 @@ export const GmmDiagnosticsPanel: React.FC<GmmDiagnosticsPanelProps> = ({ diagno
         {diagnostics.iterations !== undefined && (
           <Descriptions.Item label="迭代次数">
             {String(diagnostics.iterations)}
+          </Descriptions.Item>
+        )}
+        {diagnostics.ar1_test !== undefined && (
+          <Descriptions.Item label="AR(1) 检验（差分残差）">
+            z = {fmt(diagnostics.ar1_test?.statistic)}，p = {fmt(diagnostics.ar1_test?.pvalue)}
+          </Descriptions.Item>
+        )}
+        {diagnostics.ar2_test !== undefined && (
+          <Descriptions.Item label="AR(2) 检验（差分残差）">
+            z = {fmt(diagnostics.ar2_test?.statistic)}，p = {fmt(diagnostics.ar2_test?.pvalue)}
+          </Descriptions.Item>
+        )}
+        {(diagnostics.n_groups !== undefined || diagnostics.n_periods !== undefined) && (
+          <Descriptions.Item label="面板规模">
+            个体 {fmt(diagnostics.n_groups)}，时期 {fmt(diagnostics.n_periods)}，差分样本{' '}
+            {fmt(diagnostics.n_obs_diff)}
+          </Descriptions.Item>
+        )}
+        {diagnostics.instrument_lags !== undefined && diagnostics.instrument_lags.length >= 2 && (
+          <Descriptions.Item label="工具滞后层">
+            [{diagnostics.instrument_lags[0]}, {diagnostics.instrument_lags[1]}]
           </Descriptions.Item>
         )}
       </Descriptions>

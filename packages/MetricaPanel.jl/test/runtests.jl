@@ -1,4 +1,5 @@
 using Test
+using CSV
 using DataFrames
 using MetricaBase
 using MetricaPanel
@@ -508,4 +509,24 @@ end
 
     # F 检验
     @test diag["fixed_effect_f"]["available"] == true
+end
+
+@testset "S5.2 差分动态面板 GMM" begin
+    demo_path = joinpath(dirname(@__DIR__), "..", "..", "datasets", "demo", "dynamic_panel_gmm_demo.csv")
+    df = CSV.read(demo_path, DataFrame)
+    pd = PanelData(df, :firm, :year)
+    r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags = (2, 4), gmm_weight = "two_step")
+    @test r isa DynamicPanelGMMFitResult
+    @test r.n_instruments == 4  # 3 个 y 滞后层 + 1 个 Δx
+    @test r.n_obs_diff == 6      # 每截面 2 个有效差分时期 × 3 截面
+    g = glance(r)
+    @test g.model === :dynamic_panel_gmm
+    @test haskey(r.diagnostics, :ar1_test)
+    @test haskey(r.diagnostics, :ar2_test)
+    @test haskey(r.diagnostics[:hansen_j], :j_statistic)
+    pl = result_to_payload(r; include_augment = false)
+    @test pl["status"] == "success"
+    d = pl["result_payload"]["diagnostics"]
+    @test haskey(d, "ar1_test")
+    @test haskey(d, "j_statistic")
 end

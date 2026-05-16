@@ -128,8 +128,8 @@ else
 
         result = MetricaBase.fit(model, data)
         runtime_fit_envelope(MetricaTimeSeries.result_to_payload(result; include_augment=include_augment))
-    elseif model_type in ("panel", "panel_iv")
-        # 面板模型拟合
+    elseif model_type in ("panel", "panel_iv", "dynamic_panel_gmm")
+        # 面板模型拟合（含差分动态面板 GMM）
         panel_id = Symbol(String(request.model_spec.panel_id))
         panel_time = Symbol(String(request.model_spec.panel_time))
         panel_method = model_type == "panel_iv" ? :panel_iv : Symbol(String(get(request.model_spec, :panel_method, "fe")))
@@ -145,6 +145,23 @@ else
                 formula;
                 instruments=String.(collect(request.model_spec.instruments)),
                 endog=String.(collect(request.model_spec.endog_columns)),
+            )
+        elseif model_type == "dynamic_panel_gmm"
+            raw_il = get(request.model_spec, :instrument_lags, Any[2, 4])
+            il = (Int(raw_il[1]), Int(raw_il[2]))
+            collapse = Bool(get(request.model_spec, :collapse_instruments, false))
+            dpstyle = String(get(request.model_spec, :dpgmm_style, "difference"))
+            gw = String(get(request.model_spec, :gmm_weight, "two_step"))
+            MetricaBase.fit(
+                DynamicPanelGMMModel,
+                formula,
+                dataset_path;
+                panel_id=panel_id,
+                panel_time=panel_time,
+                instrument_lags=il,
+                gmm_weight=gw,
+                dpgmm_style=dpstyle,
+                collapse_instruments=collapse,
             )
         else
             fit_panel(panel_data, formula; method=panel_method)
@@ -182,7 +199,7 @@ else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()
         # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字，避免 MethodError。
-        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear"))
+        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm"))
             vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
             vcov_key = lowercase(vcov_type)
             vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical

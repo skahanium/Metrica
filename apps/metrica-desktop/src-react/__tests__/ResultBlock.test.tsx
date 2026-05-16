@@ -112,7 +112,7 @@ describe('ResultBlock', () => {
     render(
       <ResultBlock command="gmm y x1 x2, endogenous(x1) instruments(z1 z2)" result={mockGmmResult} />,
     );
-    expect(screen.getByText('GMM 诊断（过识别检验）')).toBeDefined();
+    expect(screen.getByText('GMM 与序列相关诊断')).toBeDefined();
     expect(screen.getByText('Hansen J')).toBeDefined();
   });
 

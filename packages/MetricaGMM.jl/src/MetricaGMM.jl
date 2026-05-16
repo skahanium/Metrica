@@ -9,10 +9,12 @@ using StatsModels
 using MetricaBase
 using MetricaOutput
 
-export GMMLinearModel, GMMLinearFitResult, result_to_payload
+export GMMLinearModel, GMMLinearFitResult, result_to_payload, linear_iv_gmm_stack
 
+include("gmm_algebra.jl")
 include("formula.jl")
 include("gmm.jl")
+include("linear_iv_gmm_stack.jl")
 include("serialize.jl")
 
 function __init__()

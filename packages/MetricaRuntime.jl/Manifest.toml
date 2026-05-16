@@ -534,7 +534,7 @@ uuid = "10c70d11-b779-43d3-b8f2-49770e63c885"
 version = "0.1.0"
 
 [[deps.MetricaPanel]]
-deps = ["DataFrames", "Distributions", "FixedEffectModels", "LinearAlgebra", "MetricaBase", "MetricaLinear", "Statistics", "StatsModels"]
+deps = ["DataFrames", "Distributions", "FixedEffectModels", "LinearAlgebra", "MetricaBase", "MetricaGMM", "MetricaLinear", "Statistics", "StatsModels"]
 path = "../MetricaPanel.jl"
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "0.1.0"

@@ -53,6 +53,7 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("gls", vec![]),
         ("panel", vec!["panel_id", "panel_time"]),
         ("panel_iv", vec!["panel_id", "panel_time", "instruments", "endog_columns"]),
+        ("dynamic_panel_gmm", vec!["panel_id", "panel_time", "instrument_lags"]),
         ("logit", vec![]),
         ("probit", vec![]),
         ("poisson", vec![]),
@@ -82,7 +83,7 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
     // panel 族模型：索引字段缺失时统一错误码，便于 CLI / 测试与文档对齐。
     if matches!(
         spec.model_type.as_str(),
-        "panel" | "panel_iv" | "did" | "event_study"
+        "panel" | "panel_iv" | "dynamic_panel_gmm" | "did" | "event_study"
     ) {
         let pid_ok = spec
             .panel_id
@@ -141,6 +142,10 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     "strata_column" => spec.strata_column.as_deref(),
                     "psu_column" => spec.psu_column.as_deref(),
                     "fpc_column" => spec.fpc_column.as_deref(),
+                    "instrument_lags" => spec
+                        .instrument_lags
+                        .as_ref()
+                        .map(|v| if v.len() >= 2 { "present" } else { "" }),
                     _ => Some("present"),
                 };
                 match value {
@@ -152,16 +157,41 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     }),
                 }
             }
-            if spec.model_type == "gmm_linear" {
+            if spec.model_type == "gmm_linear" || spec.model_type == "dynamic_panel_gmm" {
                 if let Some(ref w) = spec.gmm_weight {
                     let t = w.trim().to_ascii_lowercase();
                     if !t.is_empty() && t != "one_step" && t != "two_step" {
                         return Some(ValidationError {
                             code: "RUNTIME_INVALID_FIELD",
                             message: format!(
-                                "模型类型 `gmm_linear` 的 gmm_weight 只能为 one_step 或 two_step，收到 `{w}`。"
+                                "模型类型 `{}` 的 gmm_weight 只能为 one_step 或 two_step，收到 `{w}`。",
+                                spec.model_type
                             ),
                             hint: Some("请省略该字段以使用默认 two_step。".to_string()),
+                        });
+                    }
+                }
+            }
+            if spec.model_type == "dynamic_panel_gmm" {
+                if let Some(ref ds) = spec.dpgmm_style {
+                    let t = ds.trim().to_ascii_lowercase();
+                    if !t.is_empty() && t != "difference" && t != "system" {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!(
+                                "模型类型 `dynamic_panel_gmm` 的 dpgmm_style 只能为 difference 或 system（首期仅实现 difference），收到 `{ds}`。"
+                            ),
+                            hint: Some("请使用 difference 或省略该字段。".to_string()),
+                        });
+                    }
+                }
+                if let Some(ref il) = spec.instrument_lags {
+                    if il.len() < 2 || il[0] > il[1] {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: "instrument_lags 必须为 [min_lag, max_lag] 且 min_lag ≤ max_lag。"
+                                .to_string(),
+                            hint: Some("例如 JSON 数组 [2, 4]。".to_string()),
                         });
                     }
                 }
@@ -266,9 +296,17 @@ pub struct ModelSpec {
     pub instruments: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub endog_columns: Option<Vec<String>>,
-    /// 仅 `gmm_linear`：`one_step` 或 `two_step`（默认 `two_step`）。
+    /// `gmm_linear` / `dynamic_panel_gmm`：`one_step` 或 `two_step`（默认 `two_step`）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gmm_weight: Option<String>,
+    /// 仅 `dynamic_panel_gmm`：首期仅 `difference`；`system` 预留二期。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dpgmm_style: Option<String>,
+    /// 仅 `dynamic_panel_gmm`：工具滞后层 `[min_lag, max_lag]`，与 CLI `lags(2 4)` 对齐。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instrument_lags: Option<Vec<i32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collapse_instruments: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub omega_spec: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -735,6 +773,9 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             instruments: None,
             endog_columns: None,
             gmm_weight: None,
+            dpgmm_style: None,
+            instrument_lags: None,
+            collapse_instruments: None,
             omega_spec: None,
             treatment_column: None,
             treated_column: None,
@@ -809,6 +850,9 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         instruments: None,
         endog_columns: None,
         gmm_weight: None,
+        dpgmm_style: None,
+        instrument_lags: None,
+        collapse_instruments: None,
         omega_spec: None,
         treatment_column: None,
         treated_column: None,

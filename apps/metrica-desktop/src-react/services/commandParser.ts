@@ -121,7 +121,7 @@ export function parse(input: string): ParsedCommand {
 // ---- 已知模型动词集合 ----
 
 const MODEL_VERBS = new Set([
-  'regress', 'ivregress', 'gmm', 'gls', 'xtreg', 'xtivreg', 'logit', 'probit', 'poisson',
+  'regress', 'ivregress', 'gmm', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
   'arima', 'var', 'dfuller', 'coint', 'svy',
 ]);
@@ -136,6 +136,7 @@ function verbToModelType(verb: string): string {
     gls: 'gls',
     xtreg: 'panel',
     xtivreg: 'panel_iv',
+    xtabond: 'dynamic_panel_gmm',
     logit: 'logit',
     probit: 'probit',
     poisson: 'poisson',
@@ -206,7 +207,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   if (optMap.has('id')) spec.panel_id = optMap.get('id');
   if (optMap.has('time')) spec.panel_time = optMap.get('time');
-  if (optMap.has('method') && modelType !== 'panel_iv') {
+  if (optMap.has('method') && modelType !== 'panel_iv' && modelType !== 'dynamic_panel_gmm') {
     spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
   }
 
@@ -221,6 +222,24 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   if (modelType === 'gmm_linear' && optMap.has('weight')) {
     spec.gmm_weight = optMap.get('weight');
+  }
+
+  if (modelType === 'dynamic_panel_gmm') {
+    if (!spec.panel_id || !spec.panel_time) {
+      return { error: 'xtabond 需要 id(...) 与 time(...) 指定面板索引列。' };
+    }
+    if (optMap.has('lags')) {
+      const parts = optMap.get('lags')!.trim().split(/\s+/).filter(Boolean).map((s) => parseInt(s, 10));
+      if (parts.length !== 2 || parts.some((n) => Number.isNaN(n))) {
+        return { error: 'lags(min max) 需要两个整数，例如 lags(2 4)。' };
+      }
+      spec.instrument_lags = [parts[0], parts[1]];
+    } else {
+      spec.instrument_lags = [2, 4];
+    }
+    if (optMap.has('weight')) spec.gmm_weight = optMap.get('weight');
+    if (optMap.has('style')) spec.dpgmm_style = optMap.get('style');
+    if (optMap.has('collapse')) spec.collapse_instruments = optMap.get('collapse') === 'true';
   }
 
   // ---- 因果推断选项 ----

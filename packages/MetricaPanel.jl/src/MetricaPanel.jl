@@ -4,12 +4,14 @@ using DataFrames
 using Distributions
 using LinearAlgebra
 using MetricaBase
+using MetricaGMM
 using MetricaLinear
 using Statistics
 using StatsModels
 
 export PanelModel, PanelFitResult, PanelIVModel, PanelIVFitResult,
-    fit_panel, fit_hdfde, fit_crea, fit_panel_iv,
+    DynamicPanelGMMModel, DynamicPanelGMMFitResult,
+    fit_panel, fit_hdfde, fit_crea, fit_panel_iv, fit_dynamic_panel_gmm,
     panel_diagnostics, result_to_payload,
     compute_dk_vcov, compute_iv_dk_vcov
 
@@ -162,6 +164,7 @@ include("hdfde.jl")
 include("dk.jl")
 include("cre.jl")
 include("panel_iv.jl")
+include("dynamic_panel_gmm.jl")
 include("re.jl")
 include("fd.jl")
 include("between.jl")
@@ -255,6 +258,7 @@ function __init__()
         merge!(MetricaBase.MODEL_REGISTRY, Dict{String, Type}(
             "panel" => PanelModel,
             "panel_iv" => PanelIVModel,
+            "dynamic_panel_gmm" => DynamicPanelGMMModel,
         ))
     end
 end

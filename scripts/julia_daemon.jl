@@ -127,7 +127,7 @@ function handle_request(req::Dict{String, Any})
                 # 构造 kwargs
                 kwargs = Dict{Symbol, Any}()
                 # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字。
-                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear"))
+                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm"))
                     vcov_type = get(params, "vcov", "classical")
                     vcov_key = lowercase(String(vcov_type))
                     vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -139,7 +139,7 @@ function handle_request(req::Dict{String, Any})
                 end
 
                 # 面板特有参数
-                if model_type in ("panel", "panel_iv", "did", "event_study")
+                if model_type in ("panel", "panel_iv", "did", "event_study", "dynamic_panel_gmm")
                     kwargs[:panel_id] = Symbol(params["panel_id"])
                     kwargs[:panel_time] = Symbol(params["panel_time"])
                     kwargs[:panel_method] = Symbol(get(params, "panel_method", "fe"))
@@ -155,6 +155,13 @@ function handle_request(req::Dict{String, Any})
                 end
                 if model_type == "gmm_linear"
                     kwargs[:gmm_weight] = String(get(params, "gmm_weight", "two_step"))
+                end
+                if model_type == "dynamic_panel_gmm"
+                    raw_il = get(params, "instrument_lags", Any[2, 4])
+                    kwargs[:instrument_lags] = (Int(raw_il[1]), Int(raw_il[2]))
+                    kwargs[:gmm_weight] = String(get(params, "gmm_weight", "two_step"))
+                    kwargs[:dpgmm_style] = String(get(params, "dpgmm_style", "difference"))
+                    kwargs[:collapse_instruments] = Bool(get(params, "collapse_instruments", false))
                 end
                 if model_type == "panel_iv"
                     kwargs[:instruments] = String.(params["instruments"])
@@ -211,6 +218,8 @@ function handle_request(req::Dict{String, Any})
                     payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaGMM.GMMLinearFitResult
                     payload = MetricaGMM.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaPanel.DynamicPanelGMMFitResult
+                    payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 else

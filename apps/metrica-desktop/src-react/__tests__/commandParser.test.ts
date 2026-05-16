@@ -162,6 +162,18 @@ describe('parseToModelSpec', () => {
     }
   });
 
+  it('converts xtabond to dynamic_panel_gmm ModelSpec', () => {
+    const r = parse('xtabond y x, id(firm) time(year) lags(2 4) weight(two_step)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('dynamic_panel_gmm');
+      expect(spec.panel_id).toBe('firm');
+      expect(spec.panel_time).toBe('year');
+      expect(spec.instrument_lags).toEqual([2, 4]);
+      expect(spec.gmm_weight).toBe('two_step');
+    }
+  });
+
   it('converts did to DID ModelSpec', () => {
     const r = parse('did gdp, id(country) time(year) treat(reform) post(after2010)');
     const spec = parseToModelSpec(r);

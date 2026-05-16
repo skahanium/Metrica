@@ -129,6 +129,27 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.variables).toEqual(['gdp', 'inflation']);
     expect(req.model_spec.lags).toBe(2);
   });
+
+  it('passes dynamic_panel_gmm panel index and instrument_lags', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'panel.csv',
+      formula: 'y ~ x',
+      modelType: 'dynamic_panel_gmm',
+      panelId: 'firm',
+      panelTime: 'year',
+      instrumentLags: [2, 5],
+      gmmWeight: 'one_step',
+      dpgmmStyle: 'difference',
+      collapseInstruments: false,
+    });
+    expect(req.model_spec.model_type).toBe('dynamic_panel_gmm');
+    expect(req.model_spec.panel_id).toBe('firm');
+    expect(req.model_spec.panel_time).toBe('year');
+    expect(req.model_spec.instrument_lags).toEqual([2, 5]);
+    expect(req.model_spec.gmm_weight).toBe('one_step');
+    expect(req.model_spec.dpgmm_style).toBe('difference');
+    expect(req.model_spec.collapse_instruments).toBe(false);
+  });
 });
 
 describe('transformDataset', () => {

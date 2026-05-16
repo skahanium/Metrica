@@ -311,6 +311,9 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(ref instruments) = request.model_spec.instruments { params["instruments"] = json!(instruments); }
     if let Some(ref endog_columns) = request.model_spec.endog_columns { params["endog_columns"] = json!(endog_columns); }
     if let Some(ref gw) = request.model_spec.gmm_weight { params["gmm_weight"] = json!(gw); }
+    if let Some(ref ds) = request.model_spec.dpgmm_style { params["dpgmm_style"] = json!(ds); }
+    if let Some(ref il) = request.model_spec.instrument_lags { params["instrument_lags"] = json!(il); }
+    if let Some(c) = request.model_spec.collapse_instruments { params["collapse_instruments"] = json!(c); }
     if let Some(ref omega_spec) = request.model_spec.omega_spec { params["omega_spec"] = json!(omega_spec); }
 
     // S4b: 因果推断字段
