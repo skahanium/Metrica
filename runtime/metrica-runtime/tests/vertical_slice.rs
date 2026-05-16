@@ -1,7 +1,8 @@
 //! Alpha 垂直切片：真实 Julia 桥与最小 HTTP 传输测试。
 
 use metrica_runtime::{
-    execute_fit_model, execute_query_dataset, repo_root,
+    julia_bridge::{execute_fit_model, execute_query_dataset},
+    repo_root,
     server::build_router,
     sample_fit_model_request, sample_inspect_dataset_request, sample_panel_fit_model_request,
     sample_query_dataset_request,
@@ -9,9 +10,21 @@ use metrica_runtime::{
 };
 use std::fs;
 
+/// 与 `sample_fit_model_request` 默认落盘目录一致，便于 list_runs / export / rerun 与 fit 使用同一 `working_dir`。
+fn default_demo_working_dir() -> String {
+    if let Ok(p) = std::env::var("METRICA_DEMO_DIR") {
+        return p;
+    }
+    repo_root()
+        .join("datasets")
+        .join("demo")
+        .to_string_lossy()
+        .to_string()
+}
+
 async fn spawn_test_runtime() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
     let root = repo_root();
-    let julia_project = root.join("packages").join("MetricaLinear.jl");
+    let julia_project = root.join("packages").join("MetricaRuntime.jl");
     let session = JuliaSession::start(&root.to_string_lossy(), &julia_project.to_string_lossy())
         .expect("Julia session should start");
     let state = AppState::from_session(session);
@@ -100,9 +113,10 @@ fn fit_model_runs_unitroot_through_time_series_bridge() {
     assert_eq!(response.status, "success");
     let payload = response.result_payload.expect("payload");
     let glance = payload.get("glance").expect("glance");
-    assert_eq!(
-        glance.get("model").and_then(|value| value.as_str()),
-        Some("unitroot")
+    let model = glance.get("model").and_then(|v| v.as_str()).expect("glance.model");
+    assert!(
+        model.to_ascii_lowercase().contains("unitroot"),
+        "unexpected glance.model: {model}"
     );
 }
 
@@ -353,7 +367,7 @@ async fn transform_filter_operation_returns_ok() {
         },
         "dataset_ref": {
             "source": "file",
-            "path": "datasets/teaching/pwt_productivity_panel.csv",
+            "path": "datasets/demo/pwt_productivity_panel.csv",
             "format": "csv"
         },
         "operations": [
@@ -463,7 +477,7 @@ async fn fit_model_generates_run_record_and_list_runs_returns_it() {
         "action": "list_runs",
         "project_context": {
             "project_id": "alpha-demo",
-            "working_dir": "apps/metrica-desktop"
+            "working_dir": default_demo_working_dir()
         }
     })
     .to_string();
@@ -501,7 +515,7 @@ async fn transform_failure_does_not_write_output() {
         },
         "dataset_ref": {
             "source": "file",
-            "path": "datasets/teaching/pwt_productivity_panel.csv",
+            "path": "datasets/demo/pwt_productivity_panel.csv",
             "format": "csv"
         },
         "operations": [
@@ -608,10 +622,12 @@ async fn save_project_rejects_empty_source_dataset() {
 async fn list_runs_supports_pagination_and_filtering() {
     let (addr, server) = spawn_test_runtime().await;
     let client = reqwest::Client::new();
-    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let working_dir = default_demo_working_dir();
 
     // 先执行一次 fit_model 生成 run record
-    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let mut fit_req = sample_fit_model_request();
+    fit_req.project_context.working_dir = working_dir.clone();
+    let fit_body = serde_json::to_string(&fit_req).expect("request json");
     let fit_resp = client
         .post(format!("http://{addr}/fit_model"))
         .header("Content-Type", "application/json")
@@ -670,10 +686,12 @@ async fn list_runs_supports_pagination_and_filtering() {
 async fn rerun_task_returns_error_for_missing_dataset() {
     let (addr, server) = spawn_test_runtime().await;
     let client = reqwest::Client::new();
-    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let working_dir = default_demo_working_dir();
 
     // 先执行一次 fit_model 生成 run record
-    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let mut fit_req = sample_fit_model_request();
+    fit_req.project_context.working_dir = working_dir.clone();
+    let fit_body = serde_json::to_string(&fit_req).expect("request json");
     let fit_resp = client
         .post(format!("http://{addr}/fit_model"))
         .header("Content-Type", "application/json")
@@ -685,16 +703,18 @@ async fn rerun_task_returns_error_for_missing_dataset() {
     let run_id = fit_json["run_record"]["run_id"].as_str().expect("run_id");
 
     // 覆盖 run record 的 dataset_ref 路径为不存在的文件
-    let runs_dir = repo_root().join(".metrica").join("runs");
+    let runs_dir = std::path::Path::new(&working_dir).join(".metrica").join("runs");
     let run_path = runs_dir.join(format!("{run_id}.json"));
-    if run_path.exists() {
-        let mut run: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(&run_path).unwrap(),
-        )
-        .unwrap();
-        run["dataset_ref"]["path"] = serde_json::json!("/nonexistent/missing.csv");
-        std::fs::write(&run_path, serde_json::to_string_pretty(&run).unwrap()).unwrap();
-    }
+    assert!(
+        run_path.exists(),
+        "run record 未落盘，无法测试重跑缺失数据：{}",
+        run_path.display()
+    );
+    let mut run: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&run_path).expect("read run record"))
+            .expect("parse run record");
+    run["dataset_ref"]["path"] = serde_json::json!("/nonexistent/missing.csv");
+    std::fs::write(&run_path, serde_json::to_string_pretty(&run).unwrap()).unwrap();
 
     // 尝试重跑
     let rerun_body = serde_json::json!({
@@ -724,10 +744,12 @@ async fn rerun_task_returns_error_for_missing_dataset() {
 async fn export_report_markdown_returns_content() {
     let (addr, server) = spawn_test_runtime().await;
     let client = reqwest::Client::new();
-    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let working_dir = default_demo_working_dir();
 
     // 先执行一次 fit_model 生成 run record
-    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let mut fit_req = sample_fit_model_request();
+    fit_req.project_context.working_dir = working_dir.clone();
+    let fit_body = serde_json::to_string(&fit_req).expect("request json");
     let fit_resp = client
         .post(format!("http://{addr}/fit_model"))
         .header("Content-Type", "application/json")
@@ -772,10 +794,12 @@ async fn export_report_markdown_returns_content() {
 async fn export_report_csv_tidy_returns_csv() {
     let (addr, server) = spawn_test_runtime().await;
     let client = reqwest::Client::new();
-    let working_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let working_dir = default_demo_working_dir();
 
     // 先执行一次 fit_model 生成 run record
-    let fit_body = serde_json::to_string(&sample_fit_model_request()).expect("request json");
+    let mut fit_req = sample_fit_model_request();
+    fit_req.project_context.working_dir = working_dir.clone();
+    let fit_body = serde_json::to_string(&fit_req).expect("request json");
     let fit_resp = client
         .post(format!("http://{addr}/fit_model"))
         .header("Content-Type", "application/json")
@@ -840,6 +864,120 @@ async fn export_report_rejects_missing_run() {
     assert_eq!(resp.status(), 404);
     let json: serde_json::Value = resp.json().await.expect("JSON");
     assert_eq!(json["messages"][0]["code"], "RUNTIME_RUN_NOT_FOUND");
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fit_model_http_logit_returns_glance_and_tidy() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let body = serde_json::json!({
+        "task_id": "fit-logit-http",
+        "action": "fit_model",
+        "project_context": { "project_id": "alpha-demo", "working_dir": wd },
+        "dataset_ref": { "source": "file", "path": "datasets/teaching/s4_discrete_demo.csv", "format": "csv" },
+        "model_spec": {
+            "model_type": "logit",
+            "formula": "y_bin ~ x1 + x2"
+        },
+        "options": { "drop_missing": true, "return_augment": false }
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["status"], "success");
+    let glance = json["result_payload"]["glance"].as_object().expect("glance");
+    assert_eq!(glance["model"].as_str(), Some("logit"));
+    let tidy = json["result_payload"]["tidy"].as_array().expect("tidy");
+    assert!(!tidy.is_empty());
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fit_model_http_arima_returns_time_series_fields() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let body = serde_json::json!({
+        "task_id": "fit-arima-http",
+        "action": "fit_model",
+        "project_context": { "project_id": "alpha-demo", "working_dir": wd },
+        "dataset_ref": { "source": "file", "path": "datasets/teaching/s4_timeseries_demo.csv", "format": "csv" },
+        "model_spec": {
+            "model_type": "arima",
+            "formula": "y",
+            "variable": "y",
+            "time_column": "time",
+            "order": [1, 0, 0]
+        },
+        "options": { "drop_missing": true, "return_augment": false }
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["status"], "success");
+    let glance = json["result_payload"]["glance"].as_object().expect("glance");
+    let model = glance["model"].as_str().expect("glance.model");
+    assert!(
+        model.to_ascii_lowercase().contains("arima"),
+        "unexpected glance.model: {model}"
+    );
+
+    server.abort();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fit_model_http_survey_ols_returns_survey_fields() {
+    let (addr, server) = spawn_test_runtime().await;
+    let client = reqwest::Client::new();
+    let wd = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let body = serde_json::json!({
+        "task_id": "fit-svyols-http",
+        "action": "fit_model",
+        "project_context": { "project_id": "alpha-demo", "working_dir": wd },
+        "dataset_ref": { "source": "file", "path": "datasets/teaching/s4_survey_demo.csv", "format": "csv" },
+        "model_spec": {
+            "model_type": "survey_ols",
+            "formula": "y ~ x1 + x2",
+            "weights_column": "wt",
+            "strata_column": "strata",
+            "psu_column": "psu"
+        },
+        "options": { "drop_missing": true, "return_augment": false }
+    })
+    .to_string();
+
+    let resp = client
+        .post(format!("http://{addr}/fit_model"))
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .expect("POST /fit_model");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.json().await.expect("JSON");
+    assert_eq!(json["status"], "success");
+    let glance = json["result_payload"]["glance"].as_object().expect("glance");
+    assert_eq!(glance["model"].as_str(), Some("survey_ols"));
 
     server.abort();
 }

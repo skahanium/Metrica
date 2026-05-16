@@ -17,7 +17,8 @@ export AbstractTimeSeriesModel, AbstractTSFitResult,
     forecast, impulse_response, variance_decomposition,
     granger_causality, adf_test, pp_test, kpss_test,
     engle_granger_test, johansen_test,
-    acf, pacf, ljung_box_test
+    acf, pacf, ljung_box_test,
+    build_time_series_model
 
 # === 抽象类型 =============================================================
 
@@ -106,6 +107,90 @@ include("var.jl")
 include("cointegration.jl")
 include("forecast.jl")
 include("serialize.jl")
+
+# === 统一构造函数 ==========================================================
+
+"""
+    build_time_series_model(model_type::String, params::Dict) -> AbstractTimeSeriesModel
+
+从 JSON 参数统一构造时间序列模型实例。
+
+# 参数
+- `model_type`: 模型类型字符串，支持 "arima"、"var"、"unitroot"、"cointegration"
+- `params`: 参数字典，包含模型构造所需的字段
+
+# 返回值
+对应的模型实例
+
+# 示例
+```julia
+params = Dict(
+    "variable" => "gdp",
+    "time_column" => "time",
+    "order" => [1, 1, 0],
+)
+model = build_time_series_model("arima", params)
+```
+"""
+function build_time_series_model(model_type::String, params::Dict)
+    time_col = Symbol(get(params, "time_column", "time"))
+
+    if model_type == "arima"
+        var_sym = Symbol(get(params, "variable", error("ARIMA 模型需要 variable 参数")))
+        order_arr = get(params, "order", [1, 1, 0])
+        length(order_arr) == 3 || error("order 必须有 3 个元素 [p, d, q]")
+        order_tuple = Tuple(Int.(order_arr))
+        seasonal_arr = get(params, "seasonal_order", [0, 0, 0, 0])
+        length(seasonal_arr) == 4 || error("seasonal_order 必须有 4 个元素 [P, D, Q, S]")
+        seasonal_tuple = Tuple(Int.(seasonal_arr))
+        ts_method = Symbol(get(params, "ts_method", "mle"))
+        return ARIMAModel(
+            variable=var_sym,
+            time_column=time_col,
+            order=order_tuple,
+            seasonal_order=seasonal_tuple,
+            method=ts_method,
+        )
+
+    elseif model_type == "var"
+        vars_raw = get(params, "variables", error("VAR 模型需要 variables 参数"))
+        var_syms = Symbol.(String.(vars_raw))
+        lags = Int(get(params, "lags", 1))
+        return VARModel(
+            variables=var_syms,
+            time_column=time_col,
+            lags=lags,
+        )
+
+    elseif model_type == "unitroot"
+        var_sym = Symbol(get(params, "variable", error("单位根检验需要 variable 参数")))
+        det = Symbol(get(params, "deterministic", "constant"))
+        max_lags = Int(get(params, "lags", 0))
+        return UnitRootModel(
+            variable=var_sym,
+            time_column=time_col,
+            deterministic=det,
+            max_lags=max_lags,
+        )
+
+    elseif model_type == "cointegration"
+        vars_raw = get(params, "variables", error("协整检验需要 variables 参数"))
+        var_syms = Symbol.(String.(vars_raw))
+        method = Symbol(get(params, "ts_method", "engle_granger"))
+        lags = Int(get(params, "lags", 1))
+        det = Symbol(get(params, "deterministic", "constant"))
+        return CointegrationModel(
+            variables=var_syms,
+            time_column=time_col,
+            method=method,
+            lags=lags,
+            deterministic=det,
+        )
+
+    else
+        error("未知时间序列模型类型：$model_type")
+    end
+end
 
 # === 注册到 MetricaBase MODEL_REGISTRY ====================================
 

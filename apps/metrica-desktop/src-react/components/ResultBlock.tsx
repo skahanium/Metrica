@@ -18,10 +18,12 @@ const { Text } = Typography;
 
 interface ResultBlockProps {
   command: string;
+  /** 与 Runtime run 对齐，供事件研究图导出注册 */
+  runId?: string;
   result: ModelResult;
 }
 
-export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result }) => {
+export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId }) => {
   const modelType = result.glance?.model;
   const isDiscrete = ['logit', 'probit', 'poisson', 'ordered_logit', 'multinomial_logit', 'negbin'].includes(modelType || '');
   const isSurvey = typeof modelType === 'string' && modelType.startsWith('survey_');
@@ -52,7 +54,7 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result }) => 
           <StrataSummary result={result} />
         </>
       )}
-      {modelType === 'event_study' && <EventStudyPlot result={result} />}
+      {modelType === 'event_study' && <EventStudyPlot result={result} runId={runId ?? null} />}
       {modelType === 'psm' && <BalanceTable result={result} />}
     </div>
   );

@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "83df467c70748042d5415274de6bde86c90d68d4"
+project_hash = "5a8840d99d1d85a60ca8a25388ccb786e4bdfa7f"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -44,10 +44,10 @@ version = "0.1.44"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.Adapt]]
-deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "0761717147821d696c9470a7a86364b2fbd22fd8"
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "28e1637322d4019ed2577cbec9268fab9b7da117"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "4.5.2"
+version = "4.6.0"
 
     [deps.Adapt.extensions]
     AdaptSparseArraysExt = "SparseArrays"
@@ -65,9 +65,9 @@ version = "1.1.3"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
-git-tree-sha1 = "54f895554d05c83e3dd59f6a396671dae8999573"
+git-tree-sha1 = "3d0cabd25fab32390e3bcb82cd67e700aebd9816"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.24.0"
+version = "7.25.0"
 
     [deps.ArrayInterface.extensions]
     ArrayInterfaceAMDGPUExt = "AMDGPU"
@@ -326,10 +326,36 @@ version = "2.31.0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
+[[deps.FixedEffectModels]]
+deps = ["DataFrames", "FixedEffects", "LinearAlgebra", "PrecompileTools", "Printf", "Reexport", "Statistics", "StatsAPI", "StatsBase", "StatsFuns", "StatsModels", "Tables", "Vcov"]
+git-tree-sha1 = "e9b6128d2cc9b533fa4206fafba1685031e6aee1"
+uuid = "9d5cd8c9-2029-5cab-9928-427838db53e3"
+version = "1.13.1"
+
+[[deps.FixedEffects]]
+deps = ["GroupedArrays", "LinearAlgebra", "PrecompileTools", "Printf", "StatsBase"]
+git-tree-sha1 = "c6c860a4896f22352fdbd3417dfd8266830aeabf"
+uuid = "c8885935-8500-56a7-9867-7708b20db0eb"
+version = "3.1.0"
+
+    [deps.FixedEffects.extensions]
+    CUDAExt = "CUDA"
+    MetalExt = "Metal"
+
+    [deps.FixedEffects.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+
 [[deps.Future]]
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 version = "1.11.0"
+
+[[deps.GroupedArrays]]
+deps = ["DataAPI", "Missings", "PrecompileTools"]
+git-tree-sha1 = "c732f2e650180e595939d2662c59a6181baa89a2"
+uuid = "6407cd72-fade-4a84-8a1e-56e431fc1533"
+version = "0.3.5"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
@@ -461,13 +487,67 @@ version = "1.11.0"
 
 [[deps.MetricaBase]]
 deps = ["Dates", "Distributions"]
-path = "../MetricaBase.jl"
+path = "../../packages/MetricaBase.jl"
 uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 version = "0.1.0"
 
-[[deps.MetricaTimeSeries]]
-deps = ["CSV", "DataFrames", "Distributions", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "Optim", "Random", "Statistics", "Test"]
+[[deps.MetricaCausal]]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaDiscrete", "MetricaLinear", "MetricaPanel", "Statistics", "StatsModels"]
+path = "../../packages/MetricaCausal.jl"
+uuid = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
+version = "0.1.0"
+
+[[deps.MetricaDaemon]]
+deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaCausal", "MetricaData", "MetricaDiagnostics", "MetricaDiscrete", "MetricaLinear", "MetricaOutput", "MetricaPanel", "MetricaSurvey", "MetricaTimeSeries", "Optim", "SpecialFunctions", "Statistics", "StatsModels"]
 path = "."
+uuid = "da000000-0000-0000-0000-000000000001"
+version = "0.1.0"
+
+[[deps.MetricaData]]
+deps = ["CSV", "DataFrames", "Statistics"]
+path = "../../packages/MetricaData.jl"
+uuid = "2248ac24-609b-424e-8643-ff19a1f22962"
+version = "0.1.0"
+
+[[deps.MetricaDiagnostics]]
+deps = ["Distributions", "LinearAlgebra", "MetricaBase", "Statistics"]
+path = "../../packages/MetricaDiagnostics.jl"
+uuid = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
+version = "0.1.0"
+
+[[deps.MetricaDiscrete]]
+deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "SpecialFunctions", "Statistics", "StatsModels"]
+path = "../../packages/MetricaDiscrete.jl"
+uuid = "d1e2f3a4-b5c6-7890-def0-123456789abc"
+version = "0.1.0"
+
+[[deps.MetricaLinear]]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaData", "MetricaOutput", "Statistics", "StatsModels"]
+path = "../../packages/MetricaLinear.jl"
+uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+version = "0.1.0"
+
+[[deps.MetricaOutput]]
+deps = ["MetricaBase"]
+path = "../../packages/MetricaOutput.jl"
+uuid = "10c70d11-b779-43d3-b8f2-49770e63c885"
+version = "0.1.0"
+
+[[deps.MetricaPanel]]
+deps = ["DataFrames", "Distributions", "FixedEffectModels", "LinearAlgebra", "MetricaBase", "MetricaLinear", "Statistics", "StatsModels"]
+path = "../../packages/MetricaPanel.jl"
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+version = "0.1.0"
+
+[[deps.MetricaSurvey]]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaDiscrete", "MetricaLinear", "Statistics", "StatsModels"]
+path = "../../packages/MetricaSurvey.jl"
+uuid = "7d3611f3-666b-40ba-b23f-c75757e1ca05"
+version = "0.1.0"
+
+[[deps.MetricaTimeSeries]]
+deps = ["DataFrames", "Distributions", "HypothesisTests", "LinearAlgebra", "MetricaBase", "Optim", "Random", "Statistics", "Test"]
+path = "../../packages/MetricaTimeSeries.jl"
 uuid = "3da64bf2-aa4b-4146-a451-f808af01572a"
 version = "0.1.0"
 
@@ -556,9 +636,9 @@ version = "0.2.4"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
-git-tree-sha1 = "07a921781cab75691315adc645096ed5e370cb77"
+git-tree-sha1 = "edbeefc7a4889f528644251bdb5fc9ab5348bc2c"
 uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
-version = "1.3.3"
+version = "1.3.4"
 
 [[deps.Preferences]]
 deps = ["TOML"]
@@ -615,12 +695,6 @@ git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
 uuid = "189a3867-3050-52da-a836-e630ba90ab69"
 version = "1.2.2"
 
-[[deps.Requires]]
-deps = ["UUIDs"]
-git-tree-sha1 = "62389eeff14780bfe55195b7204c0d8738436d64"
-uuid = "ae029012-a4dd-5104-9daa-d747884805df"
-version = "1.3.1"
-
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
 git-tree-sha1 = "5b3d50eb374cea306873b371d3f8d3915a018f0b"
@@ -674,6 +748,11 @@ deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
 git-tree-sha1 = "c5391c6ace3bc430ca630251d02ea9687169ca68"
 uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 version = "1.1.2"
+
+[[deps.ShiftedArrays]]
+git-tree-sha1 = "503688b59397b3307443af35cd953a13e8005c16"
+uuid = "1277b4bf-5013-50f5-be3d-901d8477a67a"
+version = "2.0.0"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -743,6 +822,12 @@ version = "1.5.2"
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
     InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
 
+[[deps.StatsModels]]
+deps = ["DataAPI", "DataStructures", "LinearAlgebra", "Printf", "REPL", "ShiftedArrays", "SparseArrays", "StatsAPI", "StatsBase", "StatsFuns", "Tables"]
+git-tree-sha1 = "08786db4a1346d17d0a8d952d2e66fd00fa18192"
+uuid = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+version = "0.7.9"
+
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
 git-tree-sha1 = "d05693d339e37d6ab134c5ab53c29fce5ee5d7d5"
@@ -803,6 +888,12 @@ version = "1.11.0"
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 version = "1.11.0"
+
+[[deps.Vcov]]
+deps = ["Combinatorics", "GroupedArrays", "LinearAlgebra", "PrecompileTools", "StatsAPI", "StatsBase", "Tables"]
+git-tree-sha1 = "667e09e4c9774c40614f3597d4907ed6249ac997"
+uuid = "ec2bfdc2-55df-4fc9-b9ae-4958c2cf2486"
+version = "0.8.3"
 
 [[deps.WeakRefStrings]]
 deps = ["DataAPI", "InlineStrings", "Parsers"]

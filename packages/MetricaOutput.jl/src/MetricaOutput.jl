@@ -175,13 +175,16 @@ function markdown_run_report(run_record, result)
     model_type = _dict_get(model_spec, "model_type", "—")
     formula = _dict_get(model_spec, "formula", "—")
     finished_at = _dict_get(run_record, "finished_at", "—")
-    messages = _dict_get(run_record, "messages", Any[])
-    warnings = get(result, "warnings", Any[])
+    messages_raw = _dict_get(run_record, "messages", Any[])
+    messages = messages_raw isa AbstractVector ? messages_raw : Any[]
+    warnings_raw = get(result, "warnings", Any[])
+    warnings = warnings_raw isa AbstractVector ? warnings_raw : Any[]
 
     glance_lines = String[]
-    if haskey(result, "glance")
+    if haskey(result, "glance") && result["glance"] isa AbstractDict
         glance = result["glance"]
-        metrics = get(glance, "metrics", Dict())
+        metrics_raw = get(glance, "metrics", Dict())
+        metrics = metrics_raw isa AbstractDict ? metrics_raw : Dict{String,Any}()
         push!(glance_lines, "- 模型：$(get(glance, "model", "—"))")
         push!(glance_lines, "- 样本量：$(get(glance, "nobs", "—"))")
         push!(glance_lines, "- 自由度：$(get(glance, "dof", "—"))")
@@ -190,7 +193,7 @@ function markdown_run_report(run_record, result)
         end
     end
 
-    tidy_table = if haskey(result, "tidy")
+    tidy_table = if haskey(result, "tidy") && result["tidy"] isa AbstractVector && !isempty(result["tidy"])
         rows = [
             MetricaBase.CoefRow(
                 Symbol(get(row, "term", get(row, "name", "term"))),
@@ -208,7 +211,8 @@ function markdown_run_report(run_record, result)
         ""
     end
 
-    diagnostics = get(result, "diagnostics", Dict())
+    diagnostics_raw = get(result, "diagnostics", Dict())
+    diagnostics = diagnostics_raw isa AbstractDict ? diagnostics_raw : Dict{String,Any}()
     diag_section = _diagnostics_section(diagnostics)
 
     warning_lines = isempty(warnings) ? ["- 无"] : [
@@ -245,7 +249,8 @@ end
 将 tidy 系数表导出为 CSV 字符串。
 """
 function csv_tidy(result)
-    rows = get(result, "tidy", Any[])
+    raw_tidy = get(result, "tidy", Any[])
+    rows = raw_tidy isa AbstractVector ? raw_tidy : Any[]
     isempty(rows) && return "term,estimate,std_error,statistic,p_value\n"
 
     lines = ["term,estimate,std_error,statistic,p_value"]

@@ -297,7 +297,47 @@ export interface BrowseResult {
 }
 
 export type DataCommandResult = DescribeResult | SummarizeResult | TabulateResult | BrowseResult;
-export type DataResult = DescribeResult | SummarizeResult | TabulateResult;
+
+/** 运行记录表（CLI `runs` 专用，前端结果流） */
+export interface RunsTableResult {
+  kind: 'runs';
+  dataset_summary: { row_count: number; column_count: number };
+  runs: Array<{
+    run_id: string;
+    action: string;
+    model_type?: string | null;
+    dataset_path: string;
+    status: string;
+    finished_at: string;
+  }>;
+}
+
+/** 导出预览摘要（CLI `export`，含 plot 元数据） */
+export interface ExportPreviewResult {
+  kind: 'export_preview';
+  dataset_summary: { row_count: 1; column_count: 4 };
+  run_id: string;
+  format: string;
+  target_path: string | null;
+  content_preview: string;
+}
+
+/** CLI 模型对比表（仅消费结构化字段） */
+export interface ModelComparisonResult {
+  kind: 'model_comparison';
+  dataset_summary: { row_count: number; column_count: number };
+  family: 'discrete' | 'causal';
+  rows: Array<Record<string, string | number | null>>;
+}
+
+export type DataResult =
+  | DescribeResult
+  | SummarizeResult
+  | TabulateResult
+  | BrowseResult
+  | RunsTableResult
+  | ExportPreviewResult
+  | ModelComparisonResult;
 
 export interface DataCommand {
   kind: DataCommandKind;
@@ -309,6 +349,8 @@ export interface MessageItem {
   id: string;
   kind: 'command' | 'result' | 'transform' | 'data';
   command?: string;
+  /** 与 Runtime `run_record.run_id` 对齐，供导出图表等能力索引 */
+  run_id?: string;
   result?: ModelResult;
   transform_result?: TransformResult;
   data_result?: DataResult;

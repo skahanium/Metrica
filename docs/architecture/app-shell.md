@@ -4,6 +4,8 @@
 
 壳层必须消费结构化结果载荷，且不得解析终端摘要文本。
 
+S4 all-in-CLI 教学与 warning 验收对照：`tutorials/s4-discrete.md`、`tutorials/s4-causal.md`、`tutorials/s4-timeseries.md`、`tutorials/s4-survey.md`，以及 `docs/architecture/s4-warning-coverage.md`（与实施计划 `docs/superpowers/plans/2026-05-16-s3-s4-all-in-cli-completion-plan.md` 同步）。
+
 ## 技术栈
 
 | 层 | 选型 | 理由 |

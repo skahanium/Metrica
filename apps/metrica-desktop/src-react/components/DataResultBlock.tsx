@@ -126,11 +126,76 @@ export const DataResultBlock: React.FC<DataResultBlockProps> = ({ command, resul
     );
   };
 
+  const renderRunsTable = () => {
+    if (result.kind !== 'runs') return null;
+    const dataSource = result.runs.map((r, idx) => ({ key: idx, ...r }));
+    const columns = [
+      { title: 'run_id', dataIndex: 'run_id', key: 'run_id', width: 220, ellipsis: true },
+      { title: 'action', dataIndex: 'action', key: 'action', width: 100 },
+      { title: 'model', dataIndex: 'model_type', key: 'model_type', width: 120 },
+      { title: 'dataset', dataIndex: 'dataset_path', key: 'dataset_path', ellipsis: true },
+      { title: 'status', dataIndex: 'status', key: 'status', width: 90 },
+      { title: 'finished_at', dataIndex: 'finished_at', key: 'finished_at', width: 180 },
+    ];
+    return (
+      <Card size="small">
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text strong>
+            运行记录（{result.dataset_summary.row_count} 行数据集上下文 × {result.runs.length} 条记录）
+          </Text>
+          <Table dataSource={dataSource} columns={columns} size="small" pagination={false} scroll={{ x: 900 }} />
+        </Space>
+      </Card>
+    );
+  };
+
+  const renderExportPreview = () => {
+    if (result.kind !== 'export_preview') return null;
+    return (
+      <Card size="small">
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text strong>导出摘要</Text>
+          <Text>run_id: <Text code>{result.run_id}</Text></Text>
+          <Text>格式: <Text code>{result.format}</Text></Text>
+          <Text>目标路径: {result.target_path ? <Text code>{result.target_path}</Text> : <Text type="secondary">（浏览器下载，路径为建议名）</Text>}</Text>
+          <Text type="secondary">内容预览（截断）：</Text>
+          <pre style={{ maxHeight: 200, overflow: 'auto', fontSize: 12, background: 'var(--m-panel-bg)' }}>
+            {result.content_preview}
+          </pre>
+        </Space>
+      </Card>
+    );
+  };
+
+  const renderModelComparison = () => {
+    if (result.kind !== 'model_comparison') return null;
+    const keys = result.rows.length > 0 ? Object.keys(result.rows[0]) : [];
+    const columns = keys.map((k) => ({
+      title: k,
+      dataIndex: k,
+      key: k,
+      ellipsis: true,
+      render: (v: string | number | null) => (v === null || v === undefined ? <Text type="secondary">NA</Text> : String(v)),
+    }));
+    const dataSource = result.rows.map((row, idx) => ({ key: idx, ...row }));
+    return (
+      <Card size="small">
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text strong>模型对比（{result.family}）</Text>
+          <Table dataSource={dataSource} columns={columns} size="small" pagination={false} scroll={{ x: true }} />
+        </Space>
+      </Card>
+    );
+  };
+
   const renderContent = () => {
     switch (result.kind) {
       case 'describe': return renderDescribe();
       case 'summarize': return renderSummarize();
       case 'tabulate': return renderTabulate();
+      case 'runs': return renderRunsTable();
+      case 'export_preview': return renderExportPreview();
+      case 'model_comparison': return renderModelComparison();
       default: return null;
     }
   };

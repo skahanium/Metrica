@@ -14,7 +14,7 @@ fn julia_bin() -> String {
 /// 解析 Julia 项目路径。
 ///
 /// 优先读取环境变量 `METRICA_JULIA_PROJECT`；若未设置，则基于
-/// 仓库根拼接 `scripts/daemon`（守护进程专用项目，包含所有包依赖）。
+/// 仓库根拼接 `packages/MetricaRuntime.jl`（聚合所有包依赖，供桥接脚本加载）。
 fn julia_project_path() -> String {
     if let Ok(path) = std::env::var("METRICA_JULIA_PROJECT") {
         return path;
@@ -22,7 +22,7 @@ fn julia_project_path() -> String {
 
     crate::repo_root()
         .join("packages")
-        .join("MetricaLinear.jl")
+        .join("MetricaRuntime.jl")
         .to_string_lossy()
         .to_string()
 }

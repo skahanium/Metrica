@@ -16,8 +16,12 @@ using MetricaPanel
 using MetricaSurvey
 using MetricaTimeSeries
 
-include(joinpath(String(ARGS[2]), "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
-using .MetricaDiagnostics
+# 通过环境依赖加载，确保 `Distributions` 等传递依赖在 LOAD_PATH 中可用。
+using MetricaDiagnostics
+
+# 加载共享工具模块
+include(joinpath(@__DIR__, "daemon", "src", "MetricaDaemon.jl"))
+using .MetricaDaemon
 
 request = JSON3.read(ARGS[1])
 action = String(request.action)
@@ -78,8 +82,12 @@ elseif action == "export_report"
 
     Dict(
         "status" => "success",
-        "content" => content,
-        "format" => format,
+        "messages" => Any[],
+        "result_payload" => Dict(
+            "content" => content,
+            "format" => format,
+        ),
+        "artifacts" => Any[],
     )
 else
     formula = String(request.model_spec.formula)
@@ -89,59 +97,17 @@ else
         # 时间序列模型：构造结构体 + DataFrame 拟合
         using CSV, DataFrames
         data = CSV.read(dataset_path, DataFrame)
-        time_col = Symbol(String(get(request.model_spec, :time_column, "time")))
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
 
-        if model_type == "arima"
-            var_sym = Symbol(String(get(request.model_spec, :variable, first(names(data)))))
-            order_arr = get(request.model_spec, :order, [1, 1, 0])
-            order_tuple = Tuple(Int.(collect(order_arr)))
-            seasonal_arr = get(request.model_spec, :seasonal_order, [0, 0, 0, 0])
-            seasonal_tuple = Tuple(Int.(collect(seasonal_arr)))
-            ts_method = Symbol(String(get(request.model_spec, :ts_method, "mle")))
-            model = ARIMAModel(
-                variable=var_sym,
-                time_column=time_col,
-                order=order_tuple,
-                seasonal_order=seasonal_tuple,
-                method=ts_method,
-            )
-        elseif model_type == "var"
-            vars_raw = collect(get(request.model_spec, :variables, String[]))
-            var_syms = Symbol.(String.(vars_raw))
-            lags = Int(get(request.model_spec, :lags, 1))
-            model = VARModel(
-                variables=var_syms,
-                time_column=time_col,
-                lags=lags,
-            )
-        elseif model_type == "unitroot"
-            var_sym = Symbol(String(get(request.model_spec, :variable, first(names(data)))))
-            det = Symbol(String(get(request.model_spec, :deterministic, "constant")))
-            lags_val = Int(get(request.model_spec, :lags, 0))
-            model = UnitRootModel(
-                variable=var_sym,
-                time_column=time_col,
-                deterministic=det,
-                max_lags=lags_val,
-            )
-        else  # cointegration
-            vars_raw = collect(get(request.model_spec, :variables, String[]))
-            var_syms = Symbol.(String.(vars_raw))
-            method_sym = Symbol(String(get(request.model_spec, :ts_method, "engle_granger")))
-            lags = Int(get(request.model_spec, :lags, 1))
-            det = Symbol(String(get(request.model_spec, :deterministic, "constant")))
-            model = CointegrationModel(
-                variables=var_syms,
-                time_column=time_col,
-                method=method_sym,
-                lags=lags,
-                deterministic=det,
-            )
+        # 将 JSON3 对象转换为 Dict 供 build_time_series_model 使用
+        params = Dict{String, Any}()
+        for key in keys(request.model_spec)
+            params[String(key)] = request.model_spec[key]
         end
+        model = MetricaTimeSeries.build_time_series_model(model_type, params)
 
         result = MetricaBase.fit(model, data)
-        MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
+        runtime_fit_envelope(MetricaTimeSeries.result_to_payload(result; include_augment=include_augment))
     elseif model_type in ("panel", "panel_iv")
         # 面板模型拟合
         panel_id = Symbol(String(request.model_spec.panel_id))
@@ -195,15 +161,18 @@ else
     else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()
-        vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
-        vcov_key = lowercase(vcov_type)
-        vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
-        kwargs[:vcov] = vcov_symbol
-        if haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights) && !isempty(request.model_spec.weights)
-            kwargs[:weights] = Symbol(String(request.model_spec.weights))
-        end
-        if haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column) && !isempty(request.model_spec.cluster_column)
-            kwargs[:cluster_column] = Symbol(String(request.model_spec.cluster_column))
+        # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字，避免 MethodError。
+        if !(model_type in ("ipw", "aipw", "psm"))
+            vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
+            vcov_key = lowercase(vcov_type)
+            vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
+            kwargs[:vcov] = vcov_symbol
+            if haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights) && !isempty(request.model_spec.weights)
+                kwargs[:weights] = Symbol(String(request.model_spec.weights))
+            end
+            if haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column) && !isempty(request.model_spec.cluster_column)
+                kwargs[:cluster_column] = Symbol(String(request.model_spec.cluster_column))
+            end
         end
         if haskey(request.model_spec, :treatment_column) && present(request.model_spec.treatment_column)
             kwargs[:treatment_column] = Symbol(String(request.model_spec.treatment_column))
@@ -233,4 +202,4 @@ else
         _payload
     end
 end
-println(JSON3.write(payload))
+println(JSON3.write(sanitize_json_floats(payload)))
