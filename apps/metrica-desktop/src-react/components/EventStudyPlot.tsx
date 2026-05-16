@@ -1,12 +1,27 @@
 import { Card, Typography } from 'antd';
+import { useEffect, useRef, type ComponentRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { ModelResult } from '../types/protocol';
+import { registerChartForRun } from '../services/chartExport';
 
 interface EventStudyPlotProps {
   result: ModelResult;
+  /** 有 runId 时注册图表实例，供 CLI `export plot` 使用 */
+  runId?: string | null;
 }
 
-export function EventStudyPlot({ result }: EventStudyPlotProps) {
+export function EventStudyPlot({ result, runId }: EventStudyPlotProps) {
+  const chartRef = useRef<ComponentRef<typeof ReactECharts>>(null);
+
+  useEffect(() => {
+    if (!runId) return undefined;
+    const inst = chartRef.current?.getEchartsInstance?.();
+    if (!inst) return undefined;
+    return registerChartForRun(runId, {
+      getDataURL: (opts) => inst.getDataURL(opts as never),
+    });
+  }, [runId, result.glance?.model, result.period_coefficients?.length]);
+
   if (result.glance.model !== 'event_study') return null;
 
   const coefs = result.period_coefficients || [];
@@ -97,7 +112,7 @@ export function EventStudyPlot({ result }: EventStudyPlotProps) {
           ? ' 未拒绝平行趋势假设。'
           : ' 拒绝平行趋势假设，处理效应估计可能偏误。'}
       </Typography.Paragraph>
-      <ReactECharts option={option} style={{ height: 350 }} />
+      <ReactECharts ref={chartRef} option={option} style={{ height: 350 }} />
     </Card>
   );
 }

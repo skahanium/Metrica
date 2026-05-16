@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Empty } from 'antd';
+import { Empty, Alert } from 'antd';
 import { useMessageStore } from '../stores/messageStore';
 import { ResultBlock } from './ResultBlock';
 import { TransformResultBlock } from './TransformResultBlock';
@@ -52,9 +52,12 @@ export const ResultFlow: React.FC = () => {
                   command={msg.command || ''}
                   result={msg.data_result}
                 />
+              ) : msg.kind === 'command' && msg.command ? (
+                <Alert type="info" showIcon message={msg.command} style={{ margin: 8 }} />
               ) : msg.result ? (
                 <ResultBlock
                   command={msg.command || ''}
+                  runId={msg.run_id}
                   result={msg.result}
                 />
               ) : null}

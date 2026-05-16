@@ -23,13 +23,19 @@ function persistRecentProjects(projects: string[]) {
 }
 
 interface ProjectState {
+  /** Runtime 返回的 manifest 文件绝对路径（展示用） */
   projectPath: string;
+  /** `project_context.working_dir`：含 `.metrica/` 的项目根目录 */
+  projectWorkingDir: string;
   manifest: ProjectManifest | null;
   recentProjects: string[];
   runHistory: RunRecord[];
   isDirty: boolean;
   projectId: string;
+  /** Julia 重启后工作区恢复提示的时间戳（ISO），用于节流 */
+  lastRecoveredAt: string | null;
   setProjectPath: (projectPath: string) => void;
+  setProjectWorkingDir: (dir: string) => void;
   setManifest: (manifest: ProjectManifest | null) => void;
   setRunHistory: (runHistory: RunRecord[]) => void;
   appendRunRecord: (run: RunRecord) => void;
@@ -39,6 +45,7 @@ interface ProjectState {
   generateProjectId: () => string;
   appendLineageOperations: (ops: DataOp[]) => void;
   updateLineageRowCounts: (before: number, after: number) => void;
+  markRecovered: () => void;
 }
 
 function newProjectId(): string {
@@ -47,12 +54,15 @@ function newProjectId(): string {
 
 export const useProjectStore = create<ProjectState>((set) => ({
   projectPath: '',
+  projectWorkingDir: '',
   manifest: null,
   recentProjects: loadRecentProjects(),
   runHistory: [],
   isDirty: false,
   projectId: newProjectId(),
+  lastRecoveredAt: null,
   setProjectPath: (projectPath) => set({ projectPath }),
+  setProjectWorkingDir: (projectWorkingDir) => set({ projectWorkingDir }),
   setManifest: (manifest) => set({ manifest }),
   setRunHistory: (runHistory) => set({ runHistory }),
   appendRunRecord: (run) => set((state) => ({
@@ -66,10 +76,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
   }),
   resetProject: () => set({
     projectPath: '',
+    projectWorkingDir: '',
     manifest: null,
     runHistory: [],
     isDirty: false,
     projectId: newProjectId(),
+    lastRecoveredAt: null,
   }),
   generateProjectId: () => {
     const id = newProjectId();
@@ -111,4 +123,5 @@ export const useProjectStore = create<ProjectState>((set) => ({
       },
     };
   }),
+  markRecovered: () => set({ lastRecoveredAt: new Date().toISOString() }),
 }));

@@ -14,6 +14,7 @@ import { useDatasetStore } from '../stores/datasetStore';
 import { parse } from '../services/commandParser';
 import {
   handleUse, handleProject, handleTrash, handleDatahistory, handleSave,
+  handleLoad, handleRuns, handleRerun, handleExport, handleCompare,
   handleDataView, handleDataOp, handleModel,
   handleDiagnostic, handlePostest,
   requiresActiveDataset, isDiagnosticVerb, isPostestVerb,
@@ -101,6 +102,11 @@ export function App() {
       case 'trash': return handleTrash(parsed, input, showCliFeedback);
       case 'datahistory': return handleDatahistory(parsed, input, showCliFeedback);
       case 'save': return handleSave(parsed, input, showCliFeedback);
+      case 'load': return handleLoad(parsed, input, showCliFeedback);
+      case 'runs': return handleRuns(parsed, input, showCliFeedback);
+      case 'rerun': return handleRerun(parsed, input, showCliFeedback);
+      case 'export': return handleExport(parsed, input, showCliFeedback);
+      case 'compare': return handleCompare(parsed, input, showCliFeedback);
       default: {
         if (!activePath && requiresActiveDataset(verb)) {
           showCliFeedback('warning', '请先加载数据集，再执行模型或数据操作命令');

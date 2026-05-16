@@ -1,11 +1,14 @@
 import { checkHealth } from './runtimeClient';
 import { useAppStore, MAX_RESTARTS } from '../stores/appStore';
+import { recoverJuliaWorkspaceIfPossible } from './commandExecutor';
 
 const HEALTH_STARTUP_POLL_INTERVAL_MS = 1_000;  // 启动时 1 秒轮询
 const HEALTH_NORMAL_POLL_INTERVAL_MS = 30_000;   // 就绪后 30 秒轮询
 
 let pollingId: ReturnType<typeof setInterval> | null = null;
 let isJuliaReady = false;
+/** 上一轮 Julia 是否健康，用于检测「不可用 → 可用」以触发工作区恢复 */
+let prevJuliaHealthy = true;
 
 export function startHealthPolling(): void {
   if (pollingId !== null) return;
@@ -13,8 +16,13 @@ export function startHealthPolling(): void {
   const poll = async () => {
     try {
       const health = await checkHealth();
+      const wasHealthy = prevJuliaHealthy;
+      prevJuliaHealthy = health.julia_healthy;
       useAppStore.getState().setJuliaHealth(health.julia_healthy, health.restart_count);
-      
+      if (health.julia_healthy && !wasHealthy) {
+        void recoverJuliaWorkspaceIfPossible();
+      }
+
       // 检测到就绪后，切换到正常轮询间隔
       if (health.julia_healthy && !isJuliaReady) {
         isJuliaReady = true;
@@ -41,6 +49,7 @@ export function stopHealthPolling(): void {
     clearInterval(pollingId);
     pollingId = null;
     isJuliaReady = false;
+    prevJuliaHealthy = true;
     useAppStore.getState().setHealthPollingId(null);
   }
 }

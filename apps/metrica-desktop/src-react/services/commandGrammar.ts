@@ -487,6 +487,7 @@ const grammars: CommandGrammar[] = [
     description: '保存项目',
     category: 'project',
     syntax: [
+      { kind: 'indepvar', label: '保存路径或项目根', required: false, multiple: false },
       { kind: 'comma', label: ',', required: false, multiple: false },
       {
         kind: 'option',
@@ -547,11 +548,36 @@ const grammars: CommandGrammar[] = [
   // ===== Export commands =====
   {
     verb: 'export',
-    description: '导出结果',
+    description: '导出结果（markdown / csv_* / plot）',
     category: 'export',
     syntax: [
-      { kind: 'indepvar', label: '格式', required: true, multiple: false, values: ['markdown', 'csv', 'report', 'script'] },
+      {
+        kind: 'indepvar',
+        label: '格式',
+        required: true,
+        multiple: false,
+        values: ['markdown', 'csv_tidy', 'csv_glance', 'csv_diagnostics', 'plot'],
+      },
       { kind: 'indepvar', label: '运行 ID', required: false, multiple: false },
+      { kind: 'comma', label: ',', required: false, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: false,
+        multiple: true,
+        children: {
+          using: { kind: 'option_value', label: 'using', required: false, multiple: false },
+          format: { kind: 'option_value', label: 'format', required: false, multiple: false, values: ['svg', 'png'] },
+        },
+      },
+    ],
+  },
+  {
+    verb: 'compare',
+    description: '模型对比（离散 / 因果）或 compare clear',
+    category: 'postest',
+    syntax: [
+      { kind: 'indepvar', label: '运行 ID 或 clear', required: true, multiple: true },
     ],
   },
 ];

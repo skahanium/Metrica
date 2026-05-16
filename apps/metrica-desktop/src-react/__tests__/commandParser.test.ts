@@ -52,6 +52,36 @@ describe('parse', () => {
     expect(r.error).toContain('未知命令');
   });
 
+  it('parses compare with multiple run ids', () => {
+    const r = parse('compare run-1 run-2');
+    expect(r.verb).toBe('compare');
+    expect(r.positionals).toEqual(['run-1', 'run-2']);
+    expect(r.options).toEqual([]);
+  });
+
+  it('parses export markdown with run id and using option', () => {
+    const r = parse('export markdown run-1, using("/tmp/a.md")');
+    expect(r.verb).toBe('export');
+    expect(r.positionals).toEqual(['markdown', 'run-1']);
+    expect(r.options).toEqual([{ name: 'using', value: '"/tmp/a.md"' }]);
+  });
+
+  it('parses export plot with format and using', () => {
+    const r = parse('export plot run-event, format(svg) using("/tmp/a.svg")');
+    expect(r.verb).toBe('export');
+    expect(r.positionals).toEqual(['plot', 'run-event']);
+    expect(r.options).toEqual([
+      { name: 'format', value: 'svg' },
+      { name: 'using', value: '"/tmp/a.svg"' },
+    ]);
+  });
+
+  it('load is standalone verb (not mapped to project)', () => {
+    const r = parse('load "/tmp/proj.metrica"');
+    expect(r.verb).toBe('load');
+    expect(r.positionals).toEqual(['"/tmp/proj.metrica"']);
+  });
+
   it('returns error for empty input', () => {
     const r = parse('');
     expect(r.error).toBe('空命令');

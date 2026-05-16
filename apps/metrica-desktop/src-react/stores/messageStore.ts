@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { MessageItem, SelectionMode } from '../types/protocol';
+import type { DataResult, MessageItem, SelectionMode } from '../types/protocol';
 
 interface MessageState {
   messages: MessageItem[];
@@ -13,6 +13,8 @@ interface MessageState {
   restoreMessages: (ids: string[]) => void;
   permanentlyDeleteMessages: (ids: string[]) => void;
   clearTrash: () => void;
+  /** 按结构化 data_result.kind 移除消息（如 compare clear） */
+  removeDataMessagesByKind: (kind: DataResult['kind']) => void;
 
   // 选择操作
   setSelectionMode: (mode: SelectionMode) => void;
@@ -78,6 +80,12 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   })),
 
   clearTrash: () => set({ trash: [] }),
+
+  removeDataMessagesByKind: (kind) => set((state) => ({
+    messages: state.messages.filter(
+      (m) => !(m.kind === 'data' && m.data_result && m.data_result.kind === kind),
+    ),
+  })),
 
   setSelectionMode: (mode) => set((state) => ({
     selectionMode: mode,

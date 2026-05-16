@@ -143,6 +143,115 @@ fn pick_csv_path() -> Result<Option<String>, String> {
     Err("当前宿主不支持选择本地 CSV 文件".to_string())
 }
 
+#[cfg(target_os = "macos")]
+fn pick_project_open_path() -> Result<Option<String>, String> {
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::ffi::CStr;
+    use std::os::raw::c_char;
+
+    const NS_MODAL_RESPONSE_OK: i64 = 1;
+    const YES: i8 = 1;
+    const NO: i8 = 0;
+
+    unsafe {
+        let panel: *mut objc::runtime::Object = msg_send![class!(NSOpenPanel), openPanel];
+        let _: () = msg_send![panel, setCanChooseFiles:YES];
+        let _: () = msg_send![panel, setCanChooseDirectories:YES];
+        let _: () = msg_send![panel, setAllowsMultipleSelection:NO];
+
+        let response: i64 = msg_send![panel, runModal];
+        if response != NS_MODAL_RESPONSE_OK {
+            return Ok(None);
+        }
+
+        let url: *mut objc::runtime::Object = msg_send![panel, URL];
+        if url.is_null() {
+            return Ok(None);
+        }
+
+        let path: *mut objc::runtime::Object = msg_send![url, path];
+        if path.is_null() {
+            return Ok(None);
+        }
+
+        let c_path: *const c_char = msg_send![path, UTF8String];
+        if c_path.is_null() {
+            return Err("无法读取所选路径。".to_string());
+        }
+
+        let path = CStr::from_ptr(c_path)
+            .to_str()
+            .map_err(|_| "所选路径包含无法解析的字符。".to_string())?
+            .to_string();
+
+        Ok(Some(path))
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn pick_project_open_path() -> Result<Option<String>, String> {
+    Err("当前宿主不支持项目路径选择".to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn pick_save_panel_path(default_name: &str) -> Result<Option<String>, String> {
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::ffi::{CStr, CString};
+    use std::os::raw::c_char;
+
+    const NS_MODAL_RESPONSE_OK: i64 = 1;
+
+    unsafe {
+        let panel: *mut objc::runtime::Object = msg_send![class!(NSSavePanel), savePanel];
+        let cname = CString::new(default_name).map_err(|_| "默认文件名无效".to_string())?;
+        let ns_name: *mut objc::runtime::Object =
+            msg_send![class!(NSString), stringWithUTF8String: cname.as_ptr()];
+        let _: () = msg_send![panel, setNameFieldStringValue: ns_name];
+
+        let response: i64 = msg_send![panel, runModal];
+        if response != NS_MODAL_RESPONSE_OK {
+            return Ok(None);
+        }
+
+        let url: *mut objc::runtime::Object = msg_send![panel, URL];
+        if url.is_null() {
+            return Ok(None);
+        }
+
+        let path: *mut objc::runtime::Object = msg_send![url, path];
+        if path.is_null() {
+            return Ok(None);
+        }
+
+        let c_path: *const c_char = msg_send![path, UTF8String];
+        if c_path.is_null() {
+            return Err("无法读取所选保存路径。".to_string());
+        }
+
+        let path = CStr::from_ptr(c_path)
+            .to_str()
+            .map_err(|_| "所选保存路径包含无法解析的字符。".to_string())?
+            .to_string();
+
+        Ok(Some(path))
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn pick_save_panel_path(_default_name: &str) -> Result<Option<String>, String> {
+    Err("当前宿主不支持保存路径选择".to_string())
+}
+
+fn filename_from_pick_export_uri(uri: &str) -> String {
+    let after = uri.split('?').nth(1).unwrap_or("");
+    for part in after.split('&') {
+        if let Some(v) = part.strip_prefix("filename=") {
+            return v.replace('+', " ").replace("%20", " ");
+        }
+    }
+    "metrica-export".to_string()
+}
+
 /// 加载应用图标。
 fn load_icon() -> Option<Icon> {
     let icon_path = app_dir().join("dist/assets/icons/metrica-icon-128x128.png");
@@ -379,8 +488,55 @@ pub fn run() {
         .with_custom_protocol("metrica".into(), move |_id, request| {
             let uri = request.uri();
             let path = uri.path();
+            let uri_string = uri.to_string();
             if path == "/__native__/pick_csv" {
                 return match pick_csv_path() {
+                    Ok(Some(path)) => json_response(200, serde_json::json!({
+                        "path": path,
+                        "cancelled": false,
+                    })),
+                    Ok(None) => json_response(200, serde_json::json!({
+                        "path": serde_json::Value::Null,
+                        "cancelled": true,
+                    })),
+                    Err(err) => json_response(501, serde_json::json!({
+                        "error": err,
+                    })),
+                };
+            }
+            if path == "/__native__/pick_project_open" {
+                return match pick_project_open_path() {
+                    Ok(Some(path)) => json_response(200, serde_json::json!({
+                        "path": path,
+                        "cancelled": false,
+                    })),
+                    Ok(None) => json_response(200, serde_json::json!({
+                        "path": serde_json::Value::Null,
+                        "cancelled": true,
+                    })),
+                    Err(err) => json_response(501, serde_json::json!({
+                        "error": err,
+                    })),
+                };
+            }
+            if path == "/__native__/pick_project_save" {
+                return match pick_save_panel_path("project.metrica") {
+                    Ok(Some(path)) => json_response(200, serde_json::json!({
+                        "path": path,
+                        "cancelled": false,
+                    })),
+                    Ok(None) => json_response(200, serde_json::json!({
+                        "path": serde_json::Value::Null,
+                        "cancelled": true,
+                    })),
+                    Err(err) => json_response(501, serde_json::json!({
+                        "error": err,
+                    })),
+                };
+            }
+            if path == "/__native__/pick_export_save" {
+                let suggest = filename_from_pick_export_uri(&uri_string);
+                return match pick_save_panel_path(&suggest) {
                     Ok(Some(path)) => json_response(200, serde_json::json!({
                         "path": path,
                         "cancelled": false,
