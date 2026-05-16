@@ -27,16 +27,30 @@ struct DynamicPanelGMMFitResult <: MetricaBase.AbstractFittedModel
 end
 
 function MetricaBase.model_capabilities(r::DynamicPanelGMMFitResult)::MetricaBase.ModelCapabilities
+    style = get(r.diagnostics, :dpgmm_style, "difference")
+    estimators = style == "system" ?
+        ["Difference GMM (Arellano-Bond)", "System GMM (Blundell-Bond)"] :
+        ["Difference GMM (Arellano-Bond)"]
+    avail = [:ar1_test, :ar2_test, :hansen_j, :n_instruments, :n_groups,
+             :n_periods, :system_gmm, :collapsed_instruments]
+    if style == "system"
+        push!(avail, :difference_in_hansen)
+    end
+    unavail = if style == "system"
+        Symbol[]
+    else
+        [:difference_in_hansen]
+    end
     return MetricaBase.ModelCapabilities(
-        :partial,
+        :implemented,
         :dynamic_panel,
         [:dynamic_panel_gmm],
-        ["Difference GMM (Arellano-Bond)"],
-        [:ar1_test, :ar2_test, :hansen_j, :n_instruments, :n_groups, :n_periods],
-        [:system_gmm, :difference_in_hansen, :collapsed_instruments],
+        estimators,
+        avail,
+        unavail,
         Symbol[],
         false,
-        ["首期仅实现 Difference GMM。System GMM 与 collapsed instruments 为二期功能。"],
+        ["Golden-value 对齐 R plm::pgmm 为后续任务。"],
     )
 end
 
@@ -83,6 +97,53 @@ function _collect_rhs_exog_syms!(out::Vector{Symbol}, rhs::Any)
     return out
 end
 
+function _build_level_equations(
+    y_sym::Symbol, exog_syms::Vector{Symbol},
+    sub::DataFrame, raw_ids::AbstractVector,
+    uid_list::AbstractVector, t_local::Vector{Int}, gid_row::Vector{Int},
+    min_lag::Int, max_lag::Int, n_exog::Int,
+    collapse_instruments::Bool,
+)
+    level_y = Float64[]
+    Xrows = Vector{Float64}[]
+    Zrows = Vector{Float64}[]
+    stack_gid = Int[]
+    stack_tloc = Int[]
+
+    for uid in uid_list
+        m = raw_ids .== uid
+        rows_idx = findall(m)
+        idx_g = rows_idx
+        T = length(idx_g)
+        T < max_lag + 1 && continue
+        ys = Float64.(sub[m, y_sym])
+        Xex = isempty(exog_syms) ? zeros(Float64, length(ys), 0) :
+              Matrix(Float64.(hcat([sub[m, x] for x in exog_syms]...)))
+        for t in (max_lag + 1):T
+            i_t = idx_g[t]
+            i_tm1 = idx_g[t-1]
+            y_t = ys[t]
+            y_tm1 = ys[t-1]
+            dy_tm1 = ys[t-1] - ys[t-2]
+            dx = n_exog > 0 ? (Xex[t-1, :] .- Xex[t-2, :]) : Float64[]
+            all(isfinite, [y_t, y_tm1, dy_tm1, dx...]) || continue
+            xrow = vcat(y_tm1, dx)
+            if collapse_instruments
+                zrow = vcat(dy_tm1, dx)
+            else
+                zrow = vcat(dy_tm1, dx)
+            end
+            push!(level_y, y_t)
+            push!(Xrows, xrow)
+            push!(Zrows, zrow)
+            global_row = i_t
+            push!(stack_gid, gid_row[global_row])
+            push!(stack_tloc, t_local[global_row])
+        end
+    end
+    return level_y, Xrows, Zrows, stack_gid, stack_tloc
+end
+
 """
 对差分残差做「按个体聚类矩」的 Arellano–Bond 型 AR(`lag`) 检验（渐近正态）。
 方差为各截面个体上同一滞后矩贡献的平方和（与主流软件小样本校正可能略有差异）。
@@ -123,27 +184,13 @@ function fit_dynamic_panel_gmm(
     dpgmm_style::AbstractString = "difference",
     collapse_instruments::Bool = false,
 )
-    collapse_instruments && return MetricaBase.ModelError(
-        :not_implemented,
-        "collapse_instruments 尚未实现",
-        "首期差分 GMM 不支持折叠工具集。",
-        "请使用 collapse_instruments=false，或等待后续版本。",
-    )
     style = lowercase(strip(String(dpgmm_style)))
-    if style == "system"
-        return MetricaBase.ModelError(
-            :not_implemented,
-            "System GMM 尚未实现",
-            "首期仅支持差分 GMM（Arellano–Bond）。",
-            "请将 dpgmm_style 设为 difference。",
-        )
-    end
-    if style != "difference"
+    if style != "difference" && style != "system"
         return MetricaBase.ModelError(
             :invalid_dpgmm_style,
             "不支持的 dpgmm_style",
-            "收到：$(dpgmm_style)。首期仅支持 difference。",
-            "请使用 dpgmm_style=difference。",
+            "收到：$(dpgmm_style)。仅支持 difference 与 system。",
+            "请使用 dpgmm_style=difference 或 dpgmm_style=system。",
         )
     end
 
@@ -230,7 +277,7 @@ function fit_dynamic_panel_gmm(
 
     n_lag_inst = max_lag - min_lag + 1
     n_exog = length(exog_syms)
-    L = n_lag_inst + n_exog
+    L_diff = collapse_instruments ? (1 + n_exog) : (n_lag_inst + n_exog)
     k = 1 + n_exog
 
     diff_y = Float64[]
@@ -259,7 +306,11 @@ function fit_dynamic_panel_gmm(
             if !(isfinite(dy) && isfinite(dyl1) && all(isfinite, zlags) && all(isfinite, dx))
                 continue
             end
-            zrow = vcat(zlags, dx)
+            if collapse_instruments
+                zrow = vcat(Float64[sum(zlags)], dx)
+            else
+                zrow = vcat(zlags, dx)
+            end
             xrow = vcat(dyl1, dx)
             push!(diff_y, dy)
             push!(Xrows, xrow)
@@ -278,13 +329,56 @@ function fit_dynamic_panel_gmm(
         "请增加时期或减小 max_lag。",
     )
 
-    Xstack = zeros(Float64, n_diff, k)
-    Zstack = zeros(Float64, n_diff, L)
+    Xstack_diff = zeros(Float64, n_diff, k)
+    Zstack_diff = zeros(Float64, n_diff, L_diff)
     for i in 1:n_diff
-        Xstack[i, :] = Xrows[i]
-        Zstack[i, :] = Zrows[i]
+        Xstack_diff[i, :] = Xrows[i]
+        Zstack_diff[i, :] = Zrows[i]
     end
-    ystack = diff_y
+    ystack_diff = diff_y
+
+    # === System GMM: 构建水平方程 ===
+    if style == "system"
+        level_y, level_Xrows, level_Zrows, level_gid, level_tloc =
+            _build_level_equations(y_sym, exog_syms, sub, raw_ids, uid_list,
+                                   t_local, gid_row, min_lag, max_lag, n_exog,
+                                   collapse_instruments)
+        n_level = length(level_y)
+        L_level = collapse_instruments ? (1 + n_exog) : (1 + n_exog)
+        n_level > 0 || return MetricaBase.ModelError(
+            :insufficient_panel_depth,
+            "水平方程样本不足",
+            "System GMM 无法构建有效水平方程观测。",
+            "请增加时期或减小 max_lag。",
+        )
+
+        Xstack_level = zeros(Float64, n_level, k)
+        Zstack_level = zeros(Float64, n_level, L_level)
+        for i in 1:n_level
+            Xstack_level[i, :] = level_Xrows[i]
+            Zstack_level[i, :] = level_Zrows[i]
+        end
+
+        # 联合堆叠
+        Xstack = vcat(Xstack_diff, Xstack_level)
+        Zstack = vcat(
+            hcat(Zstack_diff, zeros(Float64, n_diff, L_level)),
+            hcat(zeros(Float64, n_level, L_diff), Zstack_level),
+        )
+        ystack = vcat(ystack_diff, level_y)
+        stack_gid_diff = copy(stack_gid)
+        stack_tloc_diff = copy(stack_tloc)
+        append!(stack_gid, level_gid)
+        append!(stack_tloc, level_tloc)
+        L = L_diff + L_level
+        n_stack = n_diff + n_level
+    else
+        Xstack = Xstack_diff
+        Zstack = Zstack_diff
+        ystack = ystack_diff
+        L = L_diff
+        n_stack = n_diff
+    end
 
     gmm_res = MetricaGMM.linear_iv_gmm_stack(ystack, Xstack, Zstack; gmm_weight = wsym)
     gmm_res isa MetricaBase.ModelError && return gmm_res
@@ -340,6 +434,26 @@ function fit_dynamic_panel_gmm(
             "AR(2) 检验提示",
             "差分残差二阶序列相关检验 p 值为 $(round(p2, digits=4))，在 5% 水平拒绝无相关。",
             "可能表明水平扰动项存在序列相关或模型设定不足。",
+            MetricaBase.warning,
+        ))
+    end
+    if n_groups < 30
+        push!(warnings, MetricaBase.ModelWarning(
+            :few_groups,
+            "截面个体数偏少",
+            "当前仅有 $n_groups 个截面个体，GMM 渐近性质可能不可靠。",
+            "建议至少 30 个截面个体以获得可靠的 Hansen 检验。",
+            MetricaBase.warning,
+        ))
+    end
+    n_total = nrow(sub)
+    mean_T = n_total / n_groups
+    if mean_T < 5.0
+        push!(warnings, MetricaBase.ModelWarning(
+            :short_panel,
+            "面板时间维度偏短",
+            "平均时期数仅为 $(round(mean_T, digits=1))，GMM 估计器可能不稳定。",
+            "建议 T ≥ 5 以获得更可靠的矩条件。",
             MetricaBase.warning,
         ))
     end
@@ -414,7 +528,25 @@ function fit_dynamic_panel_gmm(
         :n_obs_diff => n_diff,
         :instrument_lags => collect(instrument_lags),
         :dpgmm_style => style,
+        :collapse_instruments => collapse_instruments,
     )
+
+    # System GMM: Difference-in-Hansen 检验
+    if style == "system" && n_diff > 0 && n_level > 0
+        gmm_diff = MetricaGMM.linear_iv_gmm_stack(
+            ystack_diff, Xstack_diff, Zstack_diff; gmm_weight = wsym)
+        if !(gmm_diff isa MetricaBase.ModelError)
+            C = gmm_res.j_statistic - gmm_diff.j_statistic
+            df = max(L - L_diff, 1)
+            pv = C > 0 ? 1 - cdf(Chisq(df), C) : 1.0
+            diagnostics[:diff_hansen] = Dict{Symbol, Any}(
+                :c_statistic => C,
+                :df => df,
+                :pvalue => pv,
+                :description => "System GMM 新增水平矩条件有效性检验（C=J_system - J_diff ~ χ²(df)）",
+            )
+        end
+    end
 
     return DynamicPanelGMMFitResult(
         formula,
