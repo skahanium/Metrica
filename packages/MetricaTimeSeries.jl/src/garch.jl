@@ -177,6 +177,20 @@ function MetricaBase.nobs(r::GARCHFitResult)
     return r.glance_table.nobs
 end
 
+function MetricaBase.model_capabilities(r::GARCHFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :volatility,
+        [:arch, :garch],
+        ["QMLE (Gaussian) + Optim (Nelder-Mead)"],
+        [:loglik, :persistence, :unconditional_variance, :conditional_volatility],
+        [:std_errors, :t_statistics, :ljung_box_on_std_residuals, :var, :es, :forecast, :gjrgarch, :egarch],
+        Symbol[],
+        false,
+        ["首期仅输出系数估计值，标准误/预测/VaR/ES/GJR/EGARCH 为二期功能。", "仅支持常数均值方程。"],
+    )
+end
+
 function result_to_payload(r::GARCHFitResult; include_augment::Bool = true)
     preview_n = 50
     σ = sqrt.(max.(r.conditional_variance, 1e-18))
@@ -229,6 +243,17 @@ function result_to_payload(r::GARCHFitResult; include_augment::Bool = true)
             ],
         ),
         "diagnostics" => diag,
+    )
+
+    caps = MetricaBase.model_capabilities(r)
+    payload["model_capabilities"] = MetricaBase.capabilities_to_dict(caps)
+    payload["augment_status"] = MetricaBase.build_augment_status(
+        r;
+        available=include_augment,
+        columns_available=include_augment ? ["residual"] : String[],
+        columns_unavailable=["fitted", "std_residual", "leverage", "cooks_d"],
+        preview_included=include_augment,
+        preview_rows=include_augment ? min(length(r.original_series), 50) : 0,
     )
 
     if !isempty(r.warnings)

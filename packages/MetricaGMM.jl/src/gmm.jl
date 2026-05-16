@@ -30,6 +30,20 @@ struct GMMLinearFitResult <: MetricaBase.AbstractLinearFitResult
     gmm_diagnostics::Dict{Symbol, Any}
 end
 
+function MetricaBase.model_capabilities(r::GMMLinearFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :gmm,
+        [:gmm_linear],
+        ["one_step", "two_step"],
+        [:j_statistic, :j_df, :j_pvalue, :overidentifying_restrictions, :exactly_identified, :n_moments, :n_params],
+        [:c_stat, :difference_in_hansen, :weak_instrument_diagnostics],
+        Symbol[],
+        false,
+        ["目前仅支持线性 IV-GMM。", "弱工具变量诊断与 C-stat 为二期功能。"],
+    )
+end
+
 MetricaBase.glance(result::GMMLinearFitResult) = result.glance_table
 MetricaBase.tidy(result::GMMLinearFitResult) = result.tidy_table
 MetricaBase.coef(result::GMMLinearFitResult) = result.coefficient_names .=> result.coef_values

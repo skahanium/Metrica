@@ -437,6 +437,15 @@ describe('parseToModelSpec', () => {
     }
   });
 
+  it('parses spreg to spatial_slx', () => {
+    const r = parse('spreg y x1, spatial_weights("w.csv") id(region) model(slx)');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(false);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('spatial_slx');
+    }
+  });
+
   it('parses stcox to duration_cox with ph formula and duration columns', () => {
     const r = parse('stcox time fail x1 x2');
     const spec = parseToModelSpec(r);

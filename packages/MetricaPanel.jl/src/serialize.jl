@@ -1,68 +1,50 @@
-# === 面板结果序列化 ===========================================================
+# === 面板结果序列化（复用 MetricaBase 共享序列化辅助）==========================
 
-function severity_to_string(severity::MetricaBase.Severity)
-    return String(Symbol(severity))
-end
-
-function warning_to_dict(warning::MetricaBase.ModelWarning)
-    return Dict(
-        "code" => String(warning.code),
-        "title" => warning.title,
-        "detail" => warning.detail,
-        "hint" => warning.hint,
-        "severity" => severity_to_string(warning.severity),
-    )
-end
+using MetricaBase: severity_to_string,
+    warning_to_dict,
+    error_to_payload,
+    capabilities_to_dict,
+    dict_symbol_to_string,
+    build_glance_envelope,
+    build_tidy_rows,
+    build_messages,
+    build_augment_status,
+    build_augment_preview,
+    try_capabilities
 
 function result_to_payload(result::PanelFitResult; include_augment::Bool=true)
     glance_table = MetricaBase.glance(result)
     tidy_table = MetricaBase.tidy(result)
-    warnings = [warning_to_dict(warning) for warning in glance_table.warnings]
 
-    payload = Dict(
+    glance_dict, warnings = build_glance_envelope(glance_table)
+    tidy_rows = build_tidy_rows(tidy_table)
+    messages = build_messages(glance_table)
+    caps_dict = try_capabilities(result)
+    aug_status = build_augment_status(
+        result;
+        available=include_augment,
+        columns_available=include_augment ? ["fitted", "residual", "std_residual"] : String[],
+        columns_unavailable=["leverage", "cooks_d"],
+        preview_included=include_augment,
+        preview_rows=include_augment ? min(100, length(result.fitted_values)) : 0,
+    )
+
+    payload = Dict{String, Any}(
         "status" => "success",
-        "messages" => [
-            Dict(
-                "level" => severity_to_string(warning.severity),
-                "code" => String(warning.code),
-                "text" => warning.detail,
-                "hint" => warning.hint,
-            )
-            for warning in glance_table.warnings
-        ],
-        "result_payload" => Dict(
-            "glance" => Dict(
-                "model" => String(glance_table.model),
-                "nobs" => glance_table.nobs,
-                "dof" => glance_table.dof,
-                "metrics" => Dict(String(key) => value for (key, value) in glance_table.metrics),
-                "warnings" => warnings,
-            ),
+        "messages" => messages,
+        "result_payload" => Dict{String, Any}(
+            "glance" => glance_dict,
             "vcov_label" => tidy_table.vcov_label,
-            "tidy" => [
-                Dict(
-                    "name" => String(row.name),
-                    "estimate" => row.estimate,
-                    "stderror" => row.stderror,
-                    "statistic" => row.statistic,
-                    "pvalue" => row.pvalue,
-                    "ci_lower" => row.ci_lower,
-                    "ci_upper" => row.ci_upper,
-                )
-                for row in tidy_table.rows
-            ],
+            "tidy" => tidy_rows,
             "warnings" => warnings,
+            "model_capabilities" => caps_dict,
+            "augment_status" => aug_status,
         ),
     )
 
     if include_augment
-        augment_table = MetricaBase.augment(result)
-        max_preview = min(100, augment_table.nobs)
-        augment_preview = Dict(
-            String(key) => values[1:max_preview]
-            for (key, values) in augment_table.columns
-        )
-        payload["result_payload"]["augment_preview"] = augment_preview
+        at = MetricaBase.augment(result)
+        payload["result_payload"]["augment_preview"] = build_augment_preview(at)
     end
 
     return payload
@@ -71,59 +53,40 @@ end
 function result_to_payload(result::PanelIVFitResult; include_augment::Bool=true)
     glance_table = MetricaBase.glance(result)
     tidy_table = MetricaBase.tidy(result)
-    warnings = [warning_to_dict(warning) for warning in glance_table.warnings]
 
-    first_stage = Dict(
-        String(k) => v for (k, v) in result.first_stage_stats
-    )
+    glance_dict, warnings = build_glance_envelope(glance_table)
+    tidy_rows = build_tidy_rows(tidy_table)
+    messages = build_messages(glance_table)
+    caps_dict = try_capabilities(result)
+    first_stage = Dict{String, Any}(String(k) => v for (k, v) in result.first_stage_stats)
     weak_warnings = [warning_to_dict(w) for w in result.weak_instrument_warnings]
+    aug_status = build_augment_status(
+        result;
+        available=include_augment,
+        columns_available=include_augment ? ["fitted", "residual"] : String[],
+        columns_unavailable=["leverage", "cooks_d"],
+        preview_included=include_augment,
+        preview_rows=include_augment ? min(100, length(result.fitted_values)) : 0,
+    )
 
-    payload = Dict(
+    payload = Dict{String, Any}(
         "status" => "success",
-        "messages" => [
-            Dict(
-                "level" => severity_to_string(warning.severity),
-                "code" => String(warning.code),
-                "text" => warning.detail,
-                "hint" => warning.hint,
-            )
-            for warning in glance_table.warnings
-        ],
-        "result_payload" => Dict(
-            "glance" => Dict(
-                "model" => String(glance_table.model),
-                "nobs" => glance_table.nobs,
-                "dof" => glance_table.dof,
-                "metrics" => Dict(String(key) => value for (key, value) in glance_table.metrics),
-                "warnings" => warnings,
-            ),
+        "messages" => messages,
+        "result_payload" => Dict{String, Any}(
+            "glance" => glance_dict,
             "vcov_label" => tidy_table.vcov_label,
-            "tidy" => [
-                Dict(
-                    "name" => String(row.name),
-                    "estimate" => row.estimate,
-                    "stderror" => row.stderror,
-                    "statistic" => row.statistic,
-                    "pvalue" => row.pvalue,
-                    "ci_lower" => row.ci_lower,
-                    "ci_upper" => row.ci_upper,
-                )
-                for row in tidy_table.rows
-            ],
+            "tidy" => tidy_rows,
             "first_stage_stats" => first_stage,
             "weak_instrument_warnings" => weak_warnings,
             "warnings" => warnings,
+            "model_capabilities" => caps_dict,
+            "augment_status" => aug_status,
         ),
     )
 
     if include_augment
-        augment_table = MetricaBase.augment(result)
-        max_preview = min(100, augment_table.nobs)
-        augment_preview = Dict(
-            String(key) => values[1:max_preview]
-            for (key, values) in augment_table.columns
-        )
-        payload["result_payload"]["augment_preview"] = augment_preview
+        at = MetricaBase.augment(result)
+        payload["result_payload"]["augment_preview"] = build_augment_preview(at)
     end
 
     return payload
@@ -132,72 +95,43 @@ end
 function result_to_payload(result::DynamicPanelGMMFitResult; include_augment::Bool = true)
     glance_table = MetricaBase.glance(result)
     tidy_table = MetricaBase.tidy(result)
-    warnings = [warning_to_dict(warning) for warning in glance_table.warnings]
 
-    function _nested_dict(d::Dict{Symbol, Any})
-        out = Dict{String, Any}()
-        for (k, v) in d
-            if v isa Dict{Symbol, Any}
-                out[String(k)] = _nested_dict(v)
-            elseif v isa Dict
-                out[String(k)] = Dict(String(kk) => vv for (kk, vv) in v)
-            else
-                out[String(k)] = v
-            end
-        end
-        return out
-    end
+    glance_dict, warnings = build_glance_envelope(glance_table)
+    tidy_rows = build_tidy_rows(tidy_table)
+    messages = build_messages(glance_table)
+    caps_dict = try_capabilities(result)
 
-    diagnostics_block = _nested_dict(result.diagnostics)
+    diagnostics_block = dict_symbol_to_string(result.diagnostics)
     for (k, v) in result.gmm_diagnostics
         diagnostics_block[String(k)] = v isa Symbol ? String(v) : v
     end
 
-    payload = Dict(
+    aug_status = build_augment_status(
+        result;
+        available=include_augment,
+        columns_available=include_augment ? ["fitted", "residual", "std_residual"] : String[],
+        columns_unavailable=["leverage", "cooks_d"],
+        preview_included=include_augment,
+        preview_rows=include_augment ? min(100, length(result.fitted_values)) : 0,
+    )
+
+    payload = Dict{String, Any}(
         "status" => "success",
-        "messages" => [
-            Dict(
-                "level" => severity_to_string(warning.severity),
-                "code" => String(warning.code),
-                "text" => warning.detail,
-                "hint" => warning.hint,
-            )
-            for warning in glance_table.warnings
-        ],
-        "result_payload" => Dict(
-            "glance" => Dict(
-                "model" => String(glance_table.model),
-                "nobs" => glance_table.nobs,
-                "dof" => glance_table.dof,
-                "metrics" => Dict(String(key) => value for (key, value) in glance_table.metrics),
-                "warnings" => warnings,
-            ),
+        "messages" => messages,
+        "result_payload" => Dict{String, Any}(
+            "glance" => glance_dict,
             "vcov_label" => tidy_table.vcov_label,
-            "tidy" => [
-                Dict(
-                    "name" => String(row.name),
-                    "estimate" => row.estimate,
-                    "stderror" => row.stderror,
-                    "statistic" => row.statistic,
-                    "pvalue" => row.pvalue,
-                    "ci_lower" => row.ci_lower,
-                    "ci_upper" => row.ci_upper,
-                )
-                for row in tidy_table.rows
-            ],
+            "tidy" => tidy_rows,
             "diagnostics" => diagnostics_block,
             "warnings" => warnings,
+            "model_capabilities" => caps_dict,
+            "augment_status" => aug_status,
         ),
     )
 
     if include_augment
-        augment_table = MetricaBase.augment(result)
-        max_preview = min(100, augment_table.nobs)
-        augment_preview = Dict(
-            String(key) => values[1:max_preview]
-            for (key, values) in augment_table.columns
-        )
-        payload["result_payload"]["augment_preview"] = augment_preview
+        at = MetricaBase.augment(result)
+        payload["result_payload"]["augment_preview"] = build_augment_preview(at)
     end
 
     return payload

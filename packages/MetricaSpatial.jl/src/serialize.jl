@@ -1,53 +1,20 @@
-# === JSON 载荷 ================================================================
+# === JSON 载荷（复用 MetricaBase 共享序列化辅助）===============================
 
-function severity_to_string(severity::MetricaBase.Severity)
-    return String(Symbol(severity))
-end
-
-function warning_to_dict(warning::MetricaBase.ModelWarning)
-    return Dict(
-        "code" => String(warning.code),
-        "title" => warning.title,
-        "detail" => warning.detail,
-        "hint" => warning.hint,
-        "severity" => severity_to_string(warning.severity),
-    )
-end
-
-function error_to_payload(err::MetricaBase.ModelError)
-    return Dict(
-        "status" => "error",
-        "messages" => [
-            Dict(
-                "level" => "error",
-                "code" => String(err.code),
-                "text" => err.detail,
-                "hint" => err.hint,
-            ),
-        ],
-    )
-end
-
-function _diag_to_dict(d::Dict{Symbol, Any})
-    out = Dict{String, Any}()
-    for (k, v) in d
-        if v isa Symbol
-            out[String(k)] = String(v)
-        elseif v === nothing
-            out[String(k)] = nothing
-        elseif v isa Dict
-            out[String(k)] = _diag_to_dict(v)
-        else
-            out[String(k)] = v
-        end
-    end
-    return out
-end
+using MetricaBase: severity_to_string,
+    warning_to_dict,
+    error_to_payload,
+    capabilities_to_dict,
+    dict_symbol_to_string,
+    build_glance_envelope,
+    build_tidy_rows,
+    build_messages,
+    build_augment_status,
+    build_augment_preview,
+    try_capabilities
 
 function result_to_payload(result::SpatialFitResult; include_augment::Bool = true)
     glance_table = MetricaBase.glance(result)
     tidy_table = MetricaBase.tidy(result)
-    warnings = [warning_to_dict(w) for w in glance_table.warnings]
 
     summary_text = try
         MetricaOutput.summary_card(glance_table)
@@ -55,41 +22,24 @@ function result_to_payload(result::SpatialFitResult; include_augment::Bool = tru
         ""
     end
 
-    tidy_rows = [
-        let se = r.stderror
-            se2 = se === nothing || (se isa Float64 && isnan(se)) ? nothing : se
-            Dict(
-                "name" => String(r.name),
-                "estimate" => r.estimate,
-                "stderror" => se2,
-                "statistic" => r.statistic,
-                "pvalue" => r.pvalue,
-                "ci_lower" => r.ci_lower,
-                "ci_upper" => r.ci_upper,
-            )
-        end
-        for r in tidy_table.rows
-    ]
+    glance_dict, warnings = build_glance_envelope(glance_table)
+    tidy_rows = build_tidy_rows(tidy_table)
+    messages = build_messages(glance_table)
+    caps_dict = try_capabilities(result)
+    aug_status = build_augment_status(
+        result;
+        available=true,
+        columns_available=["fitted", "residual"],
+        columns_unavailable=["std_residual", "leverage", "cooks_d"],
+        preview_included=include_augment,
+        preview_rows=include_augment ? length(result.fitted) : 0,
+    )
 
-    payload = Dict(
+    payload = Dict{String, Any}(
         "status" => "success",
-        "messages" => [
-            Dict(
-                "level" => severity_to_string(w.severity),
-                "code" => String(w.code),
-                "text" => w.detail,
-                "hint" => w.hint,
-            )
-            for w in glance_table.warnings
-        ],
-        "result_payload" => Dict(
-            "glance" => Dict(
-                "model" => String(glance_table.model),
-                "nobs" => glance_table.nobs,
-                "dof" => glance_table.dof,
-                "metrics" => Dict(String(k) => v for (k, v) in glance_table.metrics),
-                "warnings" => warnings,
-            ),
+        "messages" => messages,
+        "result_payload" => Dict{String, Any}(
+            "glance" => glance_dict,
             "vcov_label" => tidy_table.vcov_label,
             "tidy" => tidy_rows,
             "warnings" => warnings,
@@ -97,7 +47,9 @@ function result_to_payload(result::SpatialFitResult; include_augment::Bool = tru
             "loglikelihood" => result.loglik,
             "aic" => nothing,
             "bic" => nothing,
-            "diagnostics" => _diag_to_dict(result.diagnostics),
+            "diagnostics" => dict_symbol_to_string(result.diagnostics),
+            "model_capabilities" => caps_dict,
+            "augment_status" => aug_status,
         ),
     )
 
@@ -111,3 +63,5 @@ function result_to_payload(result::SpatialFitResult; include_augment::Bool = tru
 
     return payload
 end
+
+result_to_payload(err::MetricaBase.ModelError; include_augment::Bool=true) = error_to_payload(err)

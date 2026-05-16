@@ -85,6 +85,7 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("system_3sls", vec!["equations", "system_endogenous", "system_instruments"]),
         ("spatial_lag", vec!["spatial_weights_path", "spatial_id_column"]),
         ("spatial_error", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("spatial_slx", vec!["spatial_weights_path", "spatial_id_column"]),
         ("duration_cox", vec!["duration_time_column", "duration_event_column"]),
     ])
 }
@@ -397,7 +398,7 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
 pub fn validate_spatial_weights_on_disk(request: &TaskRequest) -> Option<ValidationError> {
     if !matches!(
         request.model_spec.model_type.as_str(),
-        "spatial_lag" | "spatial_error"
+        "spatial_lag" | "spatial_error" | "spatial_slx"
     ) {
         return None;
     }

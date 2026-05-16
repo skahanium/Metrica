@@ -47,3 +47,17 @@ function MetricaBase.tidy(r::CoxFitResult)::MetricaBase.TidyTable
     end
     return MetricaBase.TidyTable(rows, "cox_neg_loglik_finite_diff_hessian")
 end
+
+function MetricaBase.model_capabilities(r::CoxFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :duration,
+        [:duration_cox],
+        ["Breslow partial likelihood + Optim (Nelder-Mead)"],
+        [:n_events, :n_censored, :censoring_fraction, :loglik, :baseline_hazard, :hazard_ratios],
+        [:schoenfeld_residuals, :ph_global_test, :strata, :time_varying_covariates, :aft_parametric],
+        [:hazard_ratios],
+        false,
+        ["Schoenfeld 残差与 PH 假设检验为二期功能。", "不支持分层、时依协变量与 AFT 参数模型。"],
+    )
+end

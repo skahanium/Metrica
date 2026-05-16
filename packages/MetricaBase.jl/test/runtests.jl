@@ -108,6 +108,30 @@ using MetricaBase
         @test !(e isa ModelWarning)
     end
 
+    @testset "ModelCapabilities 描述模型族能力" begin
+        caps = ModelCapabilities(
+            :implemented,
+            :spatial,
+            [:spatial_lag, :spatial_slx],
+            ["2SLS", "OLS"],
+            [:moran_i, :moran_z],
+            [:robust_lm],
+            [:direct_effects, :indirect_effects, :total_effects],
+            true,
+            ["空间 Probit 尚未暴露为可调用模型"],
+        )
+
+        @test caps.status == :implemented
+        @test caps.model_family == :spatial
+        @test :spatial_slx in caps.supported_models
+        @test "2SLS" in caps.estimators
+        @test :moran_z in caps.diagnostics_available
+        @test :robust_lm in caps.diagnostics_unavailable
+        @test :total_effects in caps.effects_available
+        @test caps.prediction_available === true
+        @test length(caps.limitations) == 1
+    end
+
     # === ModelGlance ========================================================
 
     @testset "ModelGlance 完整字段" begin
@@ -282,9 +306,10 @@ using MetricaBase
             :AbstractEconModel, :AbstractFittedModel, :AbstractCovarianceSpec,
             :AbstractPanelModel,
             :Severity, :info, :warning, :critical,
-            :ModelWarning, :ModelError, :MetricValue,
+            :ModelWarning, :ModelCapabilities, :ModelError, :MetricValue,
             :ModelGlance, :CoefRow, :TidyTable, :AugmentTable, :PanelData,
             :fit, :coef, :vcov, :predict, :glance, :tidy, :augment,
+            :model_capabilities,
         ])
         for sym in exported
             @test isdefined(MetricaBase, sym)

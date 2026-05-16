@@ -86,7 +86,7 @@ export interface FitModelParams {
   garchQ?: number;
   garchMaxIter?: number;
   garchTol?: number;
-  /** 仅 `spatial_lag` / `spatial_error` */
+  /** 空间模型：边表 CSV 与主数据 ID 对齐字段 */
   spatialWeightsPath?: string;
   spatialIdColumn?: string;
   spatialRowStandardize?: boolean;
@@ -264,7 +264,7 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (typeof thresholdTrimFrac === 'number' && Number.isFinite(thresholdTrimFrac)) {
       modelSpec.threshold_trim_frac = thresholdTrimFrac;
     }
-  } else if (modelType === 'spatial_lag' || modelType === 'spatial_error') {
+  } else if (modelType === 'spatial_lag' || modelType === 'spatial_error' || modelType === 'spatial_slx') {
     const sw = spatialWeightsPath?.trim();
     if (sw) modelSpec.spatial_weights_path = sw;
     const sid = spatialIdColumn?.trim();

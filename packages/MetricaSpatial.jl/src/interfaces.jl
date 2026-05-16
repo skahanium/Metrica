@@ -25,7 +25,7 @@ function MetricaBase.stderror(r::SpatialFitResult)::Union{Nothing, Vector{Float6
 end
 
 function MetricaBase.glance(r::SpatialFitResult)::MetricaBase.ModelGlance
-    mname = r.model_kind == :spatial_lag ? :spatial_lag : :spatial_error
+    mname = r.model_kind
     metrics = Dict{Symbol, MetricaBase.MetricValue}()
     metrics[:spatial_param] = r.spatial_param
     if r.loglik !== nothing
@@ -54,4 +54,29 @@ function MetricaBase.tidy(r::SpatialFitResult)::MetricaBase.TidyTable
         )
     end
     return MetricaBase.TidyTable(rows, r.vcov_label)
+end
+
+function MetricaBase.model_capabilities(r::SpatialFitResult)::MetricaBase.ModelCapabilities
+    available = [:moran_i, :moran_ei, :moran_var, :moran_z, :moran_pvalue]
+    effects = if r.model_kind in (:spatial_lag, :spatial_slx)
+        [:direct_effects, :indirect_effects, :total_effects]
+    else
+        Symbol[]
+    end
+    unavailable = if r.model_kind == :spatial_error
+        [:direct_effects, :indirect_effects, :total_effects, :lm_lag, :lm_error, :robust_lm_lag, :robust_lm_error]
+    else
+        [:lm_lag, :lm_error, :robust_lm_lag, :robust_lm_error]
+    end
+    return MetricaBase.ModelCapabilities(
+        :implemented,
+        :spatial,
+        [:spatial_lag, :spatial_error, :spatial_slx],
+        r.model_kind == :spatial_error ? ["Gaussian ML"] : (r.model_kind == :spatial_slx ? ["OLS"] : ["2SLS"]),
+        available,
+        unavailable,
+        effects,
+        true,
+        ["SDM、SAC/SARAR、空间 Probit 与 GWR 尚未暴露为可调用模型。"],
+    )
 end

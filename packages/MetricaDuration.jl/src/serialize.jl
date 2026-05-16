@@ -1,32 +1,15 @@
-# === JSON 载荷（与 MetricaSpatial 形状对齐）================================
+# === JSON 载荷（复用 MetricaBase 共享序列化辅助）===============================
 
-function severity_to_string(severity::MetricaBase.Severity)
-    return String(Symbol(severity))
-end
-
-function warning_to_dict(warning::MetricaBase.ModelWarning)
-    return Dict(
-        "code" => String(warning.code),
-        "title" => warning.title,
-        "detail" => warning.detail,
-        "hint" => warning.hint,
-        "severity" => severity_to_string(warning.severity),
-    )
-end
-
-function error_to_payload(err::MetricaBase.ModelError)
-    return Dict(
-        "status" => "error",
-        "messages" => [
-            Dict(
-                "level" => "error",
-                "code" => String(err.code),
-                "text" => err.detail,
-                "hint" => err.hint,
-            ),
-        ],
-    )
-end
+using MetricaBase: severity_to_string,
+    warning_to_dict,
+    error_to_payload,
+    capabilities_to_dict,
+    dict_symbol_to_string,
+    build_glance_envelope,
+    build_tidy_rows,
+    build_messages,
+    build_augment_status,
+    try_capabilities
 
 function _diag_to_dict(d::Dict{Symbol, Any})
     out = Dict{String, Any}()
@@ -74,7 +57,6 @@ end
 function result_to_payload(result::CoxFitResult; include_augment::Bool = true)
     glance_table = MetricaBase.glance(result)
     tidy_table = MetricaBase.tidy(result)
-    warnings = [warning_to_dict(w) for w in glance_table.warnings]
 
     summary_text = try
         MetricaOutput.summary_card(glance_table)
@@ -82,43 +64,25 @@ function result_to_payload(result::CoxFitResult; include_augment::Bool = true)
         ""
     end
 
-    tidy_rows = [
-        let se = r.stderror
-            se2 = se === nothing || (se isa Float64 && isnan(se)) ? nothing : se
-            Dict(
-                "name" => String(r.name),
-                "estimate" => r.estimate,
-                "stderror" => se2,
-                "statistic" => r.statistic,
-                "pvalue" => r.pvalue,
-                "ci_lower" => r.ci_lower,
-                "ci_upper" => r.ci_upper,
-            )
-        end
-        for r in tidy_table.rows
-    ]
-
+    glance_dict, warnings = build_glance_envelope(glance_table)
+    tidy_rows = build_tidy_rows(tidy_table)
+    messages = build_messages(glance_table)
+    caps_dict = try_capabilities(result)
+    aug_status = build_augment_status(
+        result;
+        available=false,
+        columns_available=String[],
+        columns_unavailable=["martingale", "deviance", "score", "schoenfeld"],
+        preview_included=false,
+        preview_rows=0,
+    )
     hr_rows = _hazard_ratio_rows(result.beta, result.se, result.coef_names)
 
-    payload = Dict(
+    payload = Dict{String, Any}(
         "status" => "success",
-        "messages" => [
-            Dict(
-                "level" => severity_to_string(w.severity),
-                "code" => String(w.code),
-                "text" => w.detail,
-                "hint" => w.hint,
-            )
-            for w in glance_table.warnings
-        ],
-        "result_payload" => Dict(
-            "glance" => Dict(
-                "model" => String(glance_table.model),
-                "nobs" => glance_table.nobs,
-                "dof" => glance_table.dof,
-                "metrics" => Dict(String(k) => v for (k, v) in glance_table.metrics),
-                "warnings" => warnings,
-            ),
+        "messages" => messages,
+        "result_payload" => Dict{String, Any}(
+            "glance" => glance_dict,
             "vcov_label" => tidy_table.vcov_label,
             "tidy" => tidy_rows,
             "warnings" => warnings,
@@ -128,12 +92,12 @@ function result_to_payload(result::CoxFitResult; include_augment::Bool = true)
             "bic" => nothing,
             "diagnostics" => _diag_to_dict(result.diagnostics),
             "hazard_ratios" => hr_rows,
+            "model_capabilities" => caps_dict,
+            "augment_status" => aug_status,
         ),
     )
-
-    # 首期 Cox 不提供 augment；忽略 include_augment。
 
     return payload
 end
 
-result_to_payload(err::MetricaBase.ModelError) = error_to_payload(err)
+result_to_payload(err::MetricaBase.ModelError; include_augment::Bool=true) = error_to_payload(err)

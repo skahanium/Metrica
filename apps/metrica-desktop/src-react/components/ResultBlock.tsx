@@ -20,6 +20,7 @@ import { SystemEquationsPanel } from './SystemEquationsPanel';
 import { VolatilitySummaryPanel } from './VolatilitySummaryPanel';
 import { SpatialDiagnosticsPanel } from './SpatialDiagnosticsPanel';
 import { DurationDiagnosticsPanel } from './DurationDiagnosticsPanel';
+import { ModelCapabilitiesPanel } from './ModelCapabilitiesPanel';
 import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics, DurationDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
@@ -61,7 +62,7 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
     ? (result.diagnostics as VolatilityDiagnostics | undefined)
     : undefined;
 
-  const showSpatialDiagnostics = modelType === 'spatial_lag' || modelType === 'spatial_error';
+  const showSpatialDiagnostics = modelType === 'spatial_lag' || modelType === 'spatial_error' || modelType === 'spatial_slx';
   const spatialDiagnostics = showSpatialDiagnostics
     ? (result.diagnostics as SpatialDiagnostics | undefined)
     : undefined;
@@ -117,6 +118,9 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       )}
       {modelType === 'event_study' && <EventStudyPlot result={result} runId={runId ?? null} />}
       {modelType === 'psm' && <BalanceTable result={result} />}
+      {result.model_capabilities && (
+        <ModelCapabilitiesPanel capabilities={result.model_capabilities} />
+      )}
     </div>
   );
 };

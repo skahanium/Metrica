@@ -583,7 +583,7 @@ function stripOuterQuotes(raw: string | undefined): string {
 }
 
 /**
- * spreg：截面 SAR / SEM。spatial_weights(...) 与 weights(...) 均映射到 spatial_weights_path。
+ * spreg：截面 SAR / SEM / SLX。spatial_weights(...) 与 weights(...) 均映射到 spatial_weights_path。
  */
 function parseSpregToModelSpec(
   positionals: string[],
@@ -615,8 +615,10 @@ function parseSpregToModelSpec(
     model_type = 'spatial_lag';
   } else if (modelRaw === 'error' || modelRaw === 'sem') {
     model_type = 'spatial_error';
+  } else if (modelRaw === 'slx') {
+    model_type = 'spatial_slx';
   } else {
-    return { error: `spreg 的 model(...) 须为 lag / sar / error / sem，收到：${modelRaw}` };
+    return { error: `spreg 的 model(...) 须为 lag / sar / error / sem / slx，收到：${modelRaw}` };
   }
 
   const spec: ModelSpec = {

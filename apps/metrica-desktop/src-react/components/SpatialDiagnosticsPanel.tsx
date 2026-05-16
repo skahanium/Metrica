@@ -1,16 +1,25 @@
-import React from 'react';
 import { Card, Descriptions, Typography } from 'antd';
 import type { SpatialDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
 
-/** 展示 `spatial_lag` / `spatial_error` 的结构化 diagnostics（消费 JSON 键，不解析摘要文本）。 */
+/** 展示空间模型的结构化 diagnostics（消费 JSON 键，不解析摘要文本）。 */
 export function SpatialDiagnosticsPanel({ diagnostics }: { diagnostics: SpatialDiagnostics | undefined }) {
   if (!diagnostics) return null;
 
   const rsr = diagnostics.row_standardized_report;
   const moranZ = diagnostics.moran_z;
   const moranVar = diagnostics.moran_var;
+  const direct = diagnostics.direct_effects;
+  const indirect = diagnostics.indirect_effects;
+  const total = diagnostics.total_effects;
+
+  const renderEffects = (effects: Record<string, number> | null | undefined) => {
+    if (!effects || Object.keys(effects).length === 0) return '未计算/暂不支持';
+    return Object.entries(effects)
+      .map(([name, value]) => `${name}: ${value}`)
+      .join('；');
+  };
 
   return (
     <Card title="空间诊断" size="small" style={{ marginTop: 12 }}>
@@ -31,12 +40,17 @@ export function SpatialDiagnosticsPanel({ diagnostics }: { diagnostics: SpatialD
         <Descriptions.Item label="Moran E(I)">{diagnostics.moran_ei ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Moran Var">{moranVar ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Moran z">{moranZ ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="Moran p">{diagnostics.moran_pvalue ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="效应算法">{diagnostics.effects_method ?? '未计算/暂不支持'}</Descriptions.Item>
         <Descriptions.Item label="ρ（SAR）">{diagnostics.rho ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="λ（SEM）">{diagnostics.lambda ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="直接效应" span={2}>{renderEffects(direct)}</Descriptions.Item>
+        <Descriptions.Item label="间接效应" span={2}>{renderEffects(indirect)}</Descriptions.Item>
+        <Descriptions.Item label="总效应" span={2}>{renderEffects(total)}</Descriptions.Item>
       </Descriptions>
-      {(diagnostics.direct_effects != null || diagnostics.indirect_effects != null || diagnostics.total_effects != null) && (
+      {(direct == null || indirect == null || total == null) && (
         <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-          直接/间接/总效应字段首期可能为 null，二期填充分解后再展示。
+          直接/间接/总效应未返回时，表示当前模型或估计器暂不支持该分解。
         </Text>
       )}
     </Card>

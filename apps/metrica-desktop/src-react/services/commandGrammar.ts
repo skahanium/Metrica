@@ -394,12 +394,12 @@ const grammars: CommandGrammar[] = [
     deterministic: { kind: 'option_value', label: 'deterministic', required: false, multiple: false, values: ['constant', 'trend', 'none'] },
   }),
 
-  makeModelGrammar('spreg', '空间截面模型（SAR / SEM；外部边表权重）', {
+  makeModelGrammar('spreg', '空间截面模型（SAR / SEM / SLX；外部边表权重）', {
     spatial_weights: optionValue('spatial_weights', true),
     weights: optionValue('weights', false),
     id: optionValue('id', true),
     spatial_id: optionValue('spatial_id', false),
-    model: { kind: 'option_value', label: 'model', required: false, multiple: false, values: ['lag', 'error', 'sar', 'sem'] },
+    model: { kind: 'option_value', label: 'model', required: false, multiple: false, values: ['lag', 'error', 'sar', 'sem', 'slx'] },
     rowstd: optionValue('rowstd', false),
   }),
 

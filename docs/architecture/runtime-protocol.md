@@ -65,14 +65,14 @@
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
 | 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
 | 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
-| 空间（S5.7） | `spatial_lag`（SAR）、`spatial_error`（SEM）（`packages/MetricaSpatial.jl`；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` 专用分支） |
+| 空间（S5.7） | `spatial_lag`（SAR）、`spatial_error`（SEM）、`spatial_slx`（SLX）（`packages/MetricaSpatial.jl`；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` 专用分支） |
 | 久期（S5.8） | `duration_cox`（Cox PH；`packages/MetricaDuration.jl`；**不在** `MODEL_REGISTRY`，走专用分支） |
-| 贝叶斯（S5.9） | `bayes_linear`（高斯线性似然 + 冻结先验；`packages/MetricaBayes.jl` 候选；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` **专用分支**） |
+| 贝叶斯（S5.9） | 规划中；`bayes_linear` 不属于当前 Runtime 可调用白名单，只有 Core 包、桥接、App 类型与测试同时落地后才能进入本表 |
 
 ### `S5` 扩展规则（摘要）
 
 - 新高级专题（如 `gmm_linear`）仍须走 **`fit_model` 信封**（或未来经设计新增的白名单 `action`，不得使用自由文本替代结构化 `model_spec`）。
-- 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
+- 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`** 与可用时的 **`model_capabilities`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
 - 在 Julia 侧注册 `MODEL_REGISTRY`（**若适用**；空间模型等可走专用分支）并在桥接入口增加派发；同步更新本文件上表与 CLI 语法文档。
 - 详见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
 
@@ -154,7 +154,7 @@
 
 **CLI（App）：** `arch y, time(date) arch(q)`；`garch y, time(date) [arch(p)] [garch(p q)]`（省略 `garch(...)` 时为 GARCH(1,1)；与总规兼容写法 `garch y, time(date) arch(1) garch(1)` 表示 \(p=1,q=1\)）。演示数据：`datasets/demo/garch_demo.csv`。教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
 
-### `spatial_lag` / `spatial_error`（截面 SAR / SEM，S5.7）
+### `spatial_lag` / `spatial_error` / `spatial_slx`（截面 SAR / SEM / SLX，S5.7）
 
 **路径：** 与截面 `MODEL_REGISTRY` 并行；Runtime 校验 `model_type` 白名单与 **`spatial_weights_path` 在磁盘上存在**（相对 `project_context.working_dir` 解析）；HTTP 与守护进程均在 `params` 中附带 **`working_dir`**（绝对路径），供 Julia 解析权重相对路径。
 
@@ -162,18 +162,20 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `model_type` | 字符串 | 是 | `spatial_lag` 或 `spatial_error` |
+| `model_type` | 字符串 | 是 | `spatial_lag`、`spatial_error` 或 `spatial_slx` |
 | `spatial_weights_path` | 字符串 | 是 | 边表 CSV 路径（列名固定 **`id_i`、`id_j`、`w`**）；相对工作目录或绝对路径 |
 | `spatial_id_column` | 字符串 | 是 | 主数据中与边表 ID 对齐的列名（**每行唯一**） |
 | `spatial_row_standardize` | 布尔 | 否 | 省略时 Julia 端默认 **`true`**（行标准化） |
-| `vcov` | `{ type }` | 否 | 仅 **`spatial_lag`** 使用：`classical` 或 **`hc1`**（三明治，首期简化）；`spatial_error` 忽略 |
+| `vcov` | `{ type }` | 否 | 仅 **`spatial_lag`** 使用：`classical` 或 **`hc1`**（三明治，首期简化）；`spatial_error` / `spatial_slx` 忽略 |
 
 **首期约束：** 权重在 Julia 侧展开为 **稠密** \(n\times n\) 矩阵；要求 **`n ≤ 5000`**、边表行数 **`≤ 200000`**（与 Core 实现一致）；超出时返回结构化错误。
 
-**`result_payload.diagnostics`（约定 JSON 键）：** `n_obs`、`n_nonzero_links`、`symmetry_hint`、`id_join_unique`、`id_join_missing_count`、`spatial_weights_basename`、`row_standardized_report`（对象：`requested`、`applied`、`row_sums_min`、`row_sums_max`）、残差 **Moran**（`moran_i`、`moran_ei`、`moran_var`、`moran_z`）、SAR 的 **`rho`** 或 SEM 的 **`lambda`**；`direct_effects` / `indirect_effects` / `total_effects` 首期可为 **`null`**（二期分解）。
+**`result_payload.diagnostics`（约定 JSON 键）：** `n_obs`、`n_nonzero_links`、`symmetry_hint`、`id_join_unique`、`id_join_missing_count`、`spatial_weights_basename`、`row_standardized_report`（对象：`requested`、`applied`、`row_sums_min`、`row_sums_max`）、残差 **Moran**（`moran_i`、`moran_ei`、`moran_var`、`moran_z`、`moran_pvalue`）、SAR 的 **`rho`** 或 SEM 的 **`lambda`**；SAR / SLX 返回 `direct_effects` / `indirect_effects` / `total_effects` 与 `effects_method`，SEM 当前返回 `null` 并由 `model_capabilities.diagnostics_unavailable` 说明不可用项。
+
+**`result_payload.model_capabilities`：** 空间模型返回 `status`、`model_family`、`supported_models`、`estimators`、`diagnostics_available`、`diagnostics_unavailable`、`effects_available`、`prediction_available`、`limitations`。Runtime 与 App 不根据模型名推断能力。
 
 **CLI（App）：** 动词 **`spreg`**，例如  
-`spreg y x1, spatial_weights("datasets/demo/spatial_demo_W.csv") id(region) model(lag)`；`weights("...")` 为 **`spatial_weights` 的别名**。教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
+`spreg y x1, spatial_weights("datasets/demo/spatial_demo_W.csv") id(region) model(lag)`；`model(slx)` 选择 SLX；`weights("...")` 为 **`spatial_weights` 的别名**。教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
 
 ### `duration_cox`（Cox 比例风险，右删失，S5.8）
 
@@ -196,9 +198,9 @@
 
 **CLI（App）：** `stcox time fail x1 x2` → `duration_time_column=time`、`duration_event_column=fail`、`formula="ph ~ x1 + x2"`。演示数据：`datasets/demo/duration_demo.csv`。教程见 [`tutorials/s5-duration.md`](../../tutorials/s5-duration.md)。
 
-### `bayes_linear`（贝叶斯线性回归，S5.9 规划占位）
+### `bayes_linear`（贝叶斯线性回归，S5.9 规划占位；当前不可调用）
 
-**路径：** 与 `MODEL_REGISTRY` 并行；桥接中 **`elseif model_type == "bayes_linear"`** 专用分支调用 `MetricaBayes`（包与函数名以执行计划 **S5.9-J1** 为准）。**本节与** [`docs/superpowers/plans/2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md) **「S5.9-J0」共同构成单一事实来源；实现落地前客户端仅应依赖已列键名，不得假设未实现字段有值。**
+**状态：** 当前仓库没有完整 `MetricaBayes.jl`、Runtime 白名单、App 类型与端到端测试，因此 `bayes_linear` 不得作为可调用模型出现在客户端。下列字段只作为后续正式建设的协议草案；实现落地前客户端不得依赖这些字段。
 
 **`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
 
@@ -1017,6 +1019,52 @@
       "hint": "请确保运行成功后再导出。"
     }
   ]
+}
+```
+
+## 统一能力协议与增广状态（`model_capabilities` / `augment_status`）
+
+### `model_capabilities`
+
+所有 S5 模型（`spatial_*`、`duration_cox`、`arch`/`garch`、`gmm_linear`、`dynamic_panel_gmm`、`quantile`、`nls`、`threshold`、`sur`/`system_*`）的 `result_payload` 中必须包含 `model_capabilities` 字段。该字段由 `MetricaBase.ModelCapabilities` 结构体序列化而来，App 通过 `ModelCapabilitiesPanel` 消费展示。
+
+未接入统一能力协议的旧模型（`ols`、`panel`、`logit` 等）返回 `null`，App 应静默跳过。
+
+```json
+{
+  "model_capabilities": {
+    "status": "partial",
+    "model_family": "duration",
+    "supported_models": ["duration_cox"],
+    "estimators": ["Breslow partial likelihood + Optim (Nelder-Mead)"],
+    "diagnostics_available": ["n_events", "n_censored", "censoring_fraction", "loglik", "baseline_hazard", "hazard_ratios"],
+    "diagnostics_unavailable": ["schoenfeld_residuals", "ph_global_test", "strata", "time_varying_covariates", "aft_parametric"],
+    "effects_available": ["hazard_ratios"],
+    "prediction_available": false,
+    "limitations": ["Schoenfeld 残差与 PH 假设检验为二期功能。", "不支持分层、时依协变量与 AFT 参数模型。"]
+  }
+}
+```
+
+**字段约定：**
+- `status`：`implemented`（完整可用）、`partial`（部分实现）、`planned`（仅规划）
+- `model_family`：模型族标识（`spatial`、`duration`、`volatility`、`gmm`、`dynamic_panel`、`quantile`、`nonlinear`、`threshold`、`system`）
+- `diagnostics_available` / `diagnostics_unavailable`：明确告知 App 哪些诊断可展示、哪些不可用
+- `limitations`：教学向说明，告知用户当前版本的能力边界
+
+### `augment_status`
+
+所有模型响应的 `result_payload` 中应包含 `augment_status`，描述增广数据（逐观测拟合值、残差等）的可用性。
+
+```json
+{
+  "augment_status": {
+    "available": true,
+    "columns_available": ["fitted", "residual", "std_residual", "leverage", "cooks_d"],
+    "columns_unavailable": [],
+    "preview_included": true,
+    "preview_rows": 100
+  }
 }
 ```
 

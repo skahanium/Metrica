@@ -121,6 +121,7 @@ function fit_spatial(
         :direct_effects => nothing,
         :indirect_effects => nothing,
         :total_effects => nothing,
+        :effects_method => nothing,
     )
 
     warnings = MetricaBase.ModelWarning[]
@@ -132,6 +133,13 @@ function fit_spatial(
         mor = moran_residuals(resid, W)
         merge!(diag, mor)
         diag[:rho] = ρ
+        eff = sar_effects(ρ, pairs, W, x_colnames)
+        eff isa MetricaBase.ModelError && return eff
+        direct, indirect, total, method = eff
+        diag[:direct_effects] = direct
+        diag[:indirect_effects] = indirect
+        diag[:total_effects] = total
+        diag[:effects_method] = method
         dof = max(1, n - length(pairs))
         return SpatialFitResult(
             :spatial_lag,
@@ -171,12 +179,39 @@ function fit_spatial(
             warnings,
             ll,
         )
+    elseif model_type == "spatial_slx"
+        out = fit_slx_ols(ys, Xs, W, x_colnames)
+        out isa MetricaBase.ModelError && return out
+        pairs, se, fitted, resid = out
+        mor = moran_residuals(resid, W)
+        merge!(diag, mor)
+        direct, indirect, total, method = slx_effects(pairs, x_colnames)
+        diag[:direct_effects] = direct
+        diag[:indirect_effects] = indirect
+        diag[:total_effects] = total
+        diag[:effects_method] = method
+        dof = max(1, n - length(pairs))
+        return SpatialFitResult(
+            :spatial_slx,
+            pairs,
+            se,
+            "OLS（SLX，含 WX）",
+            resid,
+            fitted,
+            n,
+            dof,
+            0.0,
+            :none,
+            diag,
+            warnings,
+            nothing,
+        )
     else
         return MetricaBase.ModelError(
             :spatial_unknown_model,
             "未知空间模型类型",
             model_type,
-            "仅支持 spatial_lag 与 spatial_error。",
+            "仅支持 spatial_lag、spatial_error 与 spatial_slx。",
         )
     end
 end

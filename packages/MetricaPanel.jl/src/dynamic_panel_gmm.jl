@@ -26,6 +26,20 @@ struct DynamicPanelGMMFitResult <: MetricaBase.AbstractFittedModel
     n_obs_diff::Int
 end
 
+function MetricaBase.model_capabilities(r::DynamicPanelGMMFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :dynamic_panel,
+        [:dynamic_panel_gmm],
+        ["Difference GMM (Arellano-Bond)"],
+        [:ar1_test, :ar2_test, :hansen_j, :n_instruments, :n_groups, :n_periods],
+        [:system_gmm, :difference_in_hansen, :collapsed_instruments],
+        Symbol[],
+        false,
+        ["首期仅实现 Difference GMM。System GMM 与 collapsed instruments 为二期功能。"],
+    )
+end
+
 MetricaBase.glance(result::DynamicPanelGMMFitResult) = result.glance_table
 MetricaBase.tidy(result::DynamicPanelGMMFitResult) = result.tidy_table
 MetricaBase.coef(result::DynamicPanelGMMFitResult) = result.coefficient_names .=> result.coefficient_values

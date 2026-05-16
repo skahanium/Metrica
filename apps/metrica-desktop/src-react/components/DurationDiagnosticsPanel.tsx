@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, Descriptions, Table, Typography } from 'antd';
 import type { DurationDiagnostics, HazardRatioEntry } from '../types/protocol';
 

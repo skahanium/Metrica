@@ -113,6 +113,29 @@ const mockArchResult: ModelResult = {
   warnings: [],
 };
 
+const mockSpatialSlxResult: ModelResult = {
+  glance: { model: 'spatial_slx', nobs: 5, dof: 1, metrics: {} },
+  tidy: [
+    { term: 'x1', estimate: 1.0, std_error: 0.2, statistic: 5.0, p_value: null },
+    { term: 'W_x1', estimate: 0.4, std_error: 0.1, statistic: 4.0, p_value: null },
+  ],
+  diagnostics: {
+    n_obs: 5,
+    n_nonzero_links: 8,
+    spatial_weights_basename: 'spatial_demo_W.csv',
+    moran_i: 0.1,
+    moran_ei: -0.25,
+    moran_var: 0.05,
+    moran_z: 1.56,
+    moran_pvalue: 0.12,
+    direct_effects: { x1: 1.0 },
+    indirect_effects: { x1: 0.4 },
+    total_effects: { x1: 1.4 },
+    effects_method: 'SLX 系数分解（直接效应=β，间接效应=θ）',
+  },
+  warnings: [],
+};
+
 describe('ResultBlock', () => {
   it('renders command text and OLS glance for ols model', () => {
     render(
@@ -158,6 +181,16 @@ describe('ResultBlock', () => {
     expect(screen.getByText('波动率模型诊断')).toBeDefined();
     expect(screen.getByText('ARCH(2)')).toBeDefined();
     expect(asFragment()).toMatchSnapshot();
+  });
+
+  it('renders spatial effects instead of hiding available SLX decomposition', () => {
+    render(
+      <ResultBlock command="spreg y x1, model(slx)" result={mockSpatialSlxResult} />,
+    );
+    expect(screen.getByText('空间诊断')).toBeDefined();
+    expect(screen.getByText('直接效应')).toBeDefined();
+    expect(screen.getByText('x1: 1')).toBeDefined();
+    expect(screen.getByText('Moran p')).toBeDefined();
   });
 
   it('passes result prop to sub-components, not global store', () => {

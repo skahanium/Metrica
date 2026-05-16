@@ -206,6 +206,34 @@ fn fit_model_runs_spatial_error_with_spatial_diagnostics() {
 }
 
 #[test]
+fn fit_model_runs_spatial_slx_with_effects_and_capabilities() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
+    request.model_spec.model_type = "spatial_slx".to_string();
+    request.model_spec.formula = "y ~ x1".to_string();
+    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
+    request.model_spec.spatial_id_column = Some("region".to_string());
+    request.model_spec.spatial_row_standardize = Some(true);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("moran_pvalue").is_some());
+    assert!(diag.get("direct_effects").is_some());
+    assert!(diag.get("indirect_effects").is_some());
+    assert!(diag.get("total_effects").is_some());
+    let caps = payload.get("model_capabilities").expect("capabilities");
+    assert_eq!(caps.get("model_family").and_then(|v| v.as_str()), Some("spatial"));
+    assert!(caps
+        .get("supported_models")
+        .and_then(|v| v.as_array())
+        .map(|xs| xs.iter().any(|x| x.as_str() == Some("spatial_slx")))
+        .unwrap_or(false));
+}
+
+#[test]
 fn fit_model_runs_duration_cox_with_hazard_ratios_and_diagnostics() {
     let mut request = sample_fit_model_request();
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();

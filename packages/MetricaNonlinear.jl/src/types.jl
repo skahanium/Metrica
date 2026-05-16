@@ -25,6 +25,34 @@ struct NLSFitResult <: MetricaBase.AbstractFittedModel
     residuals::Vector{Float64}
 end
 
+function MetricaBase.model_capabilities(r::NLSFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :nonlinear,
+        [:nls],
+        ["Nelder-Mead (Optim.jl)"],
+        [:converged, :iterations, :optimizer, :objective_final, :nls_family],
+        [:gradient_norm, :parameter_covariance, :confidence_intervals, :multi_start],
+        Symbol[],
+        false,
+        ["首期仅支持 exp_growth 族。标准误/CI/多起点为二期功能。"],
+    )
+end
+
+function MetricaBase.model_capabilities(r::ThresholdFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :threshold,
+        [:threshold],
+        ["grid search + dual-regime OLS"],
+        [:gamma_hat, :n_below, :n_above, :rss_piecewise, :search_grid_meta],
+        [:bootstrap_ci, :sup_wald, :multi_threshold],
+        Symbol[],
+        false,
+        ["首期仅支持单门限、双区制。Bootstrap CI、sup-Wald、多门限为二期功能。"],
+    )
+end
+
 """门限回归拟合结果。"""
 struct ThresholdFitResult <: MetricaBase.AbstractFittedModel
     formula_string::String

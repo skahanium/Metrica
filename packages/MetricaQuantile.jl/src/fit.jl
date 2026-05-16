@@ -8,6 +8,20 @@ import StatsAPI
 using Statistics
 using StatsModels: coefnames
 
+function MetricaBase.model_capabilities(r::QuantileFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :quantile,
+        [:quantile],
+        ["linear programming (IP)"],
+        [:pseudo_r2, :rank_X, :cond_X, :inference_kind],
+        [:multi_tau, :bootstrap_se, :rank_inference, :sparsity_inference, :iv_quantile, :panel_quantile],
+        Symbol[],
+        false,
+        ["首期仅支持单 τ 分位数回归。多 τ、bootstrap SE、IV/panel quantile 为二期功能。"],
+    )
+end
+
 """check 损失求和：ρ_τ(u) = u * (τ - I(u<0))，用于伪 R²。"""
 function _check_loss_sum(residuals::AbstractVector{<:Real}, τ::Float64)
     s = 0.0

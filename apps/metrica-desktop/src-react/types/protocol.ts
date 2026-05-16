@@ -118,11 +118,42 @@ export interface SpatialDiagnostics {
   moran_ei?: number | null;
   moran_var?: number | null;
   moran_z?: number | null;
+  moran_pvalue?: number | null;
   rho?: number;
   lambda?: number;
-  direct_effects?: unknown;
-  indirect_effects?: unknown;
-  total_effects?: unknown;
+  direct_effects?: Record<string, number> | null;
+  indirect_effects?: Record<string, number> | null;
+  total_effects?: Record<string, number> | null;
+  effects_method?: string | null;
+}
+
+export interface ModelCapabilities {
+  status: 'implemented' | 'partial' | 'planned' | string;
+  model_family: string;
+  supported_models: string[];
+  estimators: string[];
+  diagnostics_available: string[];
+  diagnostics_unavailable: string[];
+  effects_available: string[];
+  prediction_available: boolean;
+  limitations: string[];
+}
+
+/** 标准化增广数据可用性声明（与 Julia `build_augment_status` 对齐） */
+export interface AugmentStatus {
+  available: boolean;
+  columns_available: string[];
+  columns_unavailable: string[];
+  preview_included: boolean;
+  preview_rows: number;
+}
+
+/** 效应分解结果（空间模型 direct/indirect/total effects） */
+export interface EffectsResult {
+  method?: string;
+  direct?: Record<string, number>;
+  indirect?: Record<string, number>;
+  total?: Record<string, number>;
 }
 
 /** 线性 GMM（Runtime `result_payload.diagnostics`） */
@@ -273,6 +304,9 @@ export interface ModelResult {
   equation_glances?: GlanceResult[];
   tidy: TidyRow[];
   diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics | VolatilityDiagnostics | SpatialDiagnostics | DurationDiagnostics;
+  model_capabilities?: ModelCapabilities;
+  augment_status?: AugmentStatus;
+  effects?: EffectsResult;
   odds_ratios?: OddsRatioEntry[];
   hazard_ratios?: HazardRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
@@ -513,7 +547,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'duration_cox';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'duration_cox';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -581,7 +615,7 @@ export interface ModelSpec {
   threshold_variable?: string;
   threshold_grid?: number[];
   threshold_trim_frac?: number;
-  /** 仅 `spatial_lag` / `spatial_error`：边表 CSV（列 id_i, id_j, w） */
+  /** 空间模型：边表 CSV（列 id_i, id_j, w） */
   spatial_weights_path?: string;
   spatial_id_column?: string;
   spatial_row_standardize?: boolean;

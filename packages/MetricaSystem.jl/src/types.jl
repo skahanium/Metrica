@@ -41,5 +41,23 @@ function _aggregate_glance(r::SystemEquationsFitResult)
     return MetricaBase.ModelGlance(r.model_type_key, r.nobs, dof_sum, metrics, r.all_warnings)
 end
 
+function MetricaBase.model_capabilities(r::SystemEquationsFitResult)::MetricaBase.ModelCapabilities
+    supported = [:sur, :system_2sls, :system_3sls]
+    estimators = r.system_method == "sur_fgls" ? ["FGLS"] :
+                 r.system_method == "2sls" ? ["2SLS per equation"] :
+                 r.system_method == "3sls" ? ["2SLS residuals Σ + single-step GLS"] : ["unknown"]
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :system,
+        supported,
+        estimators,
+        [:sigma_residual, :equation_correlation, :equation_glances],
+        [:cross_equation_wald, :robust_covariance, :system_prediction],
+        Symbol[],
+        false,
+        ["系统级 Wald/LR/LM 检验与 robust covariance 为二期功能。"],
+    )
+end
+
 MetricaBase.glance(r::SystemEquationsFitResult) = _aggregate_glance(r)
 MetricaBase.tidy(r::SystemEquationsFitResult) = r.tidy_table

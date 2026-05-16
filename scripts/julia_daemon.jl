@@ -126,7 +126,7 @@ function handle_request(req::Dict{String, Any})
                 payload = runtime_fit_envelope(
                     MetricaTimeSeries.result_to_payload(result; include_augment=include_augment),
                 )
-            elseif model_type in ("spatial_lag", "spatial_error")
+            elseif model_type in ("spatial_lag", "spatial_error", "spatial_slx")
                 data = CSV.read(dataset_path, DataFrame)
                 wd = String(get(params, "working_dir", ""))
                 spec = Dict{String, Any}(
