@@ -11,9 +11,13 @@ using MetricaOutput
 
 export SpatialFitResult, fit_spatial, result_to_payload, error_to_payload
 export lm_lag_test, lm_error_test, robust_lm_lag_test, robust_lm_error_test
+export build_knn_weights, build_distance_band_weights
+export euclidean_distance, haversine_distance
 
 include("types.jl")
 include("weights_io.jl")
+include("weights_knn.jl")
+include("weights_distance.jl")
 include("moran.jl")
 include("lm_tests.jl")
 include("sar_fit.jl")
