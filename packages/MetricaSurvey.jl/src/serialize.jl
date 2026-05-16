@@ -28,7 +28,7 @@ function build_survey_payload(
 
     result_dict = Dict{String, Any}(
         "glance" => Dict(
-            "model" => String(g.model),
+            "model" => model_label,
             "nobs" => g.nobs,
             "dof" => g.dof,
             "metrics" => Dict(String(k) => v for (k, v) in g.metrics),

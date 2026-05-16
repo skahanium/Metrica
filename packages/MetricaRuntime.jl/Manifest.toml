@@ -546,7 +546,7 @@ uuid = "7d3611f3-666b-40ba-b23f-c75757e1ca05"
 version = "0.1.0"
 
 [[deps.MetricaTimeSeries]]
-deps = ["DataFrames", "Distributions", "HypothesisTests", "LinearAlgebra", "MetricaBase", "Optim", "Random", "Statistics", "Test"]
+deps = ["CSV", "DataFrames", "Distributions", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "Optim", "Random", "Statistics", "Test"]
 path = "../MetricaTimeSeries.jl"
 uuid = "3da64bf2-aa4b-4146-a451-f808af01572a"
 version = "0.1.0"

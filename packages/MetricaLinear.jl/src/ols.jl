@@ -162,7 +162,8 @@ function prepare_model_data(dataset, model_formula, model_columns, weights::Unio
 
     model_matrix = ModelMatrix(model_frame)
     X = model_matrix.m
-    y = Float64.(response(model_frame))
+    # 显式使用 StatsModels，避免与 MetricaBase.response（拟合结果）在 Main 聚合环境中同名冲突。
+    y = Float64.(StatsModels.response(model_frame))
 
     weight_values = if isnothing(weights)
         nothing
