@@ -67,6 +67,7 @@
 | 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
 | 空间（S5.7） | `spatial_lag`（SAR）、`spatial_error`（SEM）（`packages/MetricaSpatial.jl`；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` 专用分支） |
 | 久期（S5.8） | `duration_cox`（Cox PH；`packages/MetricaDuration.jl`；**不在** `MODEL_REGISTRY`，走专用分支） |
+| 贝叶斯（S5.9） | `bayes_linear`（高斯线性似然 + 冻结先验；`packages/MetricaBayes.jl` 候选；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` **专用分支**） |
 
 ### `S5` 扩展规则（摘要）
 
@@ -194,6 +195,36 @@
 **`result_payload`：** 与线性族相同的 `glance` / `tidy` / `warnings`；额外 **`hazard_ratios`** 数组（元素含 `term`、`hr`、`ci_lower`、`ci_upper`，基于 log 系数正态近似）；`tidy` 中 `estimate` 为 **log(HR)** 尺度。`diagnostics` 含 `n_obs`、`n_events`、`n_censored`、`censoring_fraction`、`converged`、`iterations`、`loglikelihood`、`baseline_hazard_summary`（含长度有界的 `preview`）、`ph_diagnostics`（首期 **`null`**）。
 
 **CLI（App）：** `stcox time fail x1 x2` → `duration_time_column=time`、`duration_event_column=fail`、`formula="ph ~ x1 + x2"`。演示数据：`datasets/demo/duration_demo.csv`。教程见 [`tutorials/s5-duration.md`](../../tutorials/s5-duration.md)。
+
+### `bayes_linear`（贝叶斯线性回归，S5.9 规划占位）
+
+**路径：** 与 `MODEL_REGISTRY` 并行；桥接中 **`elseif model_type == "bayes_linear"`** 专用分支调用 `MetricaBayes`（包与函数名以执行计划 **S5.9-J1** 为准）。**本节与** [`docs/superpowers/plans/2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md) **「S5.9-J0」共同构成单一事实来源；实现落地前客户端仅应依赖已列键名，不得假设未实现字段有值。**
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `bayes_linear` |
+| `bayes_seed` | 整数 | 否 | 可复现种子；省略时 Julia 侧定义确定性默认或报错策略（须测试锁定） |
+| `bayes_chains` | 整数 | 否 | 默认 **1** |
+| `bayes_warmup` | 整数 | 否 | 默认 **0**；与 **`bayes_iter` 均为 0 或省略** 表示 **解析/共轭路径 A**（无 MCMC） |
+| `bayes_iter` | 整数 | 否 | 默认 **0**；含义见上 |
+| `bayes_prior_scale` | 数 | 否 | 独立高斯先验尺度控制；默认 **`1.0`**（与执行计划一致，若变更须双处同改） |
+| `bayes_sigma2_known` | 布尔 | 否 | **`true`** 且提供 `bayes_sigma2_value` → σ² 已知解析分支 |
+| `bayes_sigma2_value` | 数 | 条件 | σ² 已知时必填，须为有限 **正** 数 |
+| `bayes_ig_alpha` | 数 | 条件 | σ² 未知 InvGamma 形状；与 `bayes_ig_beta` 成对；与「σ² 已知」分支 **互斥** |
+| `bayes_ig_beta` | 数 | 条件 | σ² 未知 InvGamma 速率/尺度参数（文献记法差异在 Julia 文档字符串说明） |
+
+**不转发字段（首期）：** 桥接不传 `vcov` / `weights` / `cluster` 等线性族推断关键字（与 Cox 专用分支类似）。
+
+**`result_payload`：**
+
+- **`glance` / `tidy` / `warnings`：** 与线性族相同信封。  
+- **`tidy`：** 每系数含 **`posterior_mean`、`ci_lower`、`ci_upper`**（**credible interval**）；**`stderror`、`statistic`、`pvalue` 为 `null`**（首期禁止与频率学派列混读）。**不设** 顶层 `posterior_summary` 数组（避免与 `tidy` 双真来源，见执行计划 S5.9-J0）。  
+- **`glance.metrics`：** 至少 `prior_family`（字符串）；**`log_marginal_likelihood`** 可解析则为数，否则 **`null`** 且 **`log_marginal_likelihood_not_available_reason`** 说明。  
+- **`diagnostics`：** **`inference_mode`**（`"analytical"` 或 `"mcmc"`）；路径 A 下 **`r_hat`、`ess` 等为 `null`** 且 **`mcmc_not_applicable_reason`** 非空（教学诚实）；**`seed_used`、`chains`、`warmup`、`iter`** 与请求对齐或解析路径解释值。路径 B（可选二期）可含 `r_hat`、`ess`、`divergences` 等；**默认不启用 MCMC**（见执行计划：环境门控与硬上限）。
+
+**CLI（App）：** **`bayesreg y x1 x2`** → `formula="y ~ x1 + x2"`（与 `reg` 习惯对齐）；可选括号选项映射到 `bayes_*` 键（以 App 解析器与 Vitest 为准）。教程见 [`tutorials/s5-bayes-linear.md`](../../tutorials/s5-bayes-linear.md)。
 
 ### 非参数 / 半参数（5c 预留，非实现）
 

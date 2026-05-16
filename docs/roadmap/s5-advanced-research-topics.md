@@ -41,7 +41,7 @@
 - **S5.6**（ARCH / GARCH）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.6 ARCH / GARCH」；教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
 - **S5.7**（空间计量）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.7 空间计量」；教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
 - **S5.8**（久期模型 / Cox）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.8 久期模型」；教程见 [`tutorials/s5-duration.md`](../../tutorials/s5-duration.md)。
-- **S5.9：** 见总规 §12。
+- **S5.9**（贝叶斯线性 / 预研最小闭环）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.9 贝叶斯能力预研与最小闭环」；协议字段见 [`runtime-protocol.md`](../architecture/runtime-protocol.md) **`bayes_linear`** 专节；教程见 [`tutorials/s5-bayes-linear.md`](../../tutorials/s5-bayes-linear.md)。总规口径见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) §12。
 
 ## 活跃实施计划
 

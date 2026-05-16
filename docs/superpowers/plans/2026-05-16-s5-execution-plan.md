@@ -533,6 +533,121 @@
 
 ---
 
+## S5.9 贝叶斯能力预研与最小闭环
+
+### 1. 收口状态
+
+- **范围：** 候选新建 `packages/MetricaBayes.jl`；`model_type`：**`bayes_linear`**（单方程高斯线性似然 + 冻结先验族）；Runtime 白名单与 `bayes_*` 字段；App **`bayesreg`** CLI + **`BayesDiagnosticsPanel`**（或等价命名）；协议与教程；**首期默认推断路径 A（解析/共轭），不默认 MCMC**。
+- **权威对齐：** 总规 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) §12；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)；协议专节 [`docs/architecture/runtime-protocol.md`](../../architecture/runtime-protocol.md) **`bayes_linear`**；教程 [`tutorials/s5-bayes-linear.md`](../../tutorials/s5-bayes-linear.md)。总规 §12 全文不重复，以本节 + 协议专节为实施单一事实来源。
+
+### 2. 范围与非目标
+
+| 维度 | 首期纳入（预研闭环） | 明确不做（首期） |
+|------|----------------------|------------------|
+| 模型 | **`bayes_linear`**：高斯似然 + **J0 锁定**的先验与 σ² 处理 | 任意图模型、Stan 语言、变分推断平台化 |
+| 推断 | **路径 A（默认）：** 共轭/半解析后验；**可复现**字段写入 `model_spec` 与 `diagnostics`（见 §3） | 无界链长、用户上传任意先验代码 |
+| 结果 | `glance` / `tidy` / `warnings`；`diagnostics`：**推断口径** + **credible 区间**（不能只给 `posterior_mean`）；频率学派列与贝叶斯列**互斥或显式 `null`**（见 §3） | 仅终端打印、无 JSON 键 |
+| CLI | **`bayesreg y x1 x2`** → `model_spec` 映射与 **`runtime-protocol.md`** 一致 | 任意概率 DSL |
+
+**非目标：** 将贝叶斯塞进 `MODEL_REGISTRY` 扭曲通用 `fit` 语义；默认启用 Turing/Stan 等重型依赖；App 解析自然语言摘要驱动下游。
+
+### 3. S5.9-J0 设计定稿（单一事实来源）
+
+1. **推断路径**  
+   - **路径 A（推荐首期、主线合并门槛）：** 在 **J0 锁定先验 + σ² 处理（见下）** 下使用 **共轭/解析** 后验（Normal–Normal 子族与/或 NIG 受控子族，由 σ² 已知与否分支）。**不**依赖重型 MCMC 栈。`bayes_warmup` / `bayes_iter` **为 0 或 JSON 省略** 时语义为 **解析推断**；`bayes_chains` 默认 **1**。`diagnostics` **必须**含 **`inference_mode: "analytical"`**（或协议中等价枚举值）。MCMC 专属指标：**`r_hat`、`ess` 等为 JSON `null`**，且 **必须**含 **`mcmc_not_applicable_reason`**（例如 `"conjugate_posterior_no_sampling"`），以满足总规「有收敛诊断字段」的**教学诚实性**（非伪造 R-hat）。  
+   - **路径 B（二期或 PoC，非主线默认）：** 仅当 **依赖审计通过** 且运行环境显式 **`METRICA_BAYES_MCMC=1`**（名称实施期可微调，但须在协议登记）时允许 **有上界** 的 NUTS/HMC；链数、总迭代、warmup **硬上限**；**不得**默认开启。此时 `inference_mode: "mcmc"`，填充 `r_hat` / `ess` / `divergences` 等（可为 `null` 表示未实现子项，但不得与路径 A 混用同一语义）。  
+   - 总规「依赖过重则设计 + PoC」→ **路径 A 可合并入主线**；路径 B 可标为**可选 Task / 非合并门槛**。
+
+2. **先验与 σ²（首期锁定）**  
+   - **β：** **独立高斯先验** \(\beta_j \sim \mathcal N(0, \tau^2)\)（截距项可单独放大方差，实施细节在 `MetricaBayes` 内与协议各一行说明）；**g-prior 首期不做**。尺度由 **`bayes_prior_scale`**（默认实施写入协议数值表，如 `1.0` 表示 \(\tau\) 与数据尺度挂钩的约定在 Julia 文档字符串写死）统一控制，避免随意改默认。  
+   - **σ²（二选一、互斥）：**  
+     - **已知：** `bayes_sigma2_known: true` 且 `bayes_sigma2_value` 为有限正数 → **Normal–Normal** 解析分支。  
+     - **未知：** `bayes_sigma2_known` 省略或 `false` → **逆伽马–正态共轭（NIG 受控子族）**；超参数 **`bayes_ig_alpha`、`bayes_ig_beta`**（默认值以协议专节为准）。  
+
+3. **与 OLS 公式对齐**  
+   - 与 `regress` 一致：`y ~ x1 + x2`；`noconstant` 规则与线性族一致。**不**引入 `Surv` 式左占位。
+
+4. **`tidy` 与扩展表分工（避免双真来源，已锁定）**  
+   - **`tidy` 承载** 每系数 **`posterior_mean`、`ci_lower`、`ci_upper`**（**credible interval**，命名固定）；**`stderror`、`statistic`、`pvalue` 为 JSON `null`**（或省略，以协议专节为准），与频率学派列**不混读**。  
+   - **`posterior_summary` 顶层数组首期省略**；若二期需模型层汇总，再开设计变更。
+
+5. **`glance.metrics`（首期）**  
+   - 至少：`prior_family`（字符串，如 `"normal_independent"`）；**`log_marginal_likelihood`**：若解析边际似然可算则填数，否则 **`null`** 并附 **`log_marginal_likelihood_not_available_reason`**。**禁止**虚构未实现指标。
+
+6. **`model_spec` JSON 键（全仓与 Runtime `ModelSpec` 对齐，名称已锁定）**  
+
+| 键 | 类型 | 默认 / 说明 |
+|----|------|-------------|
+| `bayes_seed` | 整数 | 可复现；解析路径仍写入 `diagnostics.seed_used` |
+| `bayes_chains` | 整数 | **1** |
+| `bayes_warmup` | 整数 | **0** 表示不适用或解析 |
+| `bayes_iter` | 整数 | **0** 表示不适用或解析 |
+| `bayes_prior_scale` | 数 | 先验尺度（默认见协议） |
+| `bayes_sigma2_known` | 布尔 | 与 `bayes_sigma2_value` 配对 |
+| `bayes_sigma2_value` | 数 | 已知 σ² 时必填且 >0 |
+| `bayes_ig_alpha` / `bayes_ig_beta` | 数 | σ² 未知 InvGamma 超参（与上互斥分支） |
+
+7. **`diagnostics`（首期建议键）**  
+   - 可复现：`seed_used`、`chains`、`warmup`、`iter`（与 `model_spec` 一致或解析路径下的解释值）。  
+   - 推断：`inference_mode`、`mcmc_not_applicable_reason`（路径 A）；路径 B 下 `r_hat`、`ess`、`divergences` 等（见协议）。
+
+### 4. 协议定稿表（`model_spec`）
+
+**共同必填：** `formula`、`dataset_ref`；`model_type: "bayes_linear"`；其余 **`bayes_*`** 以 §3 与 [`runtime-protocol.md`](../../architecture/runtime-protocol.md) **`bayes_linear`** 专节为准（单一事实来源）。
+
+### 5. CLI 与 App（CLI-first）
+
+- **动词：** `bayesreg`  
+- **形态：** `bayesreg y x1 x2`（与 `reg` 协变量列表习惯一致，映射到 `y ~ x1 + x2`）；选项式 `seed()`、`chains()` 等若引入，**须**与 §3 键名一一对应并在协议列映射表。
+
+### 6. Task 表
+
+| ID | 位置 | 一句话目标 |
+|----|------|------------|
+| S5.9-D0 | 本专节 + `s5-advanced-research-topics.md` | S5.9 三锚点与验收摘要 |
+| S5.9-J0 | 本专节 §3 | 推断路径 A/B、先验、σ²、`tidy`/扩展表分工、`bayes_*` 键 |
+| S5.9-J1 | `packages/MetricaBayes.jl` | `fit_bayes_linear`（或定名）、`glance`/`tidy`、`result_to_payload` |
+| S5.9-J2 | `Pkg.test(MetricaBayes)` + `datasets/demo/` | 小样本解析后验形状 + 秩亏/非法 seed |
+| S5.9-B1 | `julia_bridge_entry.jl`、`julia_daemon.jl` | **`elseif model_type == "bayes_linear"`** 专用分支 |
+| S5.9-R1 | `lib.rs`、`server.rs` | 白名单与 `bayes_*` 校验 |
+| S5.9-R2 | `vertical_slice.rs` | 一条成功；断言 `diagnostics.inference_mode` 与 credible 相关键 |
+| S5.9-A1 | App `commandGrammar` / `commandParser` / `commandExecutor`、`runtimeClient`、`protocol`、`ResultBlock` + **`BayesDiagnosticsPanel`** | CLI-first 展示 |
+| S5.9-A2 | Vitest | `bayesreg` 解析与 `buildFitModelRequest` |
+| S5.9-D1 | `runtime-protocol.md`、`tutorials/s5-bayes-linear.md` | 协议 + credible vs frequentist |
+| S5.9-D2 | 总规 §12 | 与 CLI/JSON 差异时回写一句对齐 |
+
+### 7. 验收
+
+- `Pkg.test("MetricaBayes")`：解析路径成功 + 错误路径。  
+- `cargo test --test vertical_slice`：含 `bayes_linear` 用例；`diagnostics.inference_mode` 与 **非空** credible 信息（不得仅 `posterior_mean`）。  
+- App：`npm test` 覆盖解析与请求构造。  
+- 总规 §12：种子/链/迭代/warmup 在结构化输出可查；教程可照抄复现；**credible** 与频率学派 CI 区分。
+
+### 8. 风险
+
+| 风险 | 缓解 |
+|------|------|
+| Turing/Stan 等依赖体积与版本漂移 | 首期默认路径 A；路径 B 独立 compat + 可选 feature |
+| 用户将 credible 误读为 frequentist CI | 专节 + 教程 + App 面板固定用语 |
+| 解析路径无 R-hat 被质疑不完整 | `mcmc_not_applicable_reason` + `inference_mode` 结构化说明 |
+| 数值奇异性 | `ModelError` + 明确 `code` |
+
+### 9. 数据流（与 S5.8 同级摘要）
+
+```mermaid
+flowchart LR
+  app[App_bayesreg_CLI]
+  rt[Runtime_lib_validate]
+  jl[julia_bridge_bayes_linear]
+  mb[MetricaBayes_fit]
+  app --> rt --> jl --> mb
+  mb --> app
+```
+
+- **桥接：** **`bayes_linear` 专用分支**；**不**扭曲 `MODEL_REGISTRY` 的通用 `fit` 语义。
+
+---
+
 ## 验证与未覆盖风险（`S5.0`）
 
 - **已做：** 全仓 `grep` 旧 `spec`/`plan` 路径与 `ui-project-button-system-plan.md`；`docs/superpowers` 目录仅剩本计划与主设计；Runtime 路由与 `julia_bridge_entry.jl` / `julia_daemon.jl` 对照更新协议文档。
