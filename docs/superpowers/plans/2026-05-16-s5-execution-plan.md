@@ -221,6 +221,70 @@
 
 ---
 
+## S5.5 非线性与门限（及非参数/半参数预留）（实施规划）
+
+> **权威条目：** 总规 [`S5-高级研究专题总施工规划.md`](../../../S5-高级研究专题总施工规划.md) §8；本节写**边界、协议定稿、文件级 Task、验收与风险**；**不**开放任意可执行代码字符串。
+
+### 0. 收口状态
+
+首期 **`nls`**（白名单族）与 **`threshold`**（单门限、单切换变量、双区制线性）在 `MetricaNonlinear.jl` 贯通后，与本节 Task 表、桥接/Runtime/App、`runtime-protocol` 专节、教程 [`tutorials/s5-nonlinear-threshold.md`](../../tutorials/s5-nonlinear-threshold.md) 对齐并在此勾选。
+
+### 1. 范围与非目标
+
+- **纳入（5a `nls`）：** `formula` + `dataset_ref`；**白名单** `nls_family`（首期仅 **`exp_growth`**：$\mu=\beta_1+\beta_2\exp(\beta_3 z)$，$z$ 为公式右侧**除截距外第一个**数值列）；**必填**初值向量 `nls_start`（长度 3、全有限）；**Optim.jl + Nelder-Mead**（`[compat]` 与 `MetricaDiscrete` 对齐 **Optim 2.x**）；`glance.metrics` 含 `rss` / `objective_final`、`converged`、`iterations`；`diagnostics` 含 `optimizer`、`failure_code`（未收敛时）、`start_used`；`tidy` 三行参数（首期标准误 `null`，须在 `warnings` 或 `diagnostics` 说明渐近 SE 未实现，勿静默）。
+- **纳入（5b `threshold`）：** 单 `threshold_variable`；`threshold_grid` 为**已展开**的单调递增候选 $\gamma$ 数组（由 App 将 `grid(min max n)` 展开）；Runtime **长度 2–500**；`threshold_trim_frac` 默认 **0.1**（在 $q$ 上按分位修剪后再与网格求交）；各区制为同一 `formula` 的 **OLS**；输出 `gamma_hat`、`n_below`、`n_above`（或等价结构化键）、合并 `tidy`（系数名带 `below_` / `above_` 前缀）；区制样本 **$<10$** → `ModelError` 或阻断。
+- **明确不做（首期）：** 任意 Julia/`eval` 文本；受限 DSL（若二期引入须另开专节）；多门限、内生门限、面板门限；非参数/半参数估计（仅 **5c 协议预留**，见 `runtime-protocol`）；与 `ols` 共用未定义的 `vcov` 语义（桥接对 `nls`/`threshold` **排除** `vcov`/`weights`/`cluster`/`instruments` 等线性族 kwargs）。
+
+### 2. 架构与包依赖
+
+- **实现归属：** `packages/MetricaNonlinear.jl`；依赖 `MetricaBase`、`MetricaLinear`、`MetricaOutput`、`CSV`、`DataFrames`、`LinearAlgebra`、`Statistics`、`Optim`（**不用** NLopt；**不用** ForwardDiff 首期）。
+- **注册：** `MODEL_REGISTRY["nls"]`、`["threshold"]` → 占位 struct，`fit` 内完成估计与诊断。
+
+### 3. 协议定稿（与 `runtime-protocol.md` 专节一致）
+
+| 方向 | 要点 |
+|------|------|
+| **`nls`** | `nls_family`（字符串枚举）；`nls_start: number[]`（长度 3）；可选 `nls_max_iter`、`nls_tol`。 |
+| **`threshold`** | `threshold_variable`；`threshold_grid: number[]`（单调，2–500）；可选 `threshold_trim_frac`（默认 0.1）。 |
+| **桥接** | 与 `quantile` 相同：不转发 `vcov` / `weights` / `cluster` / `instruments`。 |
+| **`result_payload.diagnostics`** | `nls`：`converged`、`iterations`、`optimizer`、`objective_final`、`gradient_norm`（可选占位或 `null`）、`start_used`、`failure_code`；`threshold`：`gamma_hat`、`n_below`、`n_above`、`rss_piecewise`、`search_grid_meta`（对象：`n_candidates`、`trim_frac_applied`）。 |
+
+### 4. App / CLI（定稿）
+
+- **`nls y x, family(exp_growth) start(1 0.5 0.05)`** → `model_type: "nls"`；`family` 映射 `nls_family`；`start` 解析为三个浮点。
+- **`threg y x1 x2, qvar(q) grid(0 10 41) trim(0.1)`** → `model_type: "threshold"`；`qvar` → `threshold_variable`；`grid(min max n)` 在解析器内展开为等距数组（$n\le 500$）。
+- **展示：** `NlsDiagnosticsPanel`、`ThresholdSummaryPanel`；`TidyTable` 复用。
+
+### 5. Task 清单
+
+| ID | 路径 / 位置 | 目标 |
+|----|----------------|------|
+| S5.5-D0 | 本文件 + `s5-advanced-research-topics.md` | S5.5 专节与路线图锚点。 |
+| S5.5-J1 | `packages/MetricaNonlinear.jl` | `nls` 白名单、`fit`、`glance`/`tidy`、`MODEL_REGISTRY`。 |
+| S5.5-J2 | 同上 | `threshold` 网格 + 双区制 OLS、`serialize`。 |
+| S5.5-J3 | `packages/MetricaNonlinear.jl/test` + `datasets/demo/` | 未收敛、区制过小、非法网格。 |
+| S5.5-B1 | `julia_bridge_entry.jl`、`julia_daemon.jl`、`MetricaRuntime.jl` | kwargs + `result_to_payload` 分派。 |
+| S5.5-R1 | `runtime/.../lib.rs`、`server.rs` | 字段校验与网格上限。 |
+| S5.5-R2 | `vertical_slice.rs` | `nls` / `threshold` 各一条成功断言 `diagnostics`。 |
+| S5.5-A1 | App `command*`、`protocol`、`Result*` | `nls` / `threg` 与面板。 |
+| S5.5-A2 | Vitest | `start`、`grid` 合法/非法。 |
+| S5.5-D1 | `runtime-protocol.md`、教程 | 协议 + 5c 预留小节。 |
+| S5.5-D2 | 本节与总规 §8 | 措辞对齐。 |
+
+### 6. 验收
+
+- Julia：`Pkg.test(MetricaNonlinear)`。
+- Runtime：`vertical_slice` 含 `nls` 与 `threshold`。
+- App：Vitest 覆盖解析。
+
+### 7. 风险
+
+- **初值敏感：** NLS 未收敛须 `failure_code` + 教学 `hint`。
+- **门限网格：** 过粗导致伪最优 → `warnings` 提示加密网格。
+- **DoS：** `threshold_grid` 硬上限 500。
+
+---
+
 ## 验证与未覆盖风险（`S5.0`）
 
 - **已做：** 全仓 `grep` 旧 `spec`/`plan` 路径与 `ui-project-button-system-plan.md`；`docs/superpowers` 目录仅剩本计划与主设计；Runtime 路由与 `julia_bridge_entry.jl` / `julia_daemon.jl` 对照更新协议文档。

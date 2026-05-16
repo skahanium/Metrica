@@ -58,6 +58,7 @@
 | 模型族 | `model_type` 取值（当前） |
 |--------|---------------------------|
 | 线性 | `ols`、`iv`、`gmm_linear`、`quantile`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
+| 非线性与门限（S5.5） | `nls`、`threshold`（`packages/MetricaNonlinear.jl`；受控白名单与网格搜索） |
 | 系统方程（S5.3） | `sur`、`system_2sls`、`system_3sls`（`packages/MetricaSystem.jl`） |
 | 面板 | `panel`、`panel_iv`、`dynamic_panel_gmm` |
 | 时间序列 | `arima`、`var`、`unitroot`、`cointegration` |
@@ -86,6 +87,47 @@
 **`result_payload`：** 与线性族相同的 `glance` / `tidy` / `warnings` 结构；`glance.metrics` 含 **`tau`**、**`pseudo_r2`**（McFadden 型 check 损失比）。`diagnostics` 含 `tau`、`inference_kind`（如 `asymptotic_kernel`）、`rank_X`、`cond_X`、`solver`（如 `QuantileRegressions.IP`）、`pseudo_r2_definition` 等。
 
 **CLI（App）：** `qreg y x1 x2, quantile(0.5)`；省略 `quantile(...)` 时默认 \(\tau=0.5\)。教程见 [`tutorials/s5-quantile-regression.md`](../../tutorials/s5-quantile-regression.md)。
+
+### `nls`（受控非线性最小二乘，首期白名单）
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `nls` |
+| `nls_family` | 字符串 | 否 | 首期仅 **`exp_growth`**（\(\mu=\beta_1+\beta_2\exp(\beta_3 z)\)，\(z\) 为公式右侧除截距外第一个数值列）；省略时 Julia 端按 `exp_growth` 处理；Runtime 拒绝其它枚举值。 |
+| `nls_start` | 数数组 | 是 | 长度 **3** 的初值向量，须全为有限数。 |
+| `nls_max_iter` | 整数 | 否 | 传递给 Optim；省略时使用 Julia 端默认。 |
+| `nls_tol` | 数 | 否 | 目标相对容差；省略时使用 Julia 端默认。 |
+
+**不转发字段：** 与 `quantile` 相同，桥接对 `nls` 不传 `vcov` / `weights` / `cluster` / `instruments` 等线性族关键字。
+
+**`result_payload.diagnostics`（示例键）：** `converged`、`iterations`、`optimizer`（如 `Optim.NelderMead`）、`objective_final`、`gradient_norm`（首期可为 `null`）、`start_used`、`failure_code`（未收敛时）、`nls_family`。首期 `tidy` 中标准误列可为 `null`，并在 `warnings` 中说明渐近 SE 未实现。
+
+**CLI（App）：** `nls y x, family(exp_growth) start(β1 β2 β3)`；`family` 可省略（默认 `exp_growth`）。演示数据：`datasets/demo/nls_threshold_demo.csv`。
+
+### `threshold`（单门限、双区制线性 OLS）
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `threshold` |
+| `threshold_variable` | 字符串 | 是 | 切换变量列名；**必须**同时出现在 `formula` 右侧，以便 listwise 与设计矩阵对齐。 |
+| `threshold_grid` | 数数组 | 是 | 候选门限 \(\gamma\)，须按输入顺序 **严格递增**（不允许乱序或重复）；长度 **2–500**（Runtime 硬上限，防 DoS）。 |
+| `threshold_trim_frac` | 数 | 否 | 在 \(q\) 上按分位修剪后再与网格求交；须满足 **\(0 \le \text{trim} < 0.45\)**；省略时 Julia 端默认 **0.1**。 |
+
+**不转发字段：** 与 `nls` 相同，不传 `vcov` / `weights` / `cluster` / `instruments`。
+
+**`result_payload.diagnostics`：** `gamma_hat`、`n_below`、`n_above`、`rss_piecewise`、`search_grid_meta`（对象：`n_candidates`、`trim_frac_applied`、`grid_input_length`）。
+
+**CLI（App）：** 动词 **`threg`** 映射为 `model_type: "threshold"`；`threg y x1 q, qvar(q) grid(min max n)` 在解析器内将 `grid` 展开为等距单调数组（\(n\le 500\)）。教程见 [`tutorials/s5-nonlinear-threshold.md`](../../tutorials/s5-nonlinear-threshold.md)。
+
+### 非参数 / 半参数（5c 预留，非实现）
+
+以下能力**未**在 Julia 包中实现；若请求中出现独立 `model_type`（例如未来的 `kernel`、`partial_linear`）而 Runtime 未注册，应返回 **`RUNTIME_UNSUPPORTED_MODEL_TYPE`**（或等价的结构化错误码），**禁止**返回半套 JSON 或静默空结果。
+
+**预留字段名（文档级）：** 未来若引入核回归 / 部分线性等，可在专节中冻结例如 `nonparam_kind`、`bandwidth`、`kernel_name` 等键名；在当前阶段，客户端与 Runtime **不得**假设这些字段已可用。
 
 ### `gmm_linear`（线性 IV-GMM）
 

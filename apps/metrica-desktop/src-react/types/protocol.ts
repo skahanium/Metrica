@@ -131,6 +131,31 @@ export interface QuantileDiagnostics {
   pseudo_r2_definition?: string;
 }
 
+/** 受控 NLS（`result_payload.diagnostics`） */
+export interface NlsDiagnostics {
+  converged?: boolean;
+  iterations?: number;
+  optimizer?: string;
+  objective_final?: number;
+  gradient_norm?: number | null;
+  start_used?: number[];
+  failure_code?: string | null;
+  nls_family?: string;
+}
+
+/** 单门限回归（`result_payload.diagnostics`） */
+export interface ThresholdDiagnostics {
+  gamma_hat?: number;
+  n_below?: number;
+  n_above?: number;
+  rss_piecewise?: number;
+  search_grid_meta?: {
+    n_candidates?: number;
+    trim_frac_applied?: number;
+    grid_input_length?: number;
+  };
+}
+
 export interface OddsRatioEntry {
   term: string;
   odds_ratio: number;
@@ -179,7 +204,7 @@ export interface ModelResult {
   /** 按方程的 glance（SUR / 系统 IV）；与顶层 `glance` 并存 */
   equation_glances?: GlanceResult[];
   tidy: TidyRow[];
-  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics;
+  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics;
   odds_ratios?: OddsRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
@@ -419,7 +444,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -470,6 +495,15 @@ export interface ModelSpec {
   sur_tol?: number;
   /** 仅 `quantile`：单分位点 τ（开区间 (0,1)） */
   quantile_tau?: number;
+  /** 仅 `nls`：白名单族（首期 exp_growth） */
+  nls_family?: string;
+  nls_start?: number[];
+  nls_max_iter?: number;
+  nls_tol?: number;
+  /** 仅 `threshold` */
+  threshold_variable?: string;
+  threshold_grid?: number[];
+  threshold_trim_frac?: number;
 }
 
 export interface FitModelRequest {

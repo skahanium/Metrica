@@ -248,6 +248,19 @@ const grammars: CommandGrammar[] = [
     quantile: optionValue('quantile', false),
     noconstant: optionValue('noconstant', false, ['true']),
   }),
+  makeModelGrammar('nls', '受控非线性最小二乘（首期 exp_growth；须 start(β1 β2 β3)）', {
+    family: optionValue('family', false, ['exp_growth']),
+    start: optionValue('start', true),
+    maxiter: optionValue('maxiter', false),
+    tol: optionValue('tol', false),
+    noconstant: optionValue('noconstant', false, ['true']),
+  }),
+  makeModelGrammar('threg', '单门限双区制线性回归（须 qvar、grid(min max n)）', {
+    qvar: optionValue('qvar', true),
+    grid: optionValue('grid', true),
+    trim: optionValue('trim', false),
+    noconstant: optionValue('noconstant', false, ['true']),
+  }),
   makeModelGrammar('ivregress', '工具变量回归（2SLS）', {
     endogenous: optionValue('endogenous', false),
     instruments: optionValue('instruments', false),

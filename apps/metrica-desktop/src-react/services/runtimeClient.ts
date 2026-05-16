@@ -72,6 +72,15 @@ export interface FitModelParams {
   surTol?: number;
   /** 仅 `quantile` */
   quantileTau?: number;
+  /** 仅 `nls` */
+  nlsFamily?: string;
+  nlsStart?: number[];
+  nlsMaxIter?: number;
+  nlsTol?: number;
+  /** 仅 `threshold` */
+  thresholdVariable?: string;
+  thresholdGrid?: number[];
+  thresholdTrimFrac?: number;
 }
 
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
@@ -116,6 +125,13 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     surMaxIter,
     surTol,
     quantileTau,
+    nlsFamily,
+    nlsStart,
+    nlsMaxIter,
+    nlsTol,
+    thresholdVariable,
+    thresholdGrid,
+    thresholdTrimFrac,
   } = params;
 
   const modelSpec: FitModelRequest['model_spec'] = {
@@ -196,6 +212,17 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
   } else if (modelType === 'quantile') {
     const tau = typeof quantileTau === 'number' && Number.isFinite(quantileTau) ? quantileTau : 0.5;
     modelSpec.quantile_tau = tau;
+  } else if (modelType === 'nls') {
+    if (nlsFamily?.trim()) modelSpec.nls_family = nlsFamily.trim();
+    if (nlsStart && nlsStart.length === 3) modelSpec.nls_start = nlsStart;
+    if (typeof nlsMaxIter === 'number' && Number.isFinite(nlsMaxIter)) modelSpec.nls_max_iter = nlsMaxIter;
+    if (typeof nlsTol === 'number' && Number.isFinite(nlsTol)) modelSpec.nls_tol = nlsTol;
+  } else if (modelType === 'threshold') {
+    if (thresholdVariable?.trim()) modelSpec.threshold_variable = thresholdVariable.trim();
+    if (thresholdGrid && thresholdGrid.length >= 2) modelSpec.threshold_grid = thresholdGrid;
+    if (typeof thresholdTrimFrac === 'number' && Number.isFinite(thresholdTrimFrac)) {
+      modelSpec.threshold_trim_frac = thresholdTrimFrac;
+    }
   } else {
     modelSpec.vcov = { type: vcovType };
     if (weightsColumn.trim()) modelSpec.weights = weightsColumn.trim();

@@ -14,8 +14,10 @@ import { StrataSummary } from './StrataSummary';
 import { SurveyDesignPanel } from './SurveyDesignPanel';
 import { GmmDiagnosticsPanel } from './GmmDiagnosticsPanel';
 import { QuantileSummaryPanel } from './QuantileSummaryPanel';
+import { NlsDiagnosticsPanel } from './NlsDiagnosticsPanel';
+import { ThresholdSummaryPanel } from './ThresholdSummaryPanel';
 import { SystemEquationsPanel } from './SystemEquationsPanel';
-import type { GmmDiagnostics, ModelResult, QuantileDiagnostics } from '../types/protocol';
+import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -40,6 +42,16 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
     ? (result.diagnostics as QuantileDiagnostics | undefined)
     : undefined;
 
+  const showNlsDiagnostics = modelType === 'nls';
+  const nlsDiagnostics = showNlsDiagnostics
+    ? (result.diagnostics as NlsDiagnostics | undefined)
+    : undefined;
+
+  const showThresholdSummary = modelType === 'threshold';
+  const thresholdDiagnostics = showThresholdSummary
+    ? (result.diagnostics as ThresholdDiagnostics | undefined)
+    : undefined;
+
   const showSystemEquations =
     modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls';
 
@@ -60,6 +72,8 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       {showQuantileSummary && result.glance && (
         <QuantileSummaryPanel glance={result.glance} diagnostics={quantileDiagnostics} />
       )}
+      {showNlsDiagnostics && <NlsDiagnosticsPanel diagnostics={nlsDiagnostics} />}
+      {showThresholdSummary && <ThresholdSummaryPanel diagnostics={thresholdDiagnostics} />}
       {showSystemEquations && <SystemEquationsPanel result={result} />}
       {isDiscrete && <DiscreteGlanceCards result={result} />}
       {modelType === 'did' && <DIDResultCards result={result} />}

@@ -15,6 +15,7 @@ MetricaDiagnostics = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
 MetricaDiscrete = "d1e2f3a4-b5c6-7890-def0-123456789abc"
 MetricaGMM = "c4f8e9a1-2b3d-5e6f-7a8b-9c0d1e2f3a4b"
 MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
+MetricaNonlinear = "7da9011b-ddab-4054-bbbc-d8aa09543254"
 MetricaOutput = "10c70d11-b779-43d3-b8f2-49770e63c885"
 MetricaPanel = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 MetricaQuantile = "f212cb88-0759-40d3-bab4-b1a10623addb"
@@ -31,6 +32,7 @@ MetricaDiagnostics = {path = "../MetricaDiagnostics.jl"}
 MetricaDiscrete = {path = "../MetricaDiscrete.jl"}
 MetricaGMM = {path = "../MetricaGMM.jl"}
 MetricaLinear = {path = "../MetricaLinear.jl"}
+MetricaNonlinear = {path = "../MetricaNonlinear.jl"}
 MetricaOutput = {path = "../MetricaOutput.jl"}
 MetricaPanel = {path = "../MetricaPanel.jl"}
 MetricaQuantile = {path = "../MetricaQuantile.jl"}

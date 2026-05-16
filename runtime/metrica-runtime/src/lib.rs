@@ -51,6 +51,8 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("iv", vec!["instruments", "endog_columns"]),
         ("gmm_linear", vec!["instruments", "endog_columns"]),
         ("quantile", vec![]),
+        ("nls", vec![]),
+        ("threshold", vec![]),
         ("gls", vec![]),
         ("panel", vec!["panel_id", "panel_time"]),
         ("panel_iv", vec!["panel_id", "panel_time", "instruments", "endog_columns"]),
@@ -273,6 +275,72 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     });
                 }
             }
+            if spec.model_type == "nls" {
+                let start = spec.nls_start.as_deref().unwrap_or(&[]);
+                if start.len() != 3 || start.iter().any(|x| !x.is_finite()) {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: "nls 要求 nls_start 为长度 3 的有限浮点数组。".to_string(),
+                        hint: Some("请在 model_spec 中设置 nls_start，例如 [1.0, 0.5, 0.05]。".to_string()),
+                    });
+                }
+                if let Some(ref fam) = spec.nls_family {
+                    let t = fam.trim().to_ascii_lowercase();
+                    if !t.is_empty() && t != "exp_growth" {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!("首期 nls 仅支持 nls_family = exp_growth，收到 `{fam}`。"),
+                            hint: Some("请省略 nls_family 或显式设为 exp_growth。".to_string()),
+                        });
+                    }
+                }
+            }
+            if spec.model_type == "threshold" {
+                let qv = spec.threshold_variable.as_deref().unwrap_or("").trim();
+                if qv.is_empty() {
+                    return Some(ValidationError {
+                        code: "RUNTIME_MISSING_FIELD",
+                        message: "门限回归需要非空的 threshold_variable（切换变量列名）。".to_string(),
+                        hint: Some("请在 model_spec 中设置 threshold_variable。".to_string()),
+                    });
+                }
+                let g = spec.threshold_grid.as_deref().unwrap_or(&[]);
+                if g.len() < 2 || g.len() > 500 {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: format!(
+                            "threshold_grid 长度须在 2–500 之间（单调递增），收到 {}。",
+                            g.len()
+                        ),
+                        hint: Some("请使用已排序的等距网格或缩短点数。".to_string()),
+                    });
+                }
+                if g.iter().any(|x| !x.is_finite()) {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: "threshold_grid 元素须全为有限实数。".to_string(),
+                        hint: None,
+                    });
+                }
+                for i in 1..g.len() {
+                    if g[i] <= g[i - 1] {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: "threshold_grid 须按输入顺序严格递增（不允许重复或乱序）。".to_string(),
+                            hint: Some("请使用 grid(min max n) 在 CLI 端展开为单调数组。".to_string()),
+                        });
+                    }
+                }
+                if let Some(tf) = spec.threshold_trim_frac {
+                    if !tf.is_finite() || !(0.0..0.45).contains(&tf) {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: "threshold_trim_frac 须为有限数且满足 0 ≤ trim < 0.45。".to_string(),
+                            hint: Some("请省略以使用默认 0.1。".to_string()),
+                        });
+                    }
+                }
+            }
             None
         }
     }
@@ -442,6 +510,25 @@ pub struct ModelSpec {
     /// 仅 `quantile`：单分位点 τ；JSON 省略时 Julia 端按 0.5 处理，Runtime 仍要求落在开区间 (0,1)。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quantile_tau: Option<f64>,
+    /// 仅 `nls`：白名单族（首期仅 `exp_growth`）；省略时 Julia 端按 exp_growth 处理。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nls_family: Option<String>,
+    /// 仅 `nls`：初值向量，长度须为 3。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nls_start: Option<Vec<f64>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nls_max_iter: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nls_tol: Option<f64>,
+    /// 仅 `threshold`：切换变量列名。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold_variable: Option<String>,
+    /// 仅 `threshold`：候选门限 γ 网格（严格递增，长度 2–500）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold_grid: Option<Vec<f64>>,
+    /// 仅 `threshold`：q 上修剪比例，默认 0.1。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold_trim_frac: Option<f64>,
 }
 
 // === 模型族类型（从 ModelSpec 转换，提供类型安全访问）=============================
@@ -897,6 +984,13 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             sur_max_iter: None,
             sur_tol: None,
             quantile_tau: None,
+            nls_family: None,
+            nls_start: None,
+            nls_max_iter: None,
+            nls_tol: None,
+            threshold_variable: None,
+            threshold_grid: None,
+            threshold_trim_frac: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -980,6 +1074,13 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         sur_max_iter: None,
         sur_tol: None,
         quantile_tau: None,
+        nls_family: None,
+        nls_start: None,
+        nls_max_iter: None,
+        nls_tol: None,
+        threshold_variable: None,
+        threshold_grid: None,
+        threshold_trim_frac: None,
     };
     request.options.return_augment = true;
     request

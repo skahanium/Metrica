@@ -13,6 +13,7 @@ using MetricaCausal
 using MetricaLinear
 using MetricaGMM
 using MetricaQuantile
+using MetricaNonlinear
 using MetricaOutput
 using MetricaPanel
 using MetricaSurvey
@@ -201,7 +202,7 @@ else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()
         # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字，避免 MethodError。
-        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm", "sur", "system_2sls", "system_3sls", "quantile"))
+        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm", "sur", "system_2sls", "system_3sls", "quantile", "nls", "threshold"))
             vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
             vcov_key = lowercase(vcov_type)
             vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -242,6 +243,29 @@ else
             end
             kwargs[:quantile_tau] = τ
         end
+        if model_type == "nls"
+            fam = if haskey(request.model_spec, :nls_family) && !isnothing(request.model_spec.nls_family)
+                String(request.model_spec.nls_family)
+            else
+                "exp_growth"
+            end
+            kwargs[:nls_family] = fam
+            raw_start = request.model_spec.nls_start
+            kwargs[:nls_start] = Float64.(collect(raw_start))
+            if haskey(request.model_spec, :nls_max_iter) && !isnothing(request.model_spec.nls_max_iter)
+                kwargs[:nls_max_iter] = Int(request.model_spec.nls_max_iter)
+            end
+            if haskey(request.model_spec, :nls_tol) && !isnothing(request.model_spec.nls_tol)
+                kwargs[:nls_tol] = Float64(request.model_spec.nls_tol)
+            end
+        end
+        if model_type == "threshold"
+            kwargs[:threshold_variable] = String(request.model_spec.threshold_variable)
+            kwargs[:threshold_grid] = Float64.(collect(request.model_spec.threshold_grid))
+            if haskey(request.model_spec, :threshold_trim_frac) && !isnothing(request.model_spec.threshold_trim_frac)
+                kwargs[:threshold_trim_frac] = Float64(request.model_spec.threshold_trim_frac)
+            end
+        end
         if model_type in ("sur", "system_2sls", "system_3sls")
             raw_eq = get(request.model_spec, :equations, nothing)
             kwargs[:equations] = raw_eq === nothing ? String[] : String.(collect(raw_eq))
@@ -275,6 +299,8 @@ else
             MetricaGMM.result_to_payload(result; include_augment=include_augment)
         elseif result isa MetricaQuantile.QuantileFitResult
             MetricaQuantile.result_to_payload(result; include_augment=include_augment)
+        elseif result isa MetricaNonlinear.NLSFitResult || result isa MetricaNonlinear.ThresholdFitResult
+            MetricaNonlinear.result_to_payload(result; include_augment=include_augment)
         elseif result isa MetricaSystem.SystemEquationsFitResult
             MetricaSystem.result_to_payload(result; include_augment=include_augment)
         else

@@ -215,6 +215,42 @@ describe('parseToModelSpec', () => {
     expect(spec).toHaveProperty('error');
   });
 
+  it('converts nls with start to ModelSpec', () => {
+    const r = parse('nls y x, start(0.5 0.5 0.05)');
+    const spec = parseToModelSpec(r);
+    expect(spec).not.toHaveProperty('error');
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('nls');
+      expect(spec.formula).toBe('y ~ x');
+      expect(spec.nls_start).toEqual([0.5, 0.5, 0.05]);
+      expect(spec.nls_family).toBe('exp_growth');
+    }
+  });
+
+  it('rejects nls without start', () => {
+    const r = parse('nls y x');
+    const spec = parseToModelSpec(r);
+    expect(spec).toHaveProperty('error');
+  });
+
+  it('converts threg with qvar and grid', () => {
+    const r = parse('threg y x q, qvar(q) grid(-1 1 5)');
+    const spec = parseToModelSpec(r);
+    expect(spec).not.toHaveProperty('error');
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('threshold');
+      expect(spec.threshold_variable).toBe('q');
+      expect(spec.threshold_grid?.length).toBe(5);
+      expect(spec.formula).toContain('q');
+    }
+  });
+
+  it('rejects threg grid with too many points', () => {
+    const r = parse('threg y x q, qvar(q) grid(0 1 501)');
+    const spec = parseToModelSpec(r);
+    expect(spec).toHaveProperty('error');
+  });
+
   it('converts xtivreg to panel IV ModelSpec', () => {
     const r = parse('xtivreg y x1 x2, id(firm) time(year) endogenous(x1) instruments(z1 z2) robust');
     const spec = parseToModelSpec(r);

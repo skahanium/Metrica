@@ -121,7 +121,7 @@ export function parse(input: string): ParsedCommand {
 // ---- 已知模型动词集合 ----
 
 const MODEL_VERBS = new Set([
-  'regress', 'ivregress', 'gmm', 'qreg', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
+  'regress', 'ivregress', 'gmm', 'qreg', 'nls', 'threg', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
   'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3',
 ]);
@@ -134,6 +134,8 @@ function verbToModelType(verb: string): string {
     ivregress: 'iv',
     gmm: 'gmm_linear',
     qreg: 'quantile',
+    nls: 'nls',
+    threg: 'threshold',
     gls: 'gls',
     xtreg: 'panel',
     xtivreg: 'panel_iv',
@@ -186,6 +188,35 @@ function splitPipeEquationColumns(raw: string | undefined): string[][] {
   return String(raw)
     .split('|')
     .map((seg) => seg.trim().split(/\s+/).filter(Boolean));
+}
+
+/** 解析 `grid(min max n)` 并展开为等距严格递增数组（与 Runtime 上限 n≤500 对齐）。 */
+function parseExpandedThresholdGrid(raw: string): { error: string } | { grid: number[] } {
+  const parts = String(raw).trim().split(/\s+/).filter(Boolean);
+  if (parts.length !== 3) {
+    return { error: 'grid(min max n) 需要恰好三个数值。' };
+  }
+  const lo = parseFloat(parts[0]);
+  const hi = parseFloat(parts[1]);
+  const n = parseInt(parts[2], 10);
+  if (![lo, hi].every(Number.isFinite) || !Number.isFinite(n)) {
+    return { error: 'grid 的 min、max 与点数 n 须全为有限数。' };
+  }
+  if (n < 2 || n > 500) {
+    return { error: 'grid 点数 n 须在 2–500 之间（与 Runtime DoS 上限一致）。' };
+  }
+  if (hi <= lo) {
+    return { error: 'grid 要求 max > min。' };
+  }
+  if (n === 2) {
+    return { grid: [lo, hi] };
+  }
+  const step = (hi - lo) / (n - 1);
+  const grid: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    grid.push(lo + step * i);
+  }
+  return { grid };
 }
 
 // ---- 语义分析：ParsedCommand -> ModelSpec ----
@@ -286,7 +317,8 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   if (optMap.has('id')) spec.panel_id = optMap.get('id');
   if (optMap.has('time')) spec.panel_time = optMap.get('time');
   if (optMap.has('method') && modelType !== 'panel_iv' && modelType !== 'dynamic_panel_gmm'
-    && modelType !== 'sur' && modelType !== 'system_2sls' && modelType !== 'system_3sls' && modelType !== 'quantile') {
+    && modelType !== 'sur' && modelType !== 'system_2sls' && modelType !== 'system_3sls' && modelType !== 'quantile'
+    && modelType !== 'nls' && modelType !== 'threshold') {
     spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
   }
 
@@ -338,6 +370,71 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     spec.vcov = undefined;
     spec.cluster_column = undefined;
     spec.weights = undefined;
+  }
+
+  if (modelType === 'nls') {
+    spec.vcov = undefined;
+    spec.cluster_column = undefined;
+    spec.weights = undefined;
+    let fam = 'exp_growth';
+    if (optMap.has('family')) {
+      fam = String(optMap.get('family')).trim().toLowerCase();
+      if (fam !== 'exp_growth') {
+        return { error: '首期 nls 仅支持 family(exp_growth)。' };
+      }
+    }
+    spec.nls_family = fam;
+    if (!optMap.has('start')) {
+      return { error: 'nls 须提供 start(β1 β2 β3) 三个有限初值。' };
+    }
+    const sp = String(optMap.get('start')).trim().split(/\s+/).filter(Boolean);
+    if (sp.length !== 3) {
+      return { error: 'start 须恰好包含三个浮点数。' };
+    }
+    const starts = sp.map((s) => parseFloat(s));
+    if (starts.some((x) => !Number.isFinite(x))) {
+      return { error: 'start 初值须全为有限实数。' };
+    }
+    spec.nls_start = starts;
+    if (optMap.has('maxiter')) {
+      const m = parseInt(String(optMap.get('maxiter')), 10);
+      if (!Number.isFinite(m) || m < 1) {
+        return { error: 'maxiter(...) 须为正整数。' };
+      }
+      spec.nls_max_iter = m;
+    }
+    if (optMap.has('tol')) {
+      const t = parseFloat(String(optMap.get('tol')));
+      if (!Number.isFinite(t) || t <= 0) {
+        return { error: 'tol(...) 须为有限正数。' };
+      }
+      spec.nls_tol = t;
+    }
+  }
+
+  if (modelType === 'threshold') {
+    spec.vcov = undefined;
+    spec.cluster_column = undefined;
+    spec.weights = undefined;
+    if (!optMap.has('qvar') || !String(optMap.get('qvar')).trim()) {
+      return { error: 'threg 需要 qvar(切换变量列名)，且该列须出现在公式右侧。' };
+    }
+    spec.threshold_variable = String(optMap.get('qvar')).trim();
+    if (!optMap.has('grid')) {
+      return { error: 'threg 需要 grid(min max n)，例如 grid(-1 1 21)。' };
+    }
+    const gr = parseExpandedThresholdGrid(String(optMap.get('grid')));
+    if ('error' in gr) {
+      return { error: gr.error };
+    }
+    spec.threshold_grid = gr.grid;
+    if (optMap.has('trim')) {
+      const tr = parseFloat(String(optMap.get('trim')));
+      if (!Number.isFinite(tr) || tr < 0 || tr >= 0.45) {
+        return { error: 'trim 须在 [0, 0.45) 区间内。' };
+      }
+      spec.threshold_trim_frac = tr;
+    }
   }
 
   // ---- 因果推断选项 ----

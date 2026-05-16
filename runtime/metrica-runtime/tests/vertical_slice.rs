@@ -169,6 +169,51 @@ fn fit_model_runs_quantile_with_tau_in_glance_metrics() {
 }
 
 #[test]
+fn fit_model_runs_nls_with_diagnostics_keys() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/nls_threshold_demo.csv".to_string();
+    request.model_spec.model_type = "nls".to_string();
+    request.model_spec.formula = "y ~ x".to_string();
+    request.model_spec.vcov = None;
+    request.model_spec.nls_family = Some("exp_growth".to_string());
+    request.model_spec.nls_start = Some(vec![0.5_f64, 0.5_f64, 0.05_f64]);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("objective_final").is_some());
+    assert!(diag.get("start_used").is_some());
+    assert_eq!(diag.get("optimizer").and_then(|v| v.as_str()), Some("Optim.NelderMead"));
+}
+
+#[test]
+fn fit_model_runs_threshold_with_gamma_in_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/nls_threshold_demo.csv".to_string();
+    request.model_spec.model_type = "threshold".to_string();
+    request.model_spec.formula = "y ~ x + q".to_string();
+    request.model_spec.vcov = None;
+    request.model_spec.threshold_variable = Some("q".to_string());
+    let g: Vec<f64> = (0..=20).map(|i| -1.0 + (2.0 / 20.0) * i as f64).collect();
+    request.model_spec.threshold_grid = Some(g);
+    request.model_spec.threshold_trim_frac = Some(0.1);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("gamma_hat").is_some());
+    assert!(diag.get("n_below").is_some());
+    assert!(diag.get("n_above").is_some());
+    assert!(diag.get("search_grid_meta").is_some());
+}
+
+#[test]
 fn fit_model_runs_sur_with_equation_glances_and_sigma() {
     let mut request = sample_fit_model_request();
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();

@@ -756,6 +756,13 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         surMaxIter: spec.sur_max_iter,
         surTol: spec.sur_tol,
         quantileTau: spec.quantile_tau,
+        nlsFamily: spec.nls_family,
+        nlsStart: spec.nls_start,
+        nlsMaxIter: spec.nls_max_iter,
+        nlsTol: spec.nls_tol,
+        thresholdVariable: spec.threshold_variable,
+        thresholdGrid: spec.threshold_grid,
+        thresholdTrimFrac: spec.threshold_trim_frac,
       });
       const payload = (result as TaskResponse).result_payload as Record<string, unknown> | undefined;
       const rr = (result as TaskResponse).run_record;

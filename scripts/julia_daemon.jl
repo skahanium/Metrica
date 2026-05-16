@@ -15,6 +15,7 @@ using MetricaBase
 using MetricaLinear
 using MetricaGMM
 using MetricaQuantile
+using MetricaNonlinear
 using MetricaOutput
 using MetricaDiscrete
 using MetricaCausal
@@ -129,7 +130,7 @@ function handle_request(req::Dict{String, Any})
                 # 构造 kwargs
                 kwargs = Dict{Symbol, Any}()
                 # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字。
-                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm", "sur", "system_2sls", "system_3sls", "quantile"))
+                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm", "sur", "system_2sls", "system_3sls", "quantile", "nls", "threshold"))
                     vcov_type = get(params, "vcov", "classical")
                     vcov_key = lowercase(String(vcov_type))
                     vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -160,6 +161,23 @@ function handle_request(req::Dict{String, Any})
                 end
                 if model_type == "quantile"
                     kwargs[:quantile_tau] = Float64(get(params, "quantile_tau", 0.5))
+                end
+                if model_type == "nls"
+                    kwargs[:nls_family] = String(get(params, "nls_family", "exp_growth"))
+                    kwargs[:nls_start] = Float64.(collect(params["nls_start"]))
+                    if haskey(params, "nls_max_iter") && params["nls_max_iter"] !== nothing
+                        kwargs[:nls_max_iter] = Int(params["nls_max_iter"])
+                    end
+                    if haskey(params, "nls_tol") && params["nls_tol"] !== nothing
+                        kwargs[:nls_tol] = Float64(params["nls_tol"])
+                    end
+                end
+                if model_type == "threshold"
+                    kwargs[:threshold_variable] = String(params["threshold_variable"])
+                    kwargs[:threshold_grid] = Float64.(collect(params["threshold_grid"]))
+                    if haskey(params, "threshold_trim_frac") && params["threshold_trim_frac"] !== nothing
+                        kwargs[:threshold_trim_frac] = Float64(params["threshold_trim_frac"])
+                    end
                 end
                 if model_type == "dynamic_panel_gmm"
                     raw_il = get(params, "instrument_lags", Any[2, 4])
@@ -248,6 +266,8 @@ function handle_request(req::Dict{String, Any})
                     payload = MetricaGMM.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaQuantile.QuantileFitResult
                     payload = MetricaQuantile.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaNonlinear.NLSFitResult || result isa MetricaNonlinear.ThresholdFitResult
+                    payload = MetricaNonlinear.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaSystem.SystemEquationsFitResult
                     payload = MetricaSystem.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaPanel.DynamicPanelGMMFitResult

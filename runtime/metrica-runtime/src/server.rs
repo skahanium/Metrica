@@ -359,6 +359,31 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if request.model_spec.model_type == "quantile" {
         params["quantile_tau"] = json!(request.model_spec.quantile_tau.unwrap_or(0.5));
     }
+    if request.model_spec.model_type == "nls" {
+        if let Some(ref fam) = request.model_spec.nls_family {
+            params["nls_family"] = json!(fam);
+        }
+        if let Some(ref s) = request.model_spec.nls_start {
+            params["nls_start"] = json!(s);
+        }
+        if let Some(n) = request.model_spec.nls_max_iter {
+            params["nls_max_iter"] = json!(n);
+        }
+        if let Some(t) = request.model_spec.nls_tol {
+            params["nls_tol"] = json!(t);
+        }
+    }
+    if request.model_spec.model_type == "threshold" {
+        if let Some(ref v) = request.model_spec.threshold_variable {
+            params["threshold_variable"] = json!(v);
+        }
+        if let Some(ref g) = request.model_spec.threshold_grid {
+            params["threshold_grid"] = json!(g);
+        }
+        if let Some(tf) = request.model_spec.threshold_trim_frac {
+            params["threshold_trim_frac"] = json!(tf);
+        }
+    }
 
     params
 }

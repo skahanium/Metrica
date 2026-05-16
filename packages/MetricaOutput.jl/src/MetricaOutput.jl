@@ -28,6 +28,28 @@ function summary_card(glance::MetricaBase.ModelGlance)
             ],
             " | ",
         )
+    elseif glance.model === :nls
+        return join(
+            [
+                "模型：$(glance.model)",
+                "样本量：$(glance.nobs)",
+                "RSS：$(metric_value_text(metrics, :rss))",
+                "收敛：$(metric_value_text(metrics, :converged))",
+                "迭代：$(metric_value_text(metrics, :iterations))",
+            ],
+            " | ",
+        )
+    elseif glance.model === :threshold
+        return join(
+            [
+                "模型：$(glance.model)",
+                "样本量：$(glance.nobs)",
+                "门限 γ̂：$(metric_value_text(metrics, :gamma_hat))",
+                "RSS（分段）：$(metric_value_text(metrics, :rss))",
+                "区制 n：$(metric_value_text(metrics, :n_below)) / $(metric_value_text(metrics, :n_above))",
+            ],
+            " | ",
+        )
     end
     return join(
         [
