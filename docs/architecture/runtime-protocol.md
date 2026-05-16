@@ -61,7 +61,7 @@
 | 非线性与门限（S5.5） | `nls`、`threshold`（`packages/MetricaNonlinear.jl`；受控白名单与网格搜索） |
 | 系统方程（S5.3） | `sur`、`system_2sls`、`system_3sls`（`packages/MetricaSystem.jl`） |
 | 面板 | `panel`、`panel_iv`、`dynamic_panel_gmm` |
-| 时间序列 | `arima`、`var`、`unitroot`、`cointegration`、`arch`、`garch`（`arch`/`garch` 走 `julia_time_series_bridge_entry.jl` + `MetricaTimeSeries.jl`） |
+| 时间序列 | `arima`、`var`、`unitroot`、`cointegration`、`arch`、`garch`、`gjr_garch`、`egarch`（波动率模型走 `julia_time_series_bridge_entry.jl` + `MetricaTimeSeries.jl`） |
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
 | 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
 | 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
