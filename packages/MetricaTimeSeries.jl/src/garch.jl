@@ -78,7 +78,7 @@ function MetricaBase.fit(model::GARCHModel, data::DataFrame)
     mu = mean(y)
     e = y .- mu
 
-    ll, ω, α, β, converged, iters, optname, h =
+    ll, ω, α, β, converged, iters, optname, h, se_all =
         fit_garch_qmle(e, p, q; max_iter=model.max_iter, tol=model.tol)
     failure = nothing
     warnings = MetricaBase.ModelWarning[]
@@ -129,13 +129,18 @@ function MetricaBase.fit(model::GARCHModel, data::DataFrame)
     glance_table = MetricaBase.ModelGlance(Symbol("GARCH($p,$q)"), n, 0, glance_metrics, warnings)
 
     coef_rows = MetricaBase.CoefRow[]
+    se_valid = all(isfinite, se_all) && all(s -> s > 0, se_all)
     push!(coef_rows, MetricaBase.CoefRow(:mu, mu, nothing, nothing, nothing, nothing, nothing))
-    push!(coef_rows, MetricaBase.CoefRow(:omega, ω, nothing, nothing, nothing, nothing, nothing))
+    se_ω = se_valid ? se_all[1] : nothing
+    push!(coef_rows, MetricaBase.CoefRow(:omega, ω, se_ω, se_valid ? ω / se_ω : nothing, se_valid ? 2 * (1 - cdf(Normal(), abs(ω / se_ω))) : nothing, se_valid ? ω - 1.96 * se_ω : nothing, se_valid ? ω + 1.96 * se_ω : nothing))
     for i in 1:length(α)
-        push!(coef_rows, MetricaBase.CoefRow(Symbol("alpha_$i"), α[i], nothing, nothing, nothing, nothing, nothing))
+        se_i = se_valid ? se_all[1 + i] : nothing
+        push!(coef_rows, MetricaBase.CoefRow(Symbol("alpha_$i"), α[i], se_i, se_valid ? α[i] / se_i : nothing, se_valid ? 2 * (1 - cdf(Normal(), abs(α[i] / se_i))) : nothing, se_valid ? α[i] - 1.96 * se_i : nothing, se_valid ? α[i] + 1.96 * se_i : nothing))
     end
     for j in 1:length(β)
-        push!(coef_rows, MetricaBase.CoefRow(Symbol("beta_$j"), β[j], nothing, nothing, nothing, nothing, nothing))
+        idx = 1 + length(α) + j
+        se_j = se_valid ? se_all[idx] : nothing
+        push!(coef_rows, MetricaBase.CoefRow(Symbol("beta_$j"), β[j], se_j, se_valid ? β[j] / se_j : nothing, se_valid ? 2 * (1 - cdf(Normal(), abs(β[j] / se_j))) : nothing, se_valid ? β[j] - 1.96 * se_j : nothing, se_valid ? β[j] + 1.96 * se_j : nothing))
     end
     tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
 
@@ -183,8 +188,8 @@ function MetricaBase.model_capabilities(r::GARCHFitResult)::MetricaBase.ModelCap
         :volatility,
         [:arch, :garch],
         ["QMLE (Gaussian) + Optim (Nelder-Mead)"],
-        [:loglik, :persistence, :unconditional_variance, :conditional_volatility],
-        [:std_errors, :t_statistics, :ljung_box_on_std_residuals, :var, :es, :forecast, :gjrgarch, :egarch],
+        [:loglik, :persistence, :unconditional_variance, :conditional_volatility, :std_errors, :z_statistics, :p_values],
+        [:ljung_box_on_std_residuals, :var, :es, :forecast, :gjrgarch, :egarch, :student_t],
         Symbol[],
         false,
         ["首期仅输出系数估计值，标准误/预测/VaR/ES/GJR/EGARCH 为二期功能。", "仅支持常数均值方程。"],

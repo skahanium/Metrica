@@ -74,7 +74,7 @@ function MetricaBase.fit(model::ARCHModel, data::DataFrame)
     mu = mean(y)
     e = y .- mu
 
-    ll, ω, α, converged, iters, optname, h = fit_arch_qmle(e, q; max_iter=model.max_iter, tol=model.tol)
+    ll, ω, α, converged, iters, optname, h, se_all = fit_arch_qmle(e, q; max_iter=model.max_iter, tol=model.tol)
     failure = nothing
     warnings = MetricaBase.ModelWarning[]
 
@@ -123,10 +123,21 @@ function MetricaBase.fit(model::ARCHModel, data::DataFrame)
     glance_table = MetricaBase.ModelGlance(Symbol("ARCH($q)"), n, 0, glance_metrics, warnings)
 
     coef_rows = MetricaBase.CoefRow[]
+    se_valid = all(isfinite, se_all) && all(s -> s > 0, se_all)
     push!(coef_rows, MetricaBase.CoefRow(:mu, mu, nothing, nothing, nothing, nothing, nothing))
-    push!(coef_rows, MetricaBase.CoefRow(:omega, ω, nothing, nothing, nothing, nothing, nothing))
+    se_omega = se_valid ? se_all[1] : nothing
+    z_omega = se_valid ? ω / se_omega : nothing
+    pv_omega = se_valid ? 2 * (1 - cdf(Normal(), abs(z_omega))) : nothing
+    lo_omega = se_valid ? ω - 1.96 * se_omega : nothing
+    hi_omega = se_valid ? ω + 1.96 * se_omega : nothing
+    push!(coef_rows, MetricaBase.CoefRow(:omega, ω, se_omega, z_omega, pv_omega, lo_omega, hi_omega))
     for i in 1:length(α)
-        push!(coef_rows, MetricaBase.CoefRow(Symbol("alpha_$i"), α[i], nothing, nothing, nothing, nothing, nothing))
+        se_i = se_valid ? se_all[1 + i] : nothing
+        z_i = se_valid ? α[i] / se_i : nothing
+        pv_i = se_valid ? 2 * (1 - cdf(Normal(), abs(z_i))) : nothing
+        lo_i = se_valid ? α[i] - 1.96 * se_i : nothing
+        hi_i = se_valid ? α[i] + 1.96 * se_i : nothing
+        push!(coef_rows, MetricaBase.CoefRow(Symbol("alpha_$i"), α[i], se_i, z_i, pv_i, lo_i, hi_i))
     end
     tidy_table = MetricaBase.TidyTable(coef_rows, "std.error")
 
@@ -172,8 +183,8 @@ function MetricaBase.model_capabilities(r::ARCHFitResult)::MetricaBase.ModelCapa
         :volatility,
         [:arch, :garch],
         ["QMLE (Gaussian) + Optim (Nelder-Mead)"],
-        [:loglik, :persistence, :unconditional_variance, :conditional_volatility],
-        [:std_errors, :t_statistics, :ljung_box_on_std_residuals, :var, :es, :forecast],
+        [:loglik, :persistence, :unconditional_variance, :conditional_volatility, :std_errors, :z_statistics, :p_values],
+        [:ljung_box_on_std_residuals, :var, :es, :forecast, :gjrgarch, :egarch, :student_t],
         Symbol[],
         false,
         ["首期仅输出系数估计值，标准误/预测/VaR/ES 为二期功能。", "仅支持常数均值方程。"],
