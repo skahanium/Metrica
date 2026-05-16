@@ -1,6 +1,6 @@
 # S4 模型族：常见误用与 warning / error 覆盖
 
-> 本文档与 `docs/superpowers/plans/2026-05-16-s3-s4-all-in-cli-completion-plan.md` Task 9 对齐，用于教学与验收对照。**验收状态**指：是否能在代码中定位到**结构化** `ModelWarning` / `ModelError`（或 Runtime 校验码），且测试或 CLI 路径可复现；不等同于「已穷尽所有边界」。
+> 本文档与 `docs/superpowers/plans/2026-05-16-s5-execution-plan.md` 及 `S5` 总规对齐，用于教学与验收对照。**验收状态**指：是否能在代码中定位到**结构化** `ModelWarning` / `ModelError`（或 Runtime 校验码），且测试或 CLI 路径可复现；不等同于「已穷尽所有边界」。
 
 ## 使用约定
 

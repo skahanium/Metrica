@@ -9,6 +9,10 @@
 - `fit_model`
 - `transform`
 
+### 诊断动作
+
+- `run_diagnostic` — 在已有拟合上下文上运行结构化诊断（HTTP 入口；载荷与 Julia 侧见实现）。
+
 ### S3 项目系统动作
 
 - `save_project` — 保存项目清单到 `.metrica/project.json`
@@ -24,23 +28,48 @@
 
 ### 当前实现（axum HTTP）
 
-当前链路通过 axum HTTP 框架暴露 Runtime：
+当前链路通过 axum HTTP 框架暴露 Runtime（默认绑定 `127.0.0.1:47821`）。下列路径与 `runtime/metrica-runtime/src/server.rs` 中 `build_router` 一致；`OPTIONS` 由全局 `CorsLayer` 处理，与具体 `POST` 路由成对出现。
 
-- 默认绑定：`127.0.0.1:47821`
-- `POST /inspect_dataset`
-- `OPTIONS /inspect_dataset`
-- `POST /query_dataset`
-- `OPTIONS /query_dataset`
-- `POST /fit_model`
-- `OPTIONS /fit_model`
-- `POST /transform`
-- `OPTIONS /transform`
-- `POST /export_report`
-- `OPTIONS /export_report`
-- `GET /health`（会话状态）
-- `GET /session/env`（变量环境）
+**持久化会话模式（默认）**
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/health` | 会话健康 |
+| `GET` | `/session/env` | 变量环境 |
+| `POST` | `/inspect_dataset` | 数据检查 |
+| `POST` | `/query_dataset` | 只读数据命令（describe / browse / summarize / tabulate） |
+| `POST` | `/fit_model` | 模型拟合 |
+| `POST` | `/transform` | 数据变换 |
+| `POST` | `/run_diagnostic` | 诊断检验 |
+| `POST` | `/save_project` | 保存项目 |
+| `POST` | `/load_project` | 加载项目 |
+| `POST` | `/list_runs` | 列出运行记录 |
+| `POST` | `/rerun_task` | 重跑历史任务 |
+| `POST` | `/export_report` | 导出报告 |
+
+**`--oneshot` 回退模式：** 路由为子集（见 `build_oneshot_router`）：含 `health`、`fit_model`、`inspect_dataset`、`query_dataset` 与项目类 `save_project` / `load_project` / `list_runs`；**不含** `transform`、`run_diagnostic`、`rerun_task`、`export_report`。文档与 App 须将上述缺失视为回退模式限制。
 
 该 HTTP 层只负责搬运结构化请求与响应，不承载计量逻辑本身。
+
+## `fit_model` 与 `model_type`（`S4` 当前枚举）
+
+`model_spec.model_type` 为**白名单字符串**，由 `scripts/julia_bridge_entry.jl` 与 `MetricaBase.MODEL_REGISTRY` 注册表共同约束；Runtime 仅做 schema 与字段完整性校验，不解释计量语义。
+
+| 模型族 | `model_type` 取值（当前） |
+|--------|---------------------------|
+| 线性 | `ols`、`iv`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
+| 面板 | `panel`、`panel_iv` |
+| 时间序列 | `arima`、`var`、`unitroot`、`cointegration` |
+| 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
+| 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
+| 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
+
+### `S5` 扩展规则（摘要）
+
+- 新高级专题（如 `gmm_linear`）仍须走 **`fit_model` 信封**（或未来经设计新增的白名单 `action`，不得使用自由文本替代结构化 `model_spec`）。
+- 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
+- 在 Julia 侧注册 `MODEL_REGISTRY`（若适用）并在桥接入口增加派发分支；同步更新本文件上表与 CLI 语法文档。
+- 详见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
 
 ## Julia 进程模型
 
@@ -54,7 +83,9 @@
 │  POST /fit_model     → 转发到 Julia 会话     │
 │  POST /inspect_dataset → 转发到 Julia 会话   │
 │  POST /query_dataset → 转发到 Julia 会话     │
-│  POST /transform     → 转发到 Julia 会话      │
+│  POST /transform     → 转发到 Julia 会话     │
+│  POST /run_diagnostic → 转发到 Julia 会话   │
+│  POST /save_project … /export_report（见上表） │
 │  GET  /health        → 返回会话状态          │
 └──────────────────┬───────────────────────────┘
                    │
@@ -66,7 +97,7 @@
 │  │  stdout → JSON Response (逐行)         │  │
 │  │  stderr → 日志/警告                    │  │
 │  └────────────────────────────────────────┘  │
-│  - 启动时加载 MetricaBase + MetricaLinear    │
+│  - 启动时加载 MetricaBase、MetricaLinear、MetricaPanel、MetricaData、MetricaOutput、MetricaDiscrete、MetricaCausal、MetricaSurvey、MetricaTimeSeries、MetricaDiagnostics（以 `scripts/julia_daemon.jl` 为准） │
 │  - 首次预热完成后通知前端就绪                  │
 │  - [计划] 支持 cancel 信号                    │
 │  - 进程崩溃自动重启（最多 3 次）              │
@@ -762,23 +793,20 @@
 - 数据操作链的结构化 `preview`、`operations` 与错误定位
 - 删行与拟合错误的警告/消息传播
 
-### S3 项目系统端点（已实现，待端到端验证）
+### 项目与导出端点（Runtime 已实现；桌面闭环为部分持续演进）
 
-S3 端点已实现并通过单元测试，但尚未经过桌面端端到端流程验证：
+下列端点在 Rust 层实现并通过 `runtime/metrica-runtime/tests/vertical_slice.rs` 等集成测例覆盖；Julia 会话不参与项目 JSON 的读写本身。
 
-- `POST /save_project` — 保存项目清单到 `.metrica/project.json`，含 manifest 字段校验
-- `POST /load_project` — 从 `.metrica/project.json` 加载项目清单
-- `POST /list_runs` — 列出运行记录，支持 `limit`/`offset`/`action_filter`/`status_filter`
-- `POST /rerun_task` — 根据历史运行记录重新执行任务
-- `POST /export_report` — 导出运行报告（Markdown / CSV 格式）
+- `POST /save_project`、`/load_project`、`/list_runs`、`/rerun_task`、`/export_report`
 
-当前已知限制：
+**桌面 App：** CLI 解析与 `executeCommand` 已包含 `export`、`rerun` 等动词路径（以 `apps/metrica-desktop/src-react` 当前实现为准）。**仍可能部分缺失或非目标的能力**包括：出版级图表 SVG/PNG 导出、多模型对比产品化、崩溃后完整工作区 UI 状态自动恢复等——以路线图与主设计「非目标」为准，不得将本节误读为「全已实现」。
 
-- S3 端点不经过 Julia Session — 保存/加载与 Julia 内存状态完全解耦
-- 加载项目后不会自动恢复 Julia session 中的数据集
-- "项目重开后可重跑"依赖数据集文件仍在原路径
-- `rerun_task` 在 oneshot 回退模式下不可用
-- `export_report` 在 oneshot 回退模式下不可用
+**持久化 vs oneshot：** 见上文「`--oneshot` 回退模式」路由差异；依赖 `transform` / `rerun_task` / `export_report` 的流程在回退模式下不可用。
+
+**其他已知限制（持久化模式仍适用）：**
+
+- 加载项目不会自动把 CSV 灌回 Julia 内存；重跑依赖数据文件仍在可访问路径
+- **[计划]** 经 stdin 的 cancel、进度事件尚未实现（见下文 JSON 示例注释）
 
 主设计与阶段边界见：
 

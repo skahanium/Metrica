@@ -1,10 +1,12 @@
-# Metrica 主设计：稳定主链路与 S1/S2 事实基线
+# Metrica 主设计：S1–S4 稳定主链路与 S5 扩展基线
 
-> **状态：当前主设计锚点。** 本文件用于记录当前稳定主链路与 `S1/S2` 的事实基线。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
+> **状态：当前主设计锚点。** 本文件记录 **`S1`–`S4` 已收口** 的产品与协议事实基线，并划定 **`S5` 高级研究专题** 的扩展边界。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
 >
-> **当前事实基线：** 仓库已经完成 `S1` 与 `S2` 对应的主要里程碑收口。真实 OLS/WLS/IV/GLS 全链路已贯通，`glance`、`tidy`、`augment`、结构化 warning / error、Runtime 真实 Julia 子进程桥接、桌面端结构化渲染与基础数据操作工作流均已落地。扩展诊断能力（White、Durbin-Watson、Breusch-Godfrey、RESET、Jarque-Bera）已在 Core 层实现；面板能力已覆盖 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 与升级后的结构化诊断；Runtime 已迁移到 axum + 持久化 Julia 守护进程，App 已完成 React 工作台与结构化结果消费。
+> **当前事实基线：** 真实 OLS/WLS/IV/GLS 与扩展协方差、扩展诊断已贯通；面板能力覆盖 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 等；**`S4` 离散、因果、时间序列、复杂抽样** 等模型族已纳入同一 `fit_model` 结构化结果协议；Runtime 为 axum HTTP + 持久化 Julia 守护进程（stdin/stdout JSON lines），并暴露数据查询、变换、项目与导出等动作；**桌面 App 主交互为 CLI-first 命令消息流**，结构化消费 `glance` / `tidy` / `diagnostics` / `warnings`，不解析终端摘要文本。教学向教程见 `tutorials/s4-*.md` 等。
 >
-> **下一步边界：** 当前主线不再停留在 OLS/面板能力补全，而是进入 `S3` 入口：结果与报告系统、项目文件、运行记录、数据谱系与桌面产品化收口。不得重开平行 mock 路线，也不得让 App 解析终端文本。
+> **`S3`（复现与报告）与产品化：** 项目保存/加载、运行记录、`export_report` 等在 Runtime 与桥接层已具备实现与测例；App 侧持续接入 CLI 动词与 UI。**不得**将「仅文档宣称」或样例 JSON 当作完成标准；未完成项在路线图与实施计划中如实标注为部分落地或待验范围。
+>
+> **`S5` 边界：** 在稳定协议上扩展 GMM、动态面板、系统方程、分位数等高级专题；新模型不得写入 `MetricaBase.jl` 的估计量实现，仅扩共享协议与类型约定；详见 [`S5-高级研究专题总施工规划.md`](../../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。不得重开平行 mock 主链路。
 
 ## 概述
 
@@ -23,20 +25,21 @@
 
 ## 目标
 
-当前阶段的目标不是继续扩张核心模型覆盖面，而是沿着已经成立的真实主链路进入报告、复现与产品化收口，并保持以下前提成立：
+当前阶段的目标是在已成立的 **`S1`–`S4` 主链路** 上继续加固协议与数值语义，同步推进 **`S3` 级复现/报告能力** 的桌面闭环与 **`S5` 高级专题** 的分期交付，并保持以下前提成立：
 
 1. `MetricaBase.jl` 的结构化协议足以作为 Core、Runtime、App 三层的稳定共享边界。
 2. `MetricaLinear.jl` 可以在不依赖 GUI、也不暴露第三方回归对象的前提下，提供真实 OLS 能力。
-3. `runtime/metrica-runtime` 可以通过 Julia 子进程稳定执行 `inspect_dataset` 与 `fit_model` 两类任务，并传递结构化成功/失败载荷。
+3. `runtime/metrica-runtime` 可以通过 Julia 子进程稳定执行 `inspect_dataset`、`query_dataset`、`fit_model`、`transform` 等动作，以及项目/导出类 HTTP 动作（见 `docs/architecture/runtime-protocol.md`），并传递结构化成功/失败载荷。
 4. `apps/metrica-desktop` 可以只消费结构化数据检查结果与模型结果对象，而不回退到解析终端文本。
 5. 教学友好行为在当前工作台中仍是协议级能力，而不是 UI 补丁。
 
 当前阶段性落点：
 
 - 已完成的最小可用边界：`fit_ols_file`、统一 `fit` 入口、`glance`、`tidy`、`augment`、结构化 warning / error、结构化 payload、Runtime 真实调用 Julia、桌面端结构化渲染与数据操作主链路
-- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1、IV/2SLS、GLS 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现；面板能力已贯通 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 与升级诊断；React 工作台与 `/transform` 数据工作流已实现并收口
+- 已完成的扩展能力：Runtime/App 贯通 WLS、HC1、IV/2SLS、GLS 与基础诊断选项，数值可信度测试已补强，扩展诊断（White、DW、BG、RESET、JB）已在 Core 层实现；面板能力已贯通 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 与升级诊断；**`S4` 离散、因果、时间序列、复杂抽样** 模型族已纳入统一协议；React 工作台、**CLI-first 消息流** 与 `/transform` 数据工作流已实现并收口
 - 明确排除的短期捷径：前端直接调用本地 Julia 脚本、前端消费示例 JSON、Runtime 返回样例载荷冒充真实链路
-- 延后处理的高级能力：完整报告系统、项目文件与运行记录之外的高级研究专题与 AI 增强层；当前只要求为其保留稳定接口铺垫，不落地完整自动化系统
+- **`S5` 高级研究专题：** 在协议稳定前提下分期落地（见总规）；每专题须自带最小教学数据、CLI 路径、Runtime 垂直切片与结构化 warning 清单
+- **延后：** 多模型对比产品化、完整图表导出产品、任意脚本执行、AI 增强层等；不阻塞当前主链路与 `S5` 分期验收
 
 ## 非目标
 
@@ -66,8 +69,7 @@
 
 `runtime/metrica-runtime` 是桌面端与 Julia Core 之间的唯一桥。
 
-- 接收 `inspect_dataset` 请求
-- 接收 `fit_model` 请求
+- 接收 `inspect_dataset`、`query_dataset`、`fit_model`、`transform` 等请求（及 `run_diagnostic`、项目/导出端点，见 `runtime-protocol`）
 - 做轻量输入校验与路径整理
 - 通过 axum HTTP 框架暴露端点
 - 管理持久化 Julia 进程的生命周期
@@ -85,19 +87,18 @@ Runtime 不得重做计量逻辑，不得解释系数或重新计算统计量。
 
 `apps/metrica-desktop` 负责真实且可扩展的桌面工作台主链路。
 
-- 选择本地 CSV
-- 触发数据检查
-- 执行基础数据操作
-- 输入线性或面板模型公式
-- 触发运行
+- 选择本地 CSV 与项目上下文
+- 通过 **CLI 命令消息流** 触发数据检查、数据查询（`query_dataset`）、数据变换与拟合
+- 执行基础数据操作（`transform` 等）
+- 输入线性、面板或 **`S4` 已注册 `model_type`** 的模型配置
 - 渲染结构化列摘要与预览表
-- 渲染结构化 `glance`、`tidy`、warnings 与错误
+- 渲染结构化 `glance`、`tidy`、`diagnostics`、`warnings` 与错误
 
 App 不解析 `summary()` 文本，也不依赖终端打印格式。
 
 当前实现约束：
 
-- App 必须继续通过 Runtime 发起真实 `fit_model` / `transform`
+- App 必须继续通过 Runtime 发起真实 `fit_model` / `transform` / `query_dataset` 及项目、导出相关动作（以 `runtime-protocol` 为准）
 - App 必须继续渲染结构化 `glance`、`tidy`、warnings、diagnostics 与数据操作结果
 - 不得把壳层页面或占位 banner 视为“基本可用前端”
 
@@ -285,34 +286,24 @@ Runtime 的职责只包括：
 - 任意 shell 命令执行
 - 以自由文本命令作为公开产品接口
 
-## App 结果页
+## App 结果与交互（当前事实）
 
-前端当前阶段不追求完整工作台，而追求一条可长期保留的真实结果页。
+**主路径：** CLI-first 命令输入 → 解析为结构化 `ModelSpec` / 任务请求 → 经 Runtime HTTP 执行 → 消息流中展示结构化结果。与「单页表单 + 单一运行按钮」的早期 Alpha 描述相比，**以命令流为教学与复现主入口**；表单式辅助输入若存在，为次要或兼容路径，不得被文档表述为唯一主路径。
 
-必须包含：
+当前须稳定具备：
 
-- 文件选择按钮
-- CSV 路径输入
-- 数据检查按钮
-- 数据摘要区
-- 数据预览表
-- 公式输入
-- 协方差类型选择
-- 可选权重列输入
-- 运行按钮
-- 运行中状态
-- `glance` 摘要区
-- `tidy` 系数表
-- diagnostics 区（VIF、Breusch-Pagan 等）
-- warnings 区
-- error 区
+- 数据与 Runtime 连接状态反馈
+- 命令输入、历史与结果消息流
+- 结构化 `glance`、`tidy`、`diagnostics`（按模型族）、`warnings`、错误展示
+- 与 `query_dataset` / `transform` / 项目动词等对齐的客户端封装（细节见 `docs/architecture/app-shell.md`）
 
-明确不包含：
+**产品化愿景（非当前验收门槛）：** 经典多面板 IDE、完整侧边栏变量浏览器、统一出版导出管线等可作为后续阶段（如 `S6`）目标；**当前** 壳层为 **tao + wry** 内嵌 WebView + CLI-first 消息流，不得与上述愿景混写为「已实现主链路」。
 
-- 多模型切换
-- 项目系统全量流程
-- 复杂导航与多标签工作区
-- 任何依赖 mock 结果的占位运行体验
+明确不包含（与本主设计非目标一致）：
+
+- 多模型对比的完整产品化
+- 任意用户 Julia/shell 脚本入口
+- 任何依赖 mock 载荷冒充真实链路的「完成」宣称
 
 ## 数据检查最小协议
 
@@ -353,17 +344,17 @@ Runtime 至少要区分三类失败：
 
 ## App 设计
 
-### 当前最小真实用户流
+### 当前主用户流（CLI-first）
 
-桌面端只实现最窄但真实的一条流程：
+1. 用户配置工作目录与数据集（及项目文件，若使用）
+2. 用户在 CLI 输入区键入命令（如 `reg`、`xtreg`、`logit`、`did` 等，以 `commandGrammar` 为准）
+3. 应用解析命令并调用 Runtime 对应动作（`fit_model`、`inspect_dataset`、`transform`、`export_report` 等）
+4. 消息流展示运行中状态与结构化结果载荷
+5. 成功时渲染模型族对应的摘要、系数表与诊断组件
+6. 若有 warnings，在结构化列表中展示教学说明
+7. 失败时展示结构化错误码与建议
 
-1. 用户选择本地 CSV
-2. 用户输入 OLS 公式
-3. 用户点击运行
-4. 页面显示运行中状态
-5. 成功时展示 `glance` 摘要卡片与 `tidy` 系数表
-6. 若有 warnings，单独展示教学友好提示区
-7. 失败时展示结构化错误说明与建议
+兼容路径：部分模型仍可通过表单字段辅助构造命令，但**文档与验收以 CLI 消息流为准**。
 
 ### 渲染原则
 
@@ -422,10 +413,23 @@ App 只消费 Runtime 返回的结构化 JSON。
 5. 至少两类失败可端到端展示为可读错误
 6. 整条链路可通过一个稳定 demo 数据集重复验证
 
+## 已完成专题设计结论索引（S3–S4 收口）
+
+以下结论原载于独立 `spec` / `plan`，已在 `S5.0` 并回本文件或 `docs/architecture/`，原文件删除以免多套主叙事：
+
+- **交互纯度 / CLI-first：** 桌面端以命令消息流为研究与教学主路径；Runtime 为唯一执行桥；禁止 App 解析 `summary()` 文本冒充结果语义。
+- **`S4` 模型族：** 离散（`logit` 等）、因果（`did`、`ipw` 等）、时间序列（`arima`、`unitroot` 等）、复杂抽样（`survey_*`）等与线性/面板族统一走 `fit_model` 与结构化输出；`model_type` 枚举以 `julia_bridge_entry.jl` 与 `MetricaBase.MODEL_REGISTRY` 为准。
+- **图标与品牌资产：** 应用图标与仓库 `assets/icons/` 交付路径已稳定；具体像素规范不再单独占活跃 spec。
+- **计量算法审查（第一批）：** 数值与算法侧修复以 Julia 包测试与变更记录为准；新审查轮次若开启应另建 dated 计划，不恢复旧 plan 为活跃依据。
+
+## 文档变更记录（节选）
+
+- **S5.0：** 更新标题与基线至 `S1`–`S4` + CLI-first；增加 `S5` 边界与已完成 spec 结论索引；回收独立 `superpowers` 计划中仍有效的叙述。
+
 ## 结论
 
-当前 Metrica 最重要的任务不是继续堆叠模块名或页面名，而是在第一条真实可运行主链路上继续加固协议与数值语义。
-
-这条链路已经把项目从“架构合理、方向清晰”推进到“架构成立、系统可验证”的阶段。
+当前 Metrica 最重要的任务不是继续堆叠模块名或页面名，而是在 **`S1`–`S4` 已验证主链路** 上继续加固协议与数值语义，并按 [`S5` 总规](../../../S5-高级研究专题总施工规划.md) 分期扩展高级专题。
 
 后续所有能力扩展，都应建立在这条链路之上推进，而不是绕开它继续增加未验证的子系统。
+
+这条链路已经把项目从“架构合理、方向清晰”推进到“架构成立、系统可验证”的阶段。

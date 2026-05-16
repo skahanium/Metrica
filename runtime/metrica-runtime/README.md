@@ -15,26 +15,20 @@
 - 计量模型语义
 - 直接面向用户的流程设计
 
-## 当前 Alpha 运行方式
+## HTTP 入口（持久化会话模式）
 
-当前最小真实链路通过本地 HTTP 方式暴露 Runtime：
+默认绑定 `127.0.0.1:47821`。完整路径表、CORS 行为、`--oneshot` 回退子集与 **`model_type` 白名单** 以仓库内 [`docs/architecture/runtime-protocol.md`](../../docs/architecture/runtime-protocol.md) 与 `src/server.rs` 为准。
 
-- 绑定地址默认：`127.0.0.1:47821`
-- 入口：`POST /inspect_dataset`
-- 入口：`POST /fit_model`
-- 预检：`OPTIONS /inspect_dataset`
-- 预检：`OPTIONS /fit_model`
+摘要（持久化 `build_router`）：
 
-启动命令：
+- `GET /health`、`GET /session/env`
+- `POST /inspect_dataset`、`/query_dataset`、`/fit_model`、`/transform`、`/run_diagnostic`
+- `POST /save_project`、`/load_project`、`/list_runs`、`/rerun_task`、`/export_report`
+
+启动示例：
 
 ```bash
-cargo run --manifest-path /Users/skahanium/Metrica/runtime/metrica-runtime/Cargo.toml -- serve
+cargo run --manifest-path /path/to/Metrica/runtime/metrica-runtime/Cargo.toml -- serve
 ```
 
-该服务只负责：
-
-- 接收结构化 `inspect_dataset` 请求
-- 接收结构化 `fit_model` 请求
-- 调用 Julia 子进程执行真实 OLS
-- 调用 Julia 子进程执行真实数据检查
-- 返回结构化成功或失败响应
+该服务负责接收结构化请求、调用持久化 Julia 会话执行真实任务，并返回结构化成功或失败响应；**不**在 Rust 层实现计量估计。

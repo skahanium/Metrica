@@ -71,6 +71,17 @@
 - 具体组件实现细节
 - 对根目录总体蓝图的覆盖权
 
+### `docs/superpowers/plans/2026-05-16-s5-execution-plan.md`
+
+拥有：
+
+- 当前阶段（`S5`）唯一活跃实施计划锚点
+- 跨分期执行顺序与验证习惯提醒
+
+不拥有：
+
+- 替代总规或路线图的完整分期规格（须回链总规与 `docs/roadmap/s5-advanced-research-topics.md`）
+
 ### `docs/superpowers/specs/2026-04-30-metrica-main-design.md`
 
 拥有：
@@ -107,10 +118,9 @@
 
 拥有：
 
-- 桌面工作台技术选型
-- 桌面工作台信息架构与布局
-- 数据网格、结果展示、可视化、教学交互在 App 侧的设计方向
-- App 壳层实施阶段
+- 当前桌面宿主（`tao` + `wry`）与 `metrica://` 原生桥、`Runtime` HTTP 客户端分工
+- CLI-first 主界面结构、主要 React 模块与目录对应关系
+- 数据网格与图表在 App 侧的实际用法（以代码为准）
 
 不拥有：
 
