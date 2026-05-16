@@ -23,6 +23,31 @@ using MetricaSurvey
 using MetricaTimeSeries
 using LinearAlgebra: I
 
+# 与桥接脚本一致：非有限浮点数序列化为 null，满足 JSON 规范。
+function sanitize_json_floats(x::AbstractFloat)
+    return isfinite(x) ? x : nothing
+end
+sanitize_json_floats(x::Integer) = x
+sanitize_json_floats(x::Bool) = x
+sanitize_json_floats(x::AbstractString) = x
+sanitize_json_floats(::Nothing) = nothing
+function sanitize_json_floats(x::AbstractDict)
+    Dict(k => sanitize_json_floats(v) for (k, v) in pairs(x))
+end
+function sanitize_json_floats(x::AbstractVector)
+    map(sanitize_json_floats, x)
+end
+sanitize_json_floats(x) = x
+
+function runtime_fit_envelope(result_payload::AbstractDict)
+    Dict{String, Any}(
+        "status" => "success",
+        "messages" => Any[],
+        "result_payload" => result_payload,
+        "artifacts" => Any[],
+    )
+end
+
 function handle_request(req::Dict{String, Any})
     id = get(req, "id", nothing)
     payload = nothing
@@ -93,19 +118,81 @@ function handle_request(req::Dict{String, Any})
             model_type = get(params, "model_type", "ols")
             include_augment = get(params, "return_augment", false)
 
-            if haskey(MetricaBase.MODEL_REGISTRY, model_type)
+            if model_type in ("arima", "var", "unitroot", "cointegration")
+                # 时间序列不在 MODEL_REGISTRY 中，必须先于注册表分支处理。
+                data = CSV.read(dataset_path, DataFrame)
+                time_col = Symbol(get(params, "time_column", "time"))
+
+                if model_type == "arima"
+                    var_sym = Symbol(get(params, "variable", first(names(data))))
+                    order_arr = get(params, "order", [1, 1, 0])
+                    length(order_arr) == 3 || error("order must have 3 elements [p, d, q]")
+                    order_tuple = Tuple(Int.(order_arr))
+                    seasonal_arr = get(params, "seasonal_order", [0, 0, 0, 0])
+                    length(seasonal_arr) == 4 || error("seasonal_order must have 4 elements [P, D, Q, S]")
+                    seasonal_tuple = Tuple(Int.(seasonal_arr))
+                    ts_method = Symbol(get(params, "ts_method", "mle"))
+                    model = ARIMAModel(
+                        variable=var_sym,
+                        time_column=time_col,
+                        order=order_tuple,
+                        seasonal_order=seasonal_tuple,
+                        method=ts_method,
+                    )
+                elseif model_type == "var"
+                    vars_raw = get(params, "variables", String[])
+                    var_syms = Symbol.(String.(vars_raw))
+                    lags = Int(get(params, "lags", 1))
+                    model = VARModel(
+                        variables=var_syms,
+                        time_column=time_col,
+                        lags=lags,
+                    )
+                elseif model_type == "unitroot"
+                    var_sym = Symbol(get(params, "variable", first(names(data))))
+                    det = Symbol(get(params, "deterministic", "constant"))
+                    lags_val = Int(get(params, "lags", 0))
+                    model = UnitRootModel(
+                        variable=var_sym,
+                        time_column=time_col,
+                        deterministic=det,
+                        max_lags=lags_val,
+                    )
+                else  # cointegration
+                    vars_raw = get(params, "variables", String[])
+                    var_syms = Symbol.(String.(vars_raw))
+                    method_sym = Symbol(get(params, "ts_method", "engle_granger"))
+                    lags = Int(get(params, "lags", 1))
+                    det = Symbol(get(params, "deterministic", "constant"))
+                    model = CointegrationModel(
+                        variables=var_syms,
+                        time_column=time_col,
+                        method=method_sym,
+                        lags=lags,
+                        deterministic=det,
+                    )
+                end
+
+                result = MetricaBase.fit(model, data)
+                payload = runtime_fit_envelope(
+                    MetricaTimeSeries.result_to_payload(result; include_augment=include_augment),
+                )
+            elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]
 
                 # 构造 kwargs
                 kwargs = Dict{Symbol, Any}()
-                vcov_type = get(params, "vcov", "classical")
-                vcov_key = lowercase(String(vcov_type))
-                vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
-                kwargs[:vcov] = vcov_symbol
-                weights = get(params, "weights", nothing)
-                if !isnothing(weights) && !isempty(weights); kwargs[:weights] = Symbol(weights); end
-                cluster_col = get(params, "cluster_column", nothing)
-                if !isnothing(cluster_col) && !isempty(cluster_col); kwargs[:cluster_column] = Symbol(cluster_col); end
+                # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字。
+                if !(model_type in ("ipw", "aipw", "psm"))
+                    vcov_type = get(params, "vcov", "classical")
+                    vcov_key = lowercase(String(vcov_type))
+                    vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
+                    kwargs[:vcov] = vcov_symbol
+                    weights = get(params, "weights", nothing)
+                    if !isnothing(weights) && !isempty(weights); kwargs[:weights] = Symbol(weights); end
+                    cluster_col = get(params, "cluster_column", nothing)
+                    if !isnothing(cluster_col) && !isempty(cluster_col); kwargs[:cluster_column] = Symbol(cluster_col); end
+                end
 
                 # 面板特有参数
                 if model_type in ("panel", "panel_iv", "did", "event_study")
@@ -165,78 +252,19 @@ function handle_request(req::Dict{String, Any})
                     end
                 end
 
-                # 时间序列模型使用结构体构造 + DataFrame 拟合
-                if model_type in ("arima", "var", "unitroot", "cointegration")
-                    data = CSV.read(dataset_path, DataFrame)
-                    time_col = Symbol(get(params, "time_column", "time"))
+                result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
 
-                    if model_type == "arima"
-                        var_sym = Symbol(get(params, "variable", first(names(data))))
-                        order_arr = get(params, "order", [1, 1, 0])
-                        length(order_arr) == 3 || error("order must have 3 elements [p, d, q]")
-                        order_tuple = Tuple(Int.(order_arr))
-                        seasonal_arr = get(params, "seasonal_order", [0, 0, 0, 0])
-                        length(seasonal_arr) == 4 || error("seasonal_order must have 4 elements [P, D, Q, S]")
-                        seasonal_tuple = Tuple(Int.(seasonal_arr))
-                        ts_method = Symbol(get(params, "ts_method", "mle"))
-                        model = ARIMAModel(
-                            variable=var_sym,
-                            time_column=time_col,
-                            order=order_tuple,
-                            seasonal_order=seasonal_tuple,
-                            method=ts_method,
-                        )
-                    elseif model_type == "var"
-                        vars_raw = get(params, "variables", String[])
-                        var_syms = Symbol.(String.(vars_raw))
-                        lags = Int(get(params, "lags", 1))
-                        model = VARModel(
-                            variables=var_syms,
-                            time_column=time_col,
-                            lags=lags,
-                        )
-                    elseif model_type == "unitroot"
-                        var_sym = Symbol(get(params, "variable", first(names(data))))
-                        det = Symbol(get(params, "deterministic", "constant"))
-                        lags_val = Int(get(params, "lags", 0))
-                        model = UnitRootModel(
-                            variable=var_sym,
-                            time_column=time_col,
-                            deterministic=det,
-                            max_lags=lags_val,
-                        )
-                    else  # cointegration
-                        vars_raw = get(params, "variables", String[])
-                        var_syms = Symbol.(String.(vars_raw))
-                        method_sym = Symbol(get(params, "ts_method", "engle_granger"))
-                        lags = Int(get(params, "lags", 1))
-                        det = Symbol(get(params, "deterministic", "constant"))
-                        model = CointegrationModel(
-                            variables=var_syms,
-                            time_column=time_col,
-                            method=method_sym,
-                            lags=lags,
-                            deterministic=det,
-                        )
-                    end
-
-                    result = MetricaBase.fit(model, data)
-                    payload = MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
+                # 分派 result_to_payload
+                if result isa MetricaCausal.AbstractCausalFitResult
+                    payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
+                    payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaSurvey.AbstractSurveyFitResult
+                    payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
+                elseif model_type in ("panel", "panel_iv")
+                    payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 else
-                    result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
-
-                    # 分派 result_to_payload
-                    if result isa MetricaCausal.AbstractCausalFitResult
-                        payload = MetricaCausal.result_to_payload(result; include_augment=include_augment)
-                    elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
-                        payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
-                    elseif result isa MetricaSurvey.AbstractSurveyFitResult
-                        payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
-                    elseif model_type in ("panel", "panel_iv")
-                        payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
-                    else
-                        payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
-                    end
+                    payload = MetricaLinear.result_to_payload(result; include_augment=include_augment)
                 end
             else
                 payload = Dict(
@@ -268,8 +296,12 @@ function handle_request(req::Dict{String, Any})
 
             payload = Dict(
                 "status" => "success",
-                "content" => content,
-                "format" => format,
+                "messages" => Any[],
+                "result_payload" => Dict(
+                    "content" => content,
+                    "format" => format,
+                ),
+                "artifacts" => Any[],
             )
         elseif action == "run_diagnostic"
             dataset_path = params["dataset_path"]
@@ -428,7 +460,7 @@ function handle_request(req::Dict{String, Any})
     end
 
     payload["id"] = id
-    println(JSON3.write(payload))
+    println(JSON3.write(sanitize_json_floats(payload)))
     flush(stdout)
 end
 

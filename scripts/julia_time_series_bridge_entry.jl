@@ -27,6 +27,31 @@ function tuple4_from_json(value, fallback::Tuple{Int,Int,Int,Int})
     return (values[1], values[2], values[3], values[4])
 end
 
+# 与主桥接一致：非有限浮点数序列化为 null，避免 JSON3 拒绝写入。
+function sanitize_json_floats(x::AbstractFloat)
+    return isfinite(x) ? x : nothing
+end
+sanitize_json_floats(x::Integer) = x
+sanitize_json_floats(x::Bool) = x
+sanitize_json_floats(x::AbstractString) = x
+sanitize_json_floats(::Nothing) = nothing
+function sanitize_json_floats(x::AbstractDict)
+    Dict(k => sanitize_json_floats(v) for (k, v) in pairs(x))
+end
+function sanitize_json_floats(x::AbstractVector)
+    map(sanitize_json_floats, x)
+end
+sanitize_json_floats(x) = x
+
+function runtime_fit_envelope(result_payload::AbstractDict)
+    Dict{String, Any}(
+        "status" => "success",
+        "messages" => Any[],
+        "result_payload" => result_payload,
+        "artifacts" => Any[],
+    )
+end
+
 function fit_time_series_model(model_type::String, model_spec, data)
     time_column = Symbol(String(model_spec.time_column))
     if model_type == "arima"
@@ -81,7 +106,7 @@ payload = try
         data = CSV.read(dataset_path, DataFrame)
         result = fit_time_series_model(model_type, request.model_spec, data)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
-        MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
+        runtime_fit_envelope(MetricaTimeSeries.result_to_payload(result; include_augment=include_augment))
     end
 catch err
     Dict(
@@ -95,4 +120,4 @@ catch err
     )
 end
 
-println(JSON3.write(payload))
+println(JSON3.write(sanitize_json_floats(payload)))

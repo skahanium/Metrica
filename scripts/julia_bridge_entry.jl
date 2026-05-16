@@ -16,8 +16,8 @@ using MetricaPanel
 using MetricaSurvey
 using MetricaTimeSeries
 
-include(joinpath(String(ARGS[2]), "packages", "MetricaDiagnostics.jl", "src", "MetricaDiagnostics.jl"))
-using .MetricaDiagnostics
+# 通过环境依赖加载，确保 `Distributions` 等传递依赖在 LOAD_PATH 中可用。
+using MetricaDiagnostics
 
 request = JSON3.read(ARGS[1])
 action = String(request.action)
@@ -26,6 +26,32 @@ dataset_path = String(request.dataset_ref.path)
 function present(value)
     return !isnothing(value) && !isempty(String(value))
 end
+
+# 将拟合结果字典包装为 Runtime / 守护进程统一的顶层 JSON 形状。
+function runtime_fit_envelope(result_payload::AbstractDict)
+    Dict{String, Any}(
+        "status" => "success",
+        "messages" => Any[],
+        "result_payload" => result_payload,
+        "artifacts" => Any[],
+    )
+end
+
+# 将非有限浮点数替换为 null，满足 JSON 规范（JSON3 默认拒绝 Inf/NaN）。
+function sanitize_json_floats(x::AbstractFloat)
+    return isfinite(x) ? x : nothing
+end
+sanitize_json_floats(x::Integer) = x
+sanitize_json_floats(x::Bool) = x
+sanitize_json_floats(x::AbstractString) = x
+sanitize_json_floats(::Nothing) = nothing
+function sanitize_json_floats(x::AbstractDict)
+    Dict(k => sanitize_json_floats(v) for (k, v) in pairs(x))
+end
+function sanitize_json_floats(x::AbstractVector)
+    map(sanitize_json_floats, x)
+end
+sanitize_json_floats(x) = x
 
 payload = if action == "inspect_dataset"
     options = get(request, :options, Dict{Symbol, Any}())
@@ -78,8 +104,12 @@ elseif action == "export_report"
 
     Dict(
         "status" => "success",
-        "content" => content,
-        "format" => format,
+        "messages" => Any[],
+        "result_payload" => Dict(
+            "content" => content,
+            "format" => format,
+        ),
+        "artifacts" => Any[],
     )
 else
     formula = String(request.model_spec.formula)
@@ -141,7 +171,7 @@ else
         end
 
         result = MetricaBase.fit(model, data)
-        MetricaTimeSeries.result_to_payload(result; include_augment=include_augment)
+        runtime_fit_envelope(MetricaTimeSeries.result_to_payload(result; include_augment=include_augment))
     elseif model_type in ("panel", "panel_iv")
         # 面板模型拟合
         panel_id = Symbol(String(request.model_spec.panel_id))
@@ -195,15 +225,18 @@ else
     else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()
-        vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
-        vcov_key = lowercase(vcov_type)
-        vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
-        kwargs[:vcov] = vcov_symbol
-        if haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights) && !isempty(request.model_spec.weights)
-            kwargs[:weights] = Symbol(String(request.model_spec.weights))
-        end
-        if haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column) && !isempty(request.model_spec.cluster_column)
-            kwargs[:cluster_column] = Symbol(String(request.model_spec.cluster_column))
+        # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字，避免 MethodError。
+        if !(model_type in ("ipw", "aipw", "psm"))
+            vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
+            vcov_key = lowercase(vcov_type)
+            vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
+            kwargs[:vcov] = vcov_symbol
+            if haskey(request.model_spec, :weights) && !isnothing(request.model_spec.weights) && !isempty(request.model_spec.weights)
+                kwargs[:weights] = Symbol(String(request.model_spec.weights))
+            end
+            if haskey(request.model_spec, :cluster_column) && !isnothing(request.model_spec.cluster_column) && !isempty(request.model_spec.cluster_column)
+                kwargs[:cluster_column] = Symbol(String(request.model_spec.cluster_column))
+            end
         end
         if haskey(request.model_spec, :treatment_column) && present(request.model_spec.treatment_column)
             kwargs[:treatment_column] = Symbol(String(request.model_spec.treatment_column))
@@ -233,4 +266,4 @@ else
         _payload
     end
 end
-println(JSON3.write(payload))
+println(JSON3.write(sanitize_json_floats(payload)))
