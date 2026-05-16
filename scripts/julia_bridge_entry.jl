@@ -200,7 +200,8 @@ else
 
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
         MetricaSurvey.result_to_payload(result; include_augment=include_augment)
-    elseif model_type in ("spatial_lag", "spatial_error", "spatial_slx")
+    elseif model_type in ("spatial_lag", "spatial_error", "spatial_slx",
+                          "spatial_sdm", "spatial_sdem", "spatial_sac", "spatial_probit")
         using CSV, DataFrames
         df = CSV.read(dataset_path, DataFrame)
         wd = ""
