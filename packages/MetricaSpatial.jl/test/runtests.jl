@@ -99,3 +99,49 @@ end
     @test "moran_z" in caps["diagnostics_available"]
     @test "direct_effects" in caps["effects_available"]
 end
+
+@testset "MetricaSpatial SDM 成功路径" begin
+    df = CSV.read(DEMO, DataFrame)
+    result = fit_spatial("spatial_sdm", "y ~ x1", df, Dict(
+        "spatial_weights_path" => joinpath(ROOT, "datasets", "demo", "spatial_demo_W.csv"),
+        "spatial_id_column" => "region",
+        "spatial_row_standardize" => true,
+    ), joinpath(ROOT, "datasets"))
+    @test result isa SpatialFitResult
+    @test result.model_kind == :spatial_sdm
+    @test haskey(result.diagnostics, :rho)
+    @test haskey(result.diagnostics, :lm_lag)
+end
+
+@testset "MetricaSpatial SAC 成功路径" begin
+    df = CSV.read(DEMO, DataFrame)
+    result = fit_spatial("spatial_sac", "y ~ x1", df, Dict(
+        "spatial_weights_path" => joinpath(ROOT, "datasets", "demo", "spatial_demo_W.csv"),
+        "spatial_id_column" => "region",
+    ), joinpath(ROOT, "datasets"))
+    @test result isa SpatialFitResult
+    @test result.model_kind == :spatial_sac
+    @test haskey(result.diagnostics, :lambda)
+end
+
+@testset "MetricaSpatial GWR 小样本成功" begin
+    coords = [0.0 0.0; 1.0 0.0; 0.0 1.0; 1.0 1.0; 0.5 0.5]
+    y = [1.0, 2.0, 1.5, 2.5, 2.0]
+    X = [ones(5) [0.5, 1.5, 0.5, 1.5, 1.0]]
+    result = fit_gwr(y, X, coords; bandwidth=2.0, kernel="gaussian")
+    @test result isa GWRFitResult
+    @test size(result.local_coefficients) == (5, 2)
+    @test length(result.fitted) == 5
+    @test result.kernel == "gaussian"
+end
+
+@testset "MetricaSpatial 权重构造 (kNN / distance-band)" begin
+    coords = [0.0 0.0; 1.0 0.0; 0.0 1.0; 1.0 1.0; 0.5 0.5]
+    edges_knn, meta_knn = build_knn_weights(coords, 2; distance_metric=:euclidean)
+    @test nrow(edges_knn) == 10  # 5 * 2
+    @test meta_knn[:method] == "knn"
+
+    edges_db, meta_db = build_distance_band_weights(coords, 2.0; distance_metric=:euclidean)
+    @test nrow(edges_db) >= 2  # at minimum the closest pair
+    @test meta_db[:method] == "distance_band"
+end
