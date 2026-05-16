@@ -17,7 +17,9 @@ MetricaGMM = "c4f8e9a1-2b3d-5e6f-7a8b-9c0d1e2f3a4b"
 MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 MetricaOutput = "10c70d11-b779-43d3-b8f2-49770e63c885"
 MetricaPanel = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+MetricaQuantile = "f212cb88-0759-40d3-bab4-b1a10623addb"
 MetricaSurvey = "7d3611f3-666b-40ba-b23f-c75757e1ca05"
+MetricaSystem = "e9e8e7e6-d5c4-b3a2-9180-76543210fedc"
 MetricaTimeSeries = "3da64bf2-aa4b-4146-a451-f808af01572a"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
@@ -31,7 +33,9 @@ MetricaGMM = {path = "../MetricaGMM.jl"}
 MetricaLinear = {path = "../MetricaLinear.jl"}
 MetricaOutput = {path = "../MetricaOutput.jl"}
 MetricaPanel = {path = "../MetricaPanel.jl"}
+MetricaQuantile = {path = "../MetricaQuantile.jl"}
 MetricaSurvey = {path = "../MetricaSurvey.jl"}
+MetricaSystem = {path = "../MetricaSystem.jl"}
 MetricaTimeSeries = {path = "../MetricaTimeSeries.jl"}
 
 [compat]

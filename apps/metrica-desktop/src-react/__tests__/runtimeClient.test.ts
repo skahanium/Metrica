@@ -150,6 +150,35 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.dpgmm_style).toBe('difference');
     expect(req.model_spec.collapse_instruments).toBe(false);
   });
+
+  it('passes sur equations and optional sur_max_iter', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'sur.csv',
+      formula: '',
+      modelType: 'sur',
+      equations: ['y1 ~ x1', 'y2 ~ x2'],
+      surMaxIter: 8,
+      surTol: 1e-5,
+    });
+    expect(req.model_spec.model_type).toBe('sur');
+    expect(req.model_spec.equations).toEqual(['y1 ~ x1', 'y2 ~ x2']);
+    expect(req.model_spec.sur_max_iter).toBe(8);
+    expect(req.model_spec.sur_tol).toBe(1e-5);
+    expect(req.model_spec.vcov).toBeUndefined();
+  });
+
+  it('passes system_2sls structured IV arrays', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 's.csv',
+      formula: '',
+      modelType: 'system_2sls',
+      equations: ['y1 ~ x1 + x2'],
+      systemEndogenous: [['x1']],
+      systemInstruments: [['z1']],
+    });
+    expect(req.model_spec.system_endogenous).toEqual([['x1']]);
+    expect(req.model_spec.system_instruments).toEqual([['z1']]);
+  });
 });
 
 describe('transformDataset', () => {

@@ -36,6 +36,7 @@ const METRIC_LABELS: Record<string, string> = {
   r2_within: '组内 R²',
   r2_between: '组间 R²',
   r2_overall: '整体 R²',
+  tau: '分位点 τ',
 };
 
 function formatMetric(key: string, value: number): string {

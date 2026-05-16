@@ -21,6 +21,10 @@ describe('tokenize', () => {
   it('handles multiple spaces', () => {
     expect(tokenize('regress   y    x1')).toEqual(['regress', 'y', 'x1']);
   });
+
+  it('preserves quantile(...) as single option token', () => {
+    expect(tokenize('qreg y x1 x2, quantile(0.5)')).toEqual(['qreg', 'y', 'x1', 'x2', ',', 'quantile(0.5)']);
+  });
 });
 
 describe('parse', () => {
@@ -30,6 +34,12 @@ describe('parse', () => {
     expect(r.positionals).toEqual(['gdp', 'inflation', 'year']);
     expect(r.options).toEqual([]);
     expect(r.error).toBeUndefined();
+  });
+
+  it('parses sur with parenthesis equation blocks', () => {
+    const r = parse('sur (y1 x1 x2) (y2 x1 x2)');
+    expect(r.verb).toBe('sur');
+    expect(r.positionals).toEqual(['(y1 x1 x2)', '(y2 x1 x2)']);
   });
 
   it('parses regress with options', () => {
@@ -97,6 +107,35 @@ describe('parse', () => {
 });
 
 describe('parseToModelSpec', () => {
+  it('converts sur to ModelSpec with equations', () => {
+    const r = parse('sur (y1 x1 x2) (y2 x1 x2)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('sur');
+      expect(spec.formula).toBe('');
+      expect(spec.equations).toEqual(['y1 ~ x1 + x2', 'y2 ~ x1 + x2']);
+    }
+  });
+
+  it('converts reg3 to system_2sls with pipe segments', () => {
+    const r = parse('reg3 (y1 x1 x2), endogenous(x1) instruments(z1)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('system_2sls');
+      expect(spec.equations).toEqual(['y1 ~ x1 + x2']);
+      expect(spec.system_endogenous).toEqual([['x1']]);
+      expect(spec.system_instruments).toEqual([['z1']]);
+    }
+  });
+
+  it('converts reg3 method(3sls) to system_3sls', () => {
+    const r = parse('reg3 (y1 x1 x2), endogenous(x1) instruments(z1) method(3sls)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('system_3sls');
+    }
+  });
+
   it('converts regress to ols ModelSpec', () => {
     const r = parse('regress gdp inflation year, robust');
     const spec = parseToModelSpec(r);
@@ -147,6 +186,33 @@ describe('parseToModelSpec', () => {
       expect(spec.model_type).toBe('gmm_linear');
       expect(spec.gmm_weight).toBeUndefined();
     }
+  });
+
+  it('converts qreg with quantile(0.5) to quantile ModelSpec', () => {
+    const r = parse('qreg y x1 x2, quantile(0.5)');
+    const spec = parseToModelSpec(r);
+    expect(spec).not.toHaveProperty('error');
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('quantile');
+      expect(spec.formula).toBe('y ~ x1 + x2');
+      expect(spec.quantile_tau).toBe(0.5);
+      expect(spec.vcov).toBeUndefined();
+    }
+  });
+
+  it('defaults qreg tau to 0.5 when quantile omitted', () => {
+    const r = parse('qreg y x1 x2');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('quantile');
+      expect(spec.quantile_tau).toBe(0.5);
+    }
+  });
+
+  it('rejects illegal quantile boundary', () => {
+    const r = parse('qreg y x1, quantile(1)');
+    const spec = parseToModelSpec(r);
+    expect(spec).toHaveProperty('error');
   });
 
   it('converts xtivreg to panel IV ModelSpec', () => {

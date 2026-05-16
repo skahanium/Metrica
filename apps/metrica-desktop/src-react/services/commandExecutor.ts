@@ -31,6 +31,7 @@ function getActivePath() { return useDatasetStore.getState().activePath; }
 
 function normalizeTidyRow(raw: Record<string, unknown>): Record<string, unknown> {
   return {
+    equation: raw.equation ?? undefined,
     term: raw.name ?? raw.term ?? '',
     estimate: raw.estimate ?? null,
     std_error: raw.stderror ?? raw.std_error ?? null,
@@ -749,6 +750,12 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         tsMethod: spec.ts_method || '',
         orderP: spec.order?.[0], orderD: spec.order?.[1], orderQ: spec.order?.[2],
         strataColumn: spec.strata_column || '', psuColumn: spec.psu_column || '', fpcColumn: spec.fpc_column || '',
+        equations: spec.equations,
+        systemEndogenous: spec.system_endogenous,
+        systemInstruments: spec.system_instruments,
+        surMaxIter: spec.sur_max_iter,
+        surTol: spec.sur_tol,
+        quantileTau: spec.quantile_tau,
       });
       const payload = (result as TaskResponse).result_payload as Record<string, unknown> | undefined;
       const rr = (result as TaskResponse).run_record;

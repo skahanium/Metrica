@@ -244,6 +244,10 @@ const grammars: CommandGrammar[] = [
     noconstant: optionValue('noconstant', false, ['true']),
     weights: optionValue('weights', false),
   }),
+  makeModelGrammar('qreg', '线性分位数回归（单分位点 τ；缺省 0.5）', {
+    quantile: optionValue('quantile', false),
+    noconstant: optionValue('noconstant', false, ['true']),
+  }),
   makeModelGrammar('ivregress', '工具变量回归（2SLS）', {
     endogenous: optionValue('endogenous', false),
     instruments: optionValue('instruments', false),
@@ -253,6 +257,39 @@ const grammars: CommandGrammar[] = [
     instruments: optionValue('instruments', false),
     weight: { kind: 'option_value', label: 'weight', required: false, multiple: false, values: ['one_step', 'two_step'] },
   }),
+  {
+    verb: 'sur',
+    description: '似不相关回归（SUR / FGLS）；各方程写作括号块 (y x1 x2)',
+    category: 'model',
+    syntax: [
+      { kind: 'indepvar', label: '方程块', required: true, multiple: true },
+      { kind: 'comma', label: ',', required: false, multiple: false },
+      modelOptions({
+        maxiter: optionValue('maxiter', false),
+        tol: optionValue('tol', false),
+      }),
+    ],
+  },
+  {
+    verb: 'reg3',
+    description: '多方程 2SLS / 3SLS：括号块 + endogenous(...|...) + instruments(...|...) + method(3sls)',
+    category: 'model',
+    syntax: [
+      { kind: 'indepvar', label: '方程块', required: true, multiple: true },
+      { kind: 'comma', label: ',', required: true, multiple: false },
+      {
+        kind: 'option',
+        label: '选项',
+        required: true,
+        multiple: true,
+        children: {
+          endogenous: optionValue('endogenous', true),
+          instruments: optionValue('instruments', true),
+          method: { kind: 'option_value', label: 'method', required: false, multiple: false, values: ['3sls', 'twostep'] },
+        },
+      },
+    ],
+  },
   makeModelGrammar('gls', '广义最小二乘法（GLS）', {
     weights: optionValue('weights', false),
   }),

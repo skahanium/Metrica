@@ -5,7 +5,7 @@ import type { TidyRow, ModelResult } from '../types/protocol';
 
 const { Text } = Typography;
 
-const COLUMNS: TableColumnsType<TidyRow> = [
+const BASE_COLUMNS: TableColumnsType<TidyRow> = [
   { dataIndex: 'term', title: '参数', width: 180 },
   { dataIndex: 'estimate', title: '估计值', align: 'right', render: (v: number | null) => v != null ? v.toFixed(6) : '—' },
   { dataIndex: 'std_error', title: '标准误', align: 'right', render: (v: number | null) => v != null ? v.toFixed(6) : '—' },
@@ -18,11 +18,14 @@ const COLUMNS: TableColumnsType<TidyRow> = [
 /** 将后端字段名 (name/stderror/pvalue) 映射为前端 TidyRow 字段名 */
 function normalizeRows(raw: Record<string, unknown>[]): TidyRow[] {
   return raw.map((r) => ({
+    equation: (r.equation as string | undefined) || undefined,
     term: (r.name ?? r.term ?? '') as string,
     estimate: (r.estimate ?? null) as number | null,
     std_error: (r.stderror ?? r.std_error ?? null) as number | null,
     statistic: (r.statistic ?? null) as number | null,
     p_value: (r.pvalue ?? r.p_value ?? null) as number | null,
+    ci_lower: (r.ci_lower ?? undefined) as number | undefined,
+    ci_upper: (r.ci_upper ?? undefined) as number | undefined,
   }));
 }
 
@@ -36,6 +39,19 @@ export function TidyTable({ result }: TidyTableProps) {
     [result],
   );
 
+  const showEquation = useMemo(() => rowData.some((r) => !!r.equation), [rowData]);
+
+  const columns = useMemo(() => {
+    if (!showEquation) return BASE_COLUMNS;
+    const eqCol: TableColumnsType<TidyRow>[0] = {
+      dataIndex: 'equation',
+      title: '方程',
+      width: 200,
+      ellipsis: true,
+    };
+    return [eqCol, ...BASE_COLUMNS];
+  }, [showEquation]);
+
   if (!result || !rowData.length) return null;
 
   return (
@@ -46,10 +62,10 @@ export function TidyTable({ result }: TidyTableProps) {
       <div style={{ overflowX: 'auto' }}>
         <Table<TidyRow>
           bordered
-          columns={COLUMNS}
+          columns={columns}
           dataSource={rowData}
           pagination={false}
-          rowKey="term"
+          rowKey={(r) => `${r.equation ?? ''}::${r.term}`}
           size="small"
         />
       </div>

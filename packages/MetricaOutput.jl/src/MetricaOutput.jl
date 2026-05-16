@@ -17,6 +17,18 @@ end
 """
 function summary_card(glance::MetricaBase.ModelGlance)
     metrics = glance.metrics
+    if glance.model === :quantile
+        return join(
+            [
+                "模型：$(glance.model)",
+                "样本量：$(glance.nobs)",
+                "自由度：$(glance.dof)",
+                "τ：$(metric_value_text(metrics, :tau))",
+                "伪 R²（McFadden）：$(metric_value_text(metrics, :pseudo_r2))",
+            ],
+            " | ",
+        )
+    end
     return join(
         [
             "模型：$(glance.model)",

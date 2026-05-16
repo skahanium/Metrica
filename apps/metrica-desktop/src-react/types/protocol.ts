@@ -16,6 +16,9 @@ export interface CliFeedback {
 export interface Warning {
   title: string;
   detail: string;
+  code?: string;
+  hint?: string;
+  severity?: string;
 }
 
 export interface Message {
@@ -86,6 +89,14 @@ export interface DiscreteDiagnostics {
   deviance?: number;
 }
 
+/** S5.3：系统方程在 `result_payload.diagnostics` 中的扩展键 */
+export interface SystemEquationsDiagnostics {
+  system_method?: string;
+  sigma_residual?: { dim?: number; matrix?: number[][] };
+  equation_correlation?: { dim?: number; matrix?: number[][] };
+  iterations?: number;
+}
+
 /** 线性 GMM（Runtime `result_payload.diagnostics`） */
 export interface GmmDiagnostics {
   j_statistic?: number;
@@ -110,6 +121,16 @@ export interface GmmDiagnostics {
   dpgmm_style?: string;
 }
 
+/** 分位数回归（`result_payload.diagnostics`） */
+export interface QuantileDiagnostics {
+  tau?: number;
+  inference_kind?: string;
+  rank_X?: number;
+  cond_X?: number;
+  solver?: string;
+  pseudo_r2_definition?: string;
+}
+
 export interface OddsRatioEntry {
   term: string;
   odds_ratio: number;
@@ -129,9 +150,13 @@ export interface GlanceResult {
   nobs: number;
   dof: number;
   metrics: Record<string, number>;
+  /** 方程级 glance 等场景下的结构化警告 */
+  warnings?: Warning[];
 }
 
 export interface TidyRow {
+  /** 多方程合并 `tidy` 时标识所属方程（如 `y1 ~ x1 + x2`） */
+  equation?: string;
   term: string;
   estimate: number | null;
   std_error: number | null;
@@ -151,8 +176,10 @@ export interface AugmentRow {
 
 export interface ModelResult {
   glance: GlanceResult;
+  /** 按方程的 glance（SUR / 系统 IV）；与顶层 `glance` 并存 */
+  equation_glances?: GlanceResult[];
   tidy: TidyRow[];
-  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics;
+  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics;
   odds_ratios?: OddsRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
@@ -392,7 +419,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -431,6 +458,18 @@ export interface ModelSpec {
   strata_column?: string;
   psu_column?: string;
   fpc_column?: string;
+  /** `sur` / `system_2sls` / `system_3sls`：各方程公式字符串（与 CLI 括号块一一对应） */
+  equations?: string[];
+  /** `system_2sls` / `system_3sls`：按方程分组的内生变量名 */
+  system_endogenous?: string[][];
+  /** `system_2sls` / `system_3sls`：按方程分组的外生工具列名 */
+  system_instruments?: string[][];
+  /** 仅 `sur`：FGLS 最大迭代次数 */
+  sur_max_iter?: number;
+  /** 仅 `sur`：系数变化收敛阈值 */
+  sur_tol?: number;
+  /** 仅 `quantile`：单分位点 τ（开区间 (0,1)） */
+  quantile_tau?: number;
 }
 
 export interface FitModelRequest {

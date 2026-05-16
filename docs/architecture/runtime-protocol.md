@@ -57,7 +57,8 @@
 
 | 模型族 | `model_type` 取值（当前） |
 |--------|---------------------------|
-| 线性 | `ols`、`iv`、`gmm_linear`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
+| 线性 | `ols`、`iv`、`gmm_linear`、`quantile`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
+| 系统方程（S5.3） | `sur`、`system_2sls`、`system_3sls`（`packages/MetricaSystem.jl`） |
 | 面板 | `panel`、`panel_iv`、`dynamic_panel_gmm` |
 | 时间序列 | `arima`、`var`、`unitroot`、`cointegration` |
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
@@ -70,6 +71,21 @@
 - 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
 - 在 Julia 侧注册 `MODEL_REGISTRY`（若适用）并在桥接入口增加派发分支；同步更新本文件上表与 CLI 语法文档。
 - 详见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
+
+### `quantile`（线性分位数回归，单 τ）
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `quantile` |
+| `quantile_tau` | 数 | 否 | 分位点 \(\tau\)；JSON 省略时按 **0.5** 处理；Runtime 要求 **有限** 且 **\(10^{-8} < \tau < 1-10^{-8}\)**。 |
+
+**不转发字段：** 桥接对 `quantile` 不传 `vcov` / `weights` / `cluster`（与 `gmm_linear` 相同），避免 `MethodError`。推断为首期 **渐近核** 口径（见 Julia `diagnostics.inference_kind`）。
+
+**`result_payload`：** 与线性族相同的 `glance` / `tidy` / `warnings` 结构；`glance.metrics` 含 **`tau`**、**`pseudo_r2`**（McFadden 型 check 损失比）。`diagnostics` 含 `tau`、`inference_kind`（如 `asymptotic_kernel`）、`rank_X`、`cond_X`、`solver`（如 `QuantileRegressions.IP`）、`pseudo_r2_definition` 等。
+
+**CLI（App）：** `qreg y x1 x2, quantile(0.5)`；省略 `quantile(...)` 时默认 \(\tau=0.5\)。教程见 [`tutorials/s5-quantile-regression.md`](../../tutorials/s5-quantile-regression.md)。
 
 ### `gmm_linear`（线性 IV-GMM）
 
@@ -120,6 +136,33 @@
 **不转发字段：** 与 `gmm_linear` 相同，桥接对 `dynamic_panel_gmm` 不传 `vcov` / `weights` / `cluster`。
 
 **`result_payload.diagnostics`：** 含 S5.1 兼容键 `j_statistic`、`j_df`、`j_pvalue`、`n_moments`、`n_params`、`gmm_weight`、`weight_matrix_description`、`iterations`；并含 `ar1_test`、`ar2_test`（对象：`statistic`、`pvalue`、`description`）、`hansen_j`（对象）、`n_instruments`、`n_groups`、`n_periods`、`n_obs_diff`、`instrument_lags`、`dpgmm_style`。
+
+### `sur` / `system_2sls` / `system_3sls`（S5.3 多方程系统）
+
+**共同约定：** `formula` 可为空字符串；**方程列表**由 `equations: string[]` 承载（各方程为 StatsModels 单行公式，如 `y1 ~ x1 + x2`）。全系统在各方程涉及列**并集**上做 listwise 删行；删行信息在 `warnings` / `messages` 中结构化报告。
+
+**Runtime 校验：** 方程数 **1–8**；`system_2sls` / `system_3sls` 要求 `system_endogenous`、`system_instruments` 外层长度与 `equations` 长度一致。
+
+**`ModelSpec` 字段：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | `sur` / `system_2sls` / `system_3sls` |
+| `equations` | 字符串数组 | 是 | 每方程一条公式 |
+| `system_endogenous` | 字符串的数组的数组 | `system_*` 必填 | 按方程分组的内生解释变量列名 |
+| `system_instruments` | 字符串的数组的数组 | `system_*` 必填 | 按方程分组的外生工具列名 |
+| `sur_max_iter` | 整数，可选 | 否 | 仅 `sur`：FGLS 最大迭代次数 |
+| `sur_tol` | 数，可选 | 否 | 仅 `sur`：系数变化收敛阈值 |
+
+**不转发字段：** 桥接对 `sur` / `system_2sls` / `system_3sls` 不传 `vcov` / `weights` / `cluster`（与 `gmm_linear` 相同），避免 `MethodError`。
+
+**`result_payload` 扩展：**
+
+- `equation_glances`：数组，元素形状与顶层 `glance` 类似（`model`、`nobs`、`dof`、`metrics`、`warnings`），按方程索引。
+- `tidy`：合并系数表；每行含 **`equation`**（方程公式字符串）及与单方程一致的系数字段（`name` / `estimate` / `stderror` / …）。
+- `diagnostics`：**`system_method`**（如 `sur_fgls`、`2sls`、`3sls`）、**`sigma_residual`**（对象：`dim`、`matrix` 为方阵行主序）、**`equation_correlation`**（若实现则同结构）、**`iterations`**（若适用）。
+
+**CLI（App）：** `sur (y1 x1 x2) (y2 x1 x2)`；`reg3 (y1 x1 x2), endogenous(x1) instruments(z1) method(3sls)`；多方程时 `endogenous` / `instruments` 内用 **`|`** 分隔方程段，与上述二维数组一一对应。教程见 [`tutorials/s5-sur-system.md`](../../tutorials/s5-sur-system.md)。
 
 ## Julia 进程模型
 

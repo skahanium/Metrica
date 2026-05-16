@@ -14,6 +14,7 @@ using DataFrames
 using MetricaBase
 using MetricaLinear
 using MetricaGMM
+using MetricaQuantile
 using MetricaOutput
 using MetricaDiscrete
 using MetricaCausal
@@ -21,6 +22,7 @@ using MetricaDiagnostics
 using MetricaPanel
 using MetricaData
 using MetricaSurvey
+using MetricaSystem
 using MetricaTimeSeries
 using LinearAlgebra: I
 
@@ -127,7 +129,7 @@ function handle_request(req::Dict{String, Any})
                 # 构造 kwargs
                 kwargs = Dict{Symbol, Any}()
                 # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字。
-                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm"))
+                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm", "sur", "system_2sls", "system_3sls", "quantile"))
                     vcov_type = get(params, "vcov", "classical")
                     vcov_key = lowercase(String(vcov_type))
                     vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -155,6 +157,9 @@ function handle_request(req::Dict{String, Any})
                 end
                 if model_type == "gmm_linear"
                     kwargs[:gmm_weight] = String(get(params, "gmm_weight", "two_step"))
+                end
+                if model_type == "quantile"
+                    kwargs[:quantile_tau] = Float64(get(params, "quantile_tau", 0.5))
                 end
                 if model_type == "dynamic_panel_gmm"
                     raw_il = get(params, "instrument_lags", Any[2, 4])
@@ -207,6 +212,29 @@ function handle_request(req::Dict{String, Any})
                     end
                 end
 
+                if model_type in ("sur", "system_2sls", "system_3sls")
+                    raw_eq = get(params, "equations", nothing)
+                    kwargs[:equations] = raw_eq === nothing ? String[] : String.(collect(raw_eq))
+                    if model_type != "sur"
+                        raw_se = get(params, "system_endogenous", nothing)
+                        raw_si = get(params, "system_instruments", nothing)
+                        kwargs[:system_endogenous] = [
+                            String.(collect(row)) for row in (raw_se === nothing ? [] : collect(raw_se))
+                        ]
+                        kwargs[:system_instruments] = [
+                            String.(collect(row)) for row in (raw_si === nothing ? [] : collect(raw_si))
+                        ]
+                    end
+                    if model_type == "sur"
+                        if haskey(params, "sur_max_iter") && params["sur_max_iter"] !== nothing
+                            kwargs[:sur_max_iter] = Int(params["sur_max_iter"])
+                        end
+                        if haskey(params, "sur_tol") && params["sur_tol"] !== nothing
+                            kwargs[:sur_tol] = Float64(params["sur_tol"])
+                        end
+                    end
+                end
+
                 result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
 
                 # 分派 result_to_payload
@@ -218,6 +246,10 @@ function handle_request(req::Dict{String, Any})
                     payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaGMM.GMMLinearFitResult
                     payload = MetricaGMM.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaQuantile.QuantileFitResult
+                    payload = MetricaQuantile.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaSystem.SystemEquationsFitResult
+                    payload = MetricaSystem.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaPanel.DynamicPanelGMMFitResult
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")

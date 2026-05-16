@@ -50,6 +50,7 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("ols", vec![]),
         ("iv", vec!["instruments", "endog_columns"]),
         ("gmm_linear", vec!["instruments", "endog_columns"]),
+        ("quantile", vec![]),
         ("gls", vec![]),
         ("panel", vec!["panel_id", "panel_time"]),
         ("panel_iv", vec!["panel_id", "panel_time", "instruments", "endog_columns"]),
@@ -75,6 +76,9 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("survey_logit", vec!["weights_column"]),
         ("survey_probit", vec!["weights_column"]),
         ("survey_poisson", vec!["weights_column"]),
+        ("sur", vec!["equations"]),
+        ("system_2sls", vec!["equations", "system_endogenous", "system_instruments"]),
+        ("system_3sls", vec!["equations", "system_endogenous", "system_instruments"]),
     ])
 }
 
@@ -146,6 +150,18 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                         .instrument_lags
                         .as_ref()
                         .map(|v| if v.len() >= 2 { "present" } else { "" }),
+                    "equations" => spec
+                        .equations
+                        .as_ref()
+                        .map(|v| if v.is_empty() { "" } else { "present" }),
+                    "system_endogenous" => spec
+                        .system_endogenous
+                        .as_ref()
+                        .map(|v| if v.is_empty() { "" } else { "present" }),
+                    "system_instruments" => spec
+                        .system_instruments
+                        .as_ref()
+                        .map(|v| if v.is_empty() { "" } else { "present" }),
                     _ => Some("present"),
                 };
                 match value {
@@ -194,6 +210,67 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                             hint: Some("例如 JSON 数组 [2, 4]。".to_string()),
                         });
                     }
+                }
+            }
+            if matches!(
+                spec.model_type.as_str(),
+                "sur" | "system_2sls" | "system_3sls"
+            ) {
+                if let Some(ref eqs) = spec.equations {
+                    if eqs.len() > 8 {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!(
+                                "模型类型 `{}` 的方程数至多 8 条，收到 {} 条。",
+                                spec.model_type,
+                                eqs.len()
+                            ),
+                            hint: Some("请拆分模型或减少方程数。".to_string()),
+                        });
+                    }
+                }
+            }
+            if matches!(spec.model_type.as_str(), "system_2sls" | "system_3sls") {
+                let g = spec.equations.as_ref().map(|e| e.len()).unwrap_or(0);
+                if let Some(ref se) = spec.system_endogenous {
+                    if se.len() != g {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!(
+                                "system_endogenous 外层长度（{}）须等于方程数（{}）。",
+                                se.len(),
+                                g
+                            ),
+                            hint: Some("请与 equations 数组对齐。".to_string()),
+                        });
+                    }
+                }
+                if let Some(ref si) = spec.system_instruments {
+                    if si.len() != g {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!(
+                                "system_instruments 外层长度（{}）须等于方程数（{}）。",
+                                si.len(),
+                                g
+                            ),
+                            hint: Some("请与 equations 数组对齐。".to_string()),
+                        });
+                    }
+                }
+            }
+            if spec.model_type == "quantile" {
+                let tau = spec.quantile_tau.unwrap_or(0.5);
+                const EPS: f64 = 1e-8;
+                if !tau.is_finite() || tau <= EPS || tau >= 1.0 - EPS {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: format!(
+                            "分位数回归要求 quantile_tau 为有限数且满足 {EPS} < τ < {}。",
+                            1.0 - EPS
+                        ),
+                        hint: Some("请在 model_spec 中设置 quantile_tau，例如 0.5。".to_string()),
+                    });
                 }
             }
             None
@@ -347,6 +424,24 @@ pub struct ModelSpec {
     pub psu_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fpc_column: Option<String>,
+    /// `sur` / `system_2sls` / `system_3sls`：各方程公式字符串数组（至多 8 条）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub equations: Option<Vec<String>>,
+    /// `system_2sls` / `system_3sls`：按方程分组的内生变量名。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_endogenous: Option<Vec<Vec<String>>>,
+    /// `system_2sls` / `system_3sls`：按方程分组的外生工具列名。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_instruments: Option<Vec<Vec<String>>>,
+    /// 仅 `sur`：FGLS 最大迭代次数（默认 5）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sur_max_iter: Option<i32>,
+    /// 仅 `sur`：系数变化收敛阈值（默认 1e-6）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sur_tol: Option<f64>,
+    /// 仅 `quantile`：单分位点 τ；JSON 省略时 Julia 端按 0.5 处理，Runtime 仍要求落在开区间 (0,1)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantile_tau: Option<f64>,
 }
 
 // === 模型族类型（从 ModelSpec 转换，提供类型安全访问）=============================
@@ -796,6 +891,12 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             strata_column: None,
             psu_column: None,
             fpc_column: None,
+            equations: None,
+            system_endogenous: None,
+            system_instruments: None,
+            sur_max_iter: None,
+            sur_tol: None,
+            quantile_tau: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -873,6 +974,12 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         strata_column: None,
         psu_column: None,
         fpc_column: None,
+        equations: None,
+        system_endogenous: None,
+        system_instruments: None,
+        sur_max_iter: None,
+        sur_tol: None,
+        quantile_tau: None,
     };
     request.options.return_augment = true;
     request

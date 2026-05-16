@@ -12,9 +12,11 @@ using MetricaDiscrete
 using MetricaCausal
 using MetricaLinear
 using MetricaGMM
+using MetricaQuantile
 using MetricaOutput
 using MetricaPanel
 using MetricaSurvey
+using MetricaSystem
 using MetricaTimeSeries
 
 # 通过环境依赖加载，确保 `Distributions` 等传递依赖在 LOAD_PATH 中可用。
@@ -199,7 +201,7 @@ else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()
         # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字，避免 MethodError。
-        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm"))
+        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear", "dynamic_panel_gmm", "sur", "system_2sls", "system_3sls", "quantile"))
             vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
             vcov_key = lowercase(vcov_type)
             vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -232,6 +234,36 @@ else
                  String(request.model_spec.gmm_weight) : "two_step"
             kwargs[:gmm_weight] = gw
         end
+        if model_type == "quantile"
+            τ = if haskey(request.model_spec, :quantile_tau) && !isnothing(request.model_spec.quantile_tau)
+                Float64(request.model_spec.quantile_tau)
+            else
+                0.5
+            end
+            kwargs[:quantile_tau] = τ
+        end
+        if model_type in ("sur", "system_2sls", "system_3sls")
+            raw_eq = get(request.model_spec, :equations, nothing)
+            kwargs[:equations] = raw_eq === nothing ? String[] : String.(collect(raw_eq))
+            if model_type != "sur"
+                raw_se = get(request.model_spec, :system_endogenous, nothing)
+                raw_si = get(request.model_spec, :system_instruments, nothing)
+                kwargs[:system_endogenous] = [
+                    String.(collect(row)) for row in (raw_se === nothing ? [] : collect(raw_se))
+                ]
+                kwargs[:system_instruments] = [
+                    String.(collect(row)) for row in (raw_si === nothing ? [] : collect(raw_si))
+                ]
+            end
+            if model_type == "sur"
+                if haskey(request.model_spec, :sur_max_iter) && !isnothing(request.model_spec.sur_max_iter)
+                    kwargs[:sur_max_iter] = Int(request.model_spec.sur_max_iter)
+                end
+                if haskey(request.model_spec, :sur_tol) && !isnothing(request.model_spec.sur_tol)
+                    kwargs[:sur_tol] = Float64(request.model_spec.sur_tol)
+                end
+            end
+        end
         ModelT = MetricaBase.MODEL_REGISTRY[model_type]
         result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
@@ -241,6 +273,10 @@ else
             MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
         elseif result isa MetricaGMM.GMMLinearFitResult
             MetricaGMM.result_to_payload(result; include_augment=include_augment)
+        elseif result isa MetricaQuantile.QuantileFitResult
+            MetricaQuantile.result_to_payload(result; include_augment=include_augment)
+        elseif result isa MetricaSystem.SystemEquationsFitResult
+            MetricaSystem.result_to_payload(result; include_augment=include_augment)
         else
             MetricaLinear.result_to_payload(result; include_augment=include_augment)
         end

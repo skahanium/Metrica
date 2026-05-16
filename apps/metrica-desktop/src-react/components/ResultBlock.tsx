@@ -13,7 +13,9 @@ import { DEFFSummary } from './DEFFSummary';
 import { StrataSummary } from './StrataSummary';
 import { SurveyDesignPanel } from './SurveyDesignPanel';
 import { GmmDiagnosticsPanel } from './GmmDiagnosticsPanel';
-import type { GmmDiagnostics, ModelResult } from '../types/protocol';
+import { QuantileSummaryPanel } from './QuantileSummaryPanel';
+import { SystemEquationsPanel } from './SystemEquationsPanel';
+import type { GmmDiagnostics, ModelResult, QuantileDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -33,6 +35,14 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
     modelType === 'gmm_linear' || modelType === 'dynamic_panel_gmm';
   const gmmDiagnostics = showGmmDiagnostics ? (result.diagnostics as GmmDiagnostics | undefined) : undefined;
 
+  const showQuantileSummary = modelType === 'quantile';
+  const quantileDiagnostics = showQuantileSummary
+    ? (result.diagnostics as QuantileDiagnostics | undefined)
+    : undefined;
+
+  const showSystemEquations =
+    modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls';
+
   const handleCopy = () => {
     navigator.clipboard.writeText(command).catch(() => {});
   };
@@ -47,6 +57,10 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
 
       {/* Model content — 所有子组件通过 props 接收 result */}
       {result.glance && <GlanceTable result={result} />}
+      {showQuantileSummary && result.glance && (
+        <QuantileSummaryPanel glance={result.glance} diagnostics={quantileDiagnostics} />
+      )}
+      {showSystemEquations && <SystemEquationsPanel result={result} />}
       {isDiscrete && <DiscreteGlanceCards result={result} />}
       {modelType === 'did' && <DIDResultCards result={result} />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}

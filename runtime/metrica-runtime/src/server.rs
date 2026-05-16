@@ -339,6 +339,27 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(ref col) = request.model_spec.psu_column { params["psu_column"] = json!(col); }
     if let Some(ref col) = request.model_spec.fpc_column { params["fpc_column"] = json!(col); }
 
+    // S5.3：SUR / 系统 2SLS / 3SLS
+    if let Some(ref eqs) = request.model_spec.equations {
+        params["equations"] = json!(eqs);
+    }
+    if let Some(ref se) = request.model_spec.system_endogenous {
+        params["system_endogenous"] = json!(se);
+    }
+    if let Some(ref si) = request.model_spec.system_instruments {
+        params["system_instruments"] = json!(si);
+    }
+    if let Some(n) = request.model_spec.sur_max_iter {
+        params["sur_max_iter"] = json!(n);
+    }
+    if let Some(t) = request.model_spec.sur_tol {
+        params["sur_tol"] = json!(t);
+    }
+
+    if request.model_spec.model_type == "quantile" {
+        params["quantile_tau"] = json!(request.model_spec.quantile_tau.unwrap_or(0.5));
+    }
+
     params
 }
 

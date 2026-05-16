@@ -121,9 +121,9 @@ export function parse(input: string): ParsedCommand {
 // ---- 已知模型动词集合 ----
 
 const MODEL_VERBS = new Set([
-  'regress', 'ivregress', 'gmm', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
+  'regress', 'ivregress', 'gmm', 'qreg', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
-  'arima', 'var', 'dfuller', 'coint', 'svy',
+  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3',
 ]);
 
 // ---- 动词 -> model_type 映射 ----
@@ -133,6 +133,7 @@ function verbToModelType(verb: string): string {
     regress: 'ols',
     ivregress: 'iv',
     gmm: 'gmm_linear',
+    qreg: 'quantile',
     gls: 'gls',
     xtreg: 'panel',
     xtivreg: 'panel_iv',
@@ -156,6 +157,37 @@ function verbToModelType(verb: string): string {
   return map[verb] || verb;
 }
 
+/** 将 CLI 括号块 `(y x1 x2)` 转为单方程公式 `y ~ x1 + x2` */
+type ParenBlocksResult = { ok: true; equations: string[] } | { ok: false; error: string };
+
+function parseParenEquationBlocks(positionals: string[]): ParenBlocksResult {
+  if (positionals.length === 0) {
+    return { ok: false, error: '请至少提供一个 (因变量 自变量1 …) 方程块。' };
+  }
+  const equations: string[] = [];
+  for (const block of positionals) {
+    const m = block.match(/^\((.+)\)$/);
+    if (!m) {
+      return { ok: false, error: `方程块须为圆括号包裹，例如 (y1 x1 x2)，收到：${block}` };
+    }
+    const parts = m[1].trim().split(/\s+/).filter(Boolean);
+    if (parts.length < 2) {
+      return { ok: false, error: '每个方程块至少需要因变量与 1 个自变量。' };
+    }
+    const rhs = parts.slice(1).join(' + ');
+    equations.push(`${parts[0]} ~ ${rhs}`);
+  }
+  return { ok: true, equations };
+}
+
+/** 将 `a b|c c` 解析为按方程分组的列名数组，与协议 `system_*` 二维数组对齐 */
+function splitPipeEquationColumns(raw: string | undefined): string[][] {
+  if (raw === undefined || String(raw).trim() === '') return [];
+  return String(raw)
+    .split('|')
+    .map((seg) => seg.trim().split(/\s+/).filter(Boolean));
+}
+
 // ---- 语义分析：ParsedCommand -> ModelSpec ----
 
 /**
@@ -171,6 +203,52 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   }
 
   const optMap = new Map(options.map(o => [o.name, o.value]));
+
+  if (verb === 'sur') {
+    const br = parseParenEquationBlocks(positionals);
+    if (!br.ok) return { error: br.error };
+    const spec: ModelSpec = {
+      model_type: 'sur',
+      formula: '',
+      equations: br.equations,
+    };
+    if (optMap.has('maxiter')) {
+      const n = parseInt(String(optMap.get('maxiter')).trim(), 10);
+      if (!Number.isNaN(n)) spec.sur_max_iter = n;
+    }
+    if (optMap.has('tol')) {
+      const t = parseFloat(String(optMap.get('tol')).trim());
+      if (!Number.isNaN(t)) spec.sur_tol = t;
+    }
+    return spec;
+  }
+
+  if (verb === 'reg3') {
+    const br = parseParenEquationBlocks(positionals);
+    if (!br.ok) return { error: br.error };
+    const endogRaw = optMap.get('endogenous');
+    const instRaw = optMap.get('instruments');
+    if (!endogRaw || !instRaw) {
+      return { error: 'reg3 需要 endogenous(...) 与 instruments(...)（多方程时用 | 分隔方程段）。' };
+    }
+    const system_endogenous = splitPipeEquationColumns(endogRaw);
+    const system_instruments = splitPipeEquationColumns(instRaw);
+    const g = br.equations.length;
+    if (system_endogenous.length !== g || system_instruments.length !== g) {
+      return {
+        error: `endogenous / instruments 用 | 分隔的方程段数须为 ${g}，与方程块数一致（当前 endogenous 段 ${system_endogenous.length}，instruments 段 ${system_instruments.length}）。`,
+      };
+    }
+    const methodRaw = (optMap.get('method') || 'twostep').trim().toLowerCase();
+    const model_type: ModelSpec['model_type'] = methodRaw === '3sls' ? 'system_3sls' : 'system_2sls';
+    return {
+      model_type,
+      formula: '',
+      equations: br.equations,
+      system_endogenous,
+      system_instruments,
+    };
+  }
 
   // svy 前缀命令：提取子模型类型和选项
   if (verb === 'svy') {
@@ -207,7 +285,8 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   if (optMap.has('id')) spec.panel_id = optMap.get('id');
   if (optMap.has('time')) spec.panel_time = optMap.get('time');
-  if (optMap.has('method') && modelType !== 'panel_iv' && modelType !== 'dynamic_panel_gmm') {
+  if (optMap.has('method') && modelType !== 'panel_iv' && modelType !== 'dynamic_panel_gmm'
+    && modelType !== 'sur' && modelType !== 'system_2sls' && modelType !== 'system_3sls' && modelType !== 'quantile') {
     spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
   }
 
@@ -240,6 +319,25 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     if (optMap.has('weight')) spec.gmm_weight = optMap.get('weight');
     if (optMap.has('style')) spec.dpgmm_style = optMap.get('style');
     if (optMap.has('collapse')) spec.collapse_instruments = optMap.get('collapse') === 'true';
+  }
+
+  if (modelType === 'quantile') {
+    let tau = 0.5;
+    if (optMap.has('quantile')) {
+      const raw = String(optMap.get('quantile')).trim();
+      const t = parseFloat(raw);
+      if (Number.isNaN(t)) {
+        return { error: 'quantile(...) 须为数值，例如 quantile(0.5)。' };
+      }
+      tau = t;
+    }
+    if (!(tau > 1e-8 && tau < 1 - 1e-8)) {
+      return { error: '分位点 τ 须严格位于开区间 (0,1)，且满足实现要求 1e-8 < τ < 1-1e-8。' };
+    }
+    spec.quantile_tau = tau;
+    spec.vcov = undefined;
+    spec.cluster_column = undefined;
+    spec.weights = undefined;
   }
 
   // ---- 因果推断选项 ----

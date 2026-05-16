@@ -64,6 +64,14 @@ export interface FitModelParams {
   fpcColumn?: string;
   workingDir?: string;
   projectId?: string;
+  /** S5.3 系统方程 */
+  equations?: string[];
+  systemEndogenous?: string[][];
+  systemInstruments?: string[][];
+  surMaxIter?: number;
+  surTol?: number;
+  /** 仅 `quantile` */
+  quantileTau?: number;
 }
 
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
@@ -102,6 +110,12 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     fpcColumn = '',
     workingDir = inferWorkingDir(datasetPath),
     projectId = 'alpha-demo',
+    equations,
+    systemEndogenous,
+    systemInstruments,
+    surMaxIter,
+    surTol,
+    quantileTau,
   } = params;
 
   const modelSpec: FitModelRequest['model_spec'] = {
@@ -169,6 +183,19 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (strataColumn.trim()) modelSpec.strata_column = strataColumn.trim();
     if (psuColumn.trim()) modelSpec.psu_column = psuColumn.trim();
     if (fpcColumn.trim()) modelSpec.fpc_column = fpcColumn.trim();
+  } else if (modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls') {
+    if (equations && equations.length > 0) modelSpec.equations = equations;
+    if (modelType !== 'sur') {
+      if (systemEndogenous && systemEndogenous.length > 0) modelSpec.system_endogenous = systemEndogenous;
+      if (systemInstruments && systemInstruments.length > 0) modelSpec.system_instruments = systemInstruments;
+    }
+    if (modelType === 'sur') {
+      if (typeof surMaxIter === 'number' && Number.isFinite(surMaxIter)) modelSpec.sur_max_iter = surMaxIter;
+      if (typeof surTol === 'number' && Number.isFinite(surTol)) modelSpec.sur_tol = surTol;
+    }
+  } else if (modelType === 'quantile') {
+    const tau = typeof quantileTau === 'number' && Number.isFinite(quantileTau) ? quantileTau : 0.5;
+    modelSpec.quantile_tau = tau;
   } else {
     modelSpec.vcov = { type: vcovType };
     if (weightsColumn.trim()) modelSpec.weights = weightsColumn.trim();

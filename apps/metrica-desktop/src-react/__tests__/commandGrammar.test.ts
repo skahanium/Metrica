@@ -6,6 +6,7 @@ describe('commandGrammar', () => {
     expect(getGrammar('regress')).toBeDefined();
     expect(getGrammar('ivregress')).toBeDefined();
     expect(getGrammar('gmm')).toBeDefined();
+    expect(getGrammar('qreg')).toBeDefined();
     expect(getGrammar('xtreg')).toBeDefined();
     expect(getGrammar('logit')).toBeDefined();
     expect(getGrammar('did')).toBeDefined();
@@ -27,7 +28,7 @@ describe('commandGrammar', () => {
   });
 
   it('all model commands have depvar as first syntax node', () => {
-    const modelVerbs = ['regress', 'ivregress', 'gmm', 'gls', 'xtreg', 'xtivreg',
+    const modelVerbs = ['regress', 'ivregress', 'gmm', 'qreg', 'gls', 'xtreg', 'xtivreg',
       'logit', 'probit', 'poisson', 'ologit', 'mlogit', 'nbreg',
       'did', 'eventstudy', 'ipw', 'psm', 'aipw',
       'arima', 'var', 'dfuller', 'coint'];

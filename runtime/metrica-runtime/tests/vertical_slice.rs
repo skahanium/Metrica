@@ -145,6 +145,60 @@ fn fit_model_runs_gmm_linear_with_diagnostics() {
 }
 
 #[test]
+fn fit_model_runs_quantile_with_tau_in_glance_metrics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/quantile_demo.csv".to_string();
+    request.model_spec.model_type = "quantile".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+    request.model_spec.vcov = None;
+    request.model_spec.quantile_tau = Some(0.5);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let glance = payload.get("glance").expect("glance");
+    let metrics = glance.get("metrics").expect("glance.metrics");
+    let tau = metrics.get("tau").and_then(|v| v.as_f64());
+    assert_eq!(tau, Some(0.5));
+    let tidy = payload.get("tidy").and_then(|v| v.as_array()).expect("tidy array");
+    assert!(!tidy.is_empty());
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert_eq!(diag.get("inference_kind").and_then(|v| v.as_str()), Some("asymptotic_kernel"));
+}
+
+#[test]
+fn fit_model_runs_sur_with_equation_glances_and_sigma() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/sur_system_demo.csv".to_string();
+    request.model_spec.model_type = "sur".to_string();
+    request.model_spec.formula = "".to_string();
+    request.model_spec.vcov = None;
+    request.model_spec.equations = Some(vec![
+        "y1 ~ x1 + x2".to_string(),
+        "y2 ~ x1 + x2".to_string(),
+    ]);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let eq_gl = payload
+        .get("equation_glances")
+        .and_then(|v| v.as_array())
+        .expect("equation_glances array");
+    assert_eq!(eq_gl.len(), 2);
+    let diag = payload.get("diagnostics").expect("sur diagnostics");
+    let sigma = diag
+        .get("sigma_residual")
+        .expect("sigma_residual");
+    assert!(sigma.get("dim").is_some());
+    assert!(sigma.get("matrix").is_some());
+}
+
+#[test]
 fn fit_model_runs_dynamic_panel_gmm_with_diagnostics() {
     let mut request = sample_fit_model_request();
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();
