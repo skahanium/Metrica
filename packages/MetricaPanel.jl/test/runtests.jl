@@ -530,3 +530,23 @@ end
     @test haskey(d, "ar1_test")
     @test haskey(d, "j_statistic")
 end
+
+@testset "S5.2 System GMM" begin
+    df = CSV.read(demo_path, DataFrame)
+    pd = PanelData(df, :firm, :year)
+    r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags = (2, 3),
+                               dpgmm_style = "system", gmm_weight = "two_step")
+    @test r isa DynamicPanelGMMFitResult
+    @test haskey(r.diagnostics, :diff_hansen)
+    @test get(r.diagnostics, :dpgmm_style, "") == "system"
+    @test r.n_instruments > 4  # System 有更多工具
+end
+
+@testset "S5.2 Collapsed instruments" begin
+    df = CSV.read(demo_path, DataFrame)
+    pd = PanelData(df, :firm, :year)
+    r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags = (2, 4),
+                               collapse_instruments = true)
+    @test r isa DynamicPanelGMMFitResult
+    @test r.n_instruments == 2  # 1 列 collapsed + 1 外生
+end
