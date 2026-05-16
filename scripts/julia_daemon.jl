@@ -23,30 +23,9 @@ using MetricaSurvey
 using MetricaTimeSeries
 using LinearAlgebra: I
 
-# 与桥接脚本一致：非有限浮点数序列化为 null，满足 JSON 规范。
-function sanitize_json_floats(x::AbstractFloat)
-    return isfinite(x) ? x : nothing
-end
-sanitize_json_floats(x::Integer) = x
-sanitize_json_floats(x::Bool) = x
-sanitize_json_floats(x::AbstractString) = x
-sanitize_json_floats(::Nothing) = nothing
-function sanitize_json_floats(x::AbstractDict)
-    Dict(k => sanitize_json_floats(v) for (k, v) in pairs(x))
-end
-function sanitize_json_floats(x::AbstractVector)
-    map(sanitize_json_floats, x)
-end
-sanitize_json_floats(x) = x
-
-function runtime_fit_envelope(result_payload::AbstractDict)
-    Dict{String, Any}(
-        "status" => "success",
-        "messages" => Any[],
-        "result_payload" => result_payload,
-        "artifacts" => Any[],
-    )
-end
+# 加载共享工具模块
+include(joinpath(@__DIR__, "daemon", "src", "MetricaDaemon.jl"))
+using .MetricaDaemon
 
 function handle_request(req::Dict{String, Any})
     id = get(req, "id", nothing)
@@ -121,58 +100,7 @@ function handle_request(req::Dict{String, Any})
             if model_type in ("arima", "var", "unitroot", "cointegration")
                 # 时间序列不在 MODEL_REGISTRY 中，必须先于注册表分支处理。
                 data = CSV.read(dataset_path, DataFrame)
-                time_col = Symbol(get(params, "time_column", "time"))
-
-                if model_type == "arima"
-                    var_sym = Symbol(get(params, "variable", first(names(data))))
-                    order_arr = get(params, "order", [1, 1, 0])
-                    length(order_arr) == 3 || error("order must have 3 elements [p, d, q]")
-                    order_tuple = Tuple(Int.(order_arr))
-                    seasonal_arr = get(params, "seasonal_order", [0, 0, 0, 0])
-                    length(seasonal_arr) == 4 || error("seasonal_order must have 4 elements [P, D, Q, S]")
-                    seasonal_tuple = Tuple(Int.(seasonal_arr))
-                    ts_method = Symbol(get(params, "ts_method", "mle"))
-                    model = ARIMAModel(
-                        variable=var_sym,
-                        time_column=time_col,
-                        order=order_tuple,
-                        seasonal_order=seasonal_tuple,
-                        method=ts_method,
-                    )
-                elseif model_type == "var"
-                    vars_raw = get(params, "variables", String[])
-                    var_syms = Symbol.(String.(vars_raw))
-                    lags = Int(get(params, "lags", 1))
-                    model = VARModel(
-                        variables=var_syms,
-                        time_column=time_col,
-                        lags=lags,
-                    )
-                elseif model_type == "unitroot"
-                    var_sym = Symbol(get(params, "variable", first(names(data))))
-                    det = Symbol(get(params, "deterministic", "constant"))
-                    lags_val = Int(get(params, "lags", 0))
-                    model = UnitRootModel(
-                        variable=var_sym,
-                        time_column=time_col,
-                        deterministic=det,
-                        max_lags=lags_val,
-                    )
-                else  # cointegration
-                    vars_raw = get(params, "variables", String[])
-                    var_syms = Symbol.(String.(vars_raw))
-                    method_sym = Symbol(get(params, "ts_method", "engle_granger"))
-                    lags = Int(get(params, "lags", 1))
-                    det = Symbol(get(params, "deterministic", "constant"))
-                    model = CointegrationModel(
-                        variables=var_syms,
-                        time_column=time_col,
-                        method=method_sym,
-                        lags=lags,
-                        deterministic=det,
-                    )
-                end
-
+                model = MetricaTimeSeries.build_time_series_model(model_type, params)
                 result = MetricaBase.fit(model, data)
                 payload = runtime_fit_envelope(
                     MetricaTimeSeries.result_to_payload(result; include_augment=include_augment),

@@ -334,6 +334,7 @@ export type DataResult =
   | DescribeResult
   | SummarizeResult
   | TabulateResult
+  | BrowseResult
   | RunsTableResult
   | ExportPreviewResult
   | ModelComparisonResult;

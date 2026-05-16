@@ -19,6 +19,10 @@ using MetricaTimeSeries
 # 通过环境依赖加载，确保 `Distributions` 等传递依赖在 LOAD_PATH 中可用。
 using MetricaDiagnostics
 
+# 加载共享工具模块
+include(joinpath(@__DIR__, "daemon", "src", "MetricaDaemon.jl"))
+using .MetricaDaemon
+
 request = JSON3.read(ARGS[1])
 action = String(request.action)
 dataset_path = String(request.dataset_ref.path)
@@ -26,32 +30,6 @@ dataset_path = String(request.dataset_ref.path)
 function present(value)
     return !isnothing(value) && !isempty(String(value))
 end
-
-# 将拟合结果字典包装为 Runtime / 守护进程统一的顶层 JSON 形状。
-function runtime_fit_envelope(result_payload::AbstractDict)
-    Dict{String, Any}(
-        "status" => "success",
-        "messages" => Any[],
-        "result_payload" => result_payload,
-        "artifacts" => Any[],
-    )
-end
-
-# 将非有限浮点数替换为 null，满足 JSON 规范（JSON3 默认拒绝 Inf/NaN）。
-function sanitize_json_floats(x::AbstractFloat)
-    return isfinite(x) ? x : nothing
-end
-sanitize_json_floats(x::Integer) = x
-sanitize_json_floats(x::Bool) = x
-sanitize_json_floats(x::AbstractString) = x
-sanitize_json_floats(::Nothing) = nothing
-function sanitize_json_floats(x::AbstractDict)
-    Dict(k => sanitize_json_floats(v) for (k, v) in pairs(x))
-end
-function sanitize_json_floats(x::AbstractVector)
-    map(sanitize_json_floats, x)
-end
-sanitize_json_floats(x) = x
 
 payload = if action == "inspect_dataset"
     options = get(request, :options, Dict{Symbol, Any}())
@@ -119,56 +97,14 @@ else
         # 时间序列模型：构造结构体 + DataFrame 拟合
         using CSV, DataFrames
         data = CSV.read(dataset_path, DataFrame)
-        time_col = Symbol(String(get(request.model_spec, :time_column, "time")))
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
 
-        if model_type == "arima"
-            var_sym = Symbol(String(get(request.model_spec, :variable, first(names(data)))))
-            order_arr = get(request.model_spec, :order, [1, 1, 0])
-            order_tuple = Tuple(Int.(collect(order_arr)))
-            seasonal_arr = get(request.model_spec, :seasonal_order, [0, 0, 0, 0])
-            seasonal_tuple = Tuple(Int.(collect(seasonal_arr)))
-            ts_method = Symbol(String(get(request.model_spec, :ts_method, "mle")))
-            model = ARIMAModel(
-                variable=var_sym,
-                time_column=time_col,
-                order=order_tuple,
-                seasonal_order=seasonal_tuple,
-                method=ts_method,
-            )
-        elseif model_type == "var"
-            vars_raw = collect(get(request.model_spec, :variables, String[]))
-            var_syms = Symbol.(String.(vars_raw))
-            lags = Int(get(request.model_spec, :lags, 1))
-            model = VARModel(
-                variables=var_syms,
-                time_column=time_col,
-                lags=lags,
-            )
-        elseif model_type == "unitroot"
-            var_sym = Symbol(String(get(request.model_spec, :variable, first(names(data)))))
-            det = Symbol(String(get(request.model_spec, :deterministic, "constant")))
-            lags_val = Int(get(request.model_spec, :lags, 0))
-            model = UnitRootModel(
-                variable=var_sym,
-                time_column=time_col,
-                deterministic=det,
-                max_lags=lags_val,
-            )
-        else  # cointegration
-            vars_raw = collect(get(request.model_spec, :variables, String[]))
-            var_syms = Symbol.(String.(vars_raw))
-            method_sym = Symbol(String(get(request.model_spec, :ts_method, "engle_granger")))
-            lags = Int(get(request.model_spec, :lags, 1))
-            det = Symbol(String(get(request.model_spec, :deterministic, "constant")))
-            model = CointegrationModel(
-                variables=var_syms,
-                time_column=time_col,
-                method=method_sym,
-                lags=lags,
-                deterministic=det,
-            )
+        # 将 JSON3 对象转换为 Dict 供 build_time_series_model 使用
+        params = Dict{String, Any}()
+        for key in keys(request.model_spec)
+            params[String(key)] = request.model_spec[key]
         end
+        model = MetricaTimeSeries.build_time_series_model(model_type, params)
 
         result = MetricaBase.fit(model, data)
         runtime_fit_envelope(MetricaTimeSeries.result_to_payload(result; include_augment=include_augment))
