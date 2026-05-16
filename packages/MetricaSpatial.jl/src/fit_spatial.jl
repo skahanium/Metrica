@@ -126,6 +126,13 @@ function fit_spatial(
 
     warnings = MetricaBase.ModelWarning[]
 
+    # OLS 残差用于 LM 检验（Anselin 1988）
+    e_ols = ys - Xs * (Xs \ ys)
+    diag[:lm_lag] = lm_lag_test(e_ols, Xs, W)
+    diag[:lm_error] = lm_error_test(e_ols, Xs, W)
+    diag[:robust_lm_lag] = robust_lm_lag_test(e_ols, Xs, W)
+    diag[:robust_lm_error] = robust_lm_error_test(e_ols, Xs, W)
+
     if model_type == "spatial_lag"
         out = fit_sar_2sls(ys, Xs, W, x_colnames; vcov_kind=vcov_sym == :HC1 ? :HC1 : :classical)
         out isa MetricaBase.ModelError && return out

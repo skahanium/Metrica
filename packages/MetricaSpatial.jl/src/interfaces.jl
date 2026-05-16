@@ -57,16 +57,17 @@ function MetricaBase.tidy(r::SpatialFitResult)::MetricaBase.TidyTable
 end
 
 function MetricaBase.model_capabilities(r::SpatialFitResult)::MetricaBase.ModelCapabilities
-    available = [:moran_i, :moran_ei, :moran_var, :moran_z, :moran_pvalue]
+    available = [:moran_i, :moran_ei, :moran_var, :moran_z, :moran_pvalue,
+                 :lm_lag, :lm_error, :robust_lm_lag, :robust_lm_error]
     effects = if r.model_kind in (:spatial_lag, :spatial_slx)
         [:direct_effects, :indirect_effects, :total_effects]
     else
         Symbol[]
     end
     unavailable = if r.model_kind == :spatial_error
-        [:direct_effects, :indirect_effects, :total_effects, :lm_lag, :lm_error, :robust_lm_lag, :robust_lm_error]
+        [:direct_effects, :indirect_effects, :total_effects]
     else
-        [:lm_lag, :lm_error, :robust_lm_lag, :robust_lm_error]
+        Symbol[]
     end
     return MetricaBase.ModelCapabilities(
         :implemented,
