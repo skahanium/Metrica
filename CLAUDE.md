@@ -26,4 +26,4 @@
 Core 层 Julia 包：MetricaBase.jl / MetricaData.jl / MetricaDiagnostics.jl / MetricaLinear.jl / MetricaPanel.jl / MetricaOutput.jl
 App 层技术栈：Tauri 2 + React 19 + TypeScript 5 + Zustand + Ant Design + AG Grid + ECharts
 Runtime 层技术栈：Rust + axum + tokio + 持久化 Julia 进程（stdin/stdout JSON lines）
-详细架构：`docs/architecture/app-shell.md`、`docs/architecture/runtime-protocol.md`
+详细架构：`docs/architecture/app-shell.md`、`docs/architecture/runtime-protocol.md`、`docs/architecture/s4-warning-coverage.md`；S4 CLI 教程见 `tutorials/s4-*.md`。
