@@ -121,7 +121,7 @@ export function parse(input: string): ParsedCommand {
 // ---- 已知模型动词集合 ----
 
 const MODEL_VERBS = new Set([
-  'regress', 'ivregress', 'gls', 'xtreg', 'xtivreg', 'logit', 'probit', 'poisson',
+  'regress', 'ivregress', 'gmm', 'gls', 'xtreg', 'xtivreg', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
   'arima', 'var', 'dfuller', 'coint', 'svy',
 ]);
@@ -132,6 +132,7 @@ function verbToModelType(verb: string): string {
   const map: Record<string, string> = {
     regress: 'ols',
     ivregress: 'iv',
+    gmm: 'gmm_linear',
     gls: 'gls',
     xtreg: 'panel',
     xtivreg: 'panel_iv',
@@ -216,6 +217,10 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   }
   if (optMap.has('instruments')) {
     spec.instruments = optMap.get('instruments')!.split(/\s+/).filter(Boolean);
+  }
+
+  if (modelType === 'gmm_linear' && optMap.has('weight')) {
+    spec.gmm_weight = optMap.get('weight');
   }
 
   // ---- 因果推断选项 ----

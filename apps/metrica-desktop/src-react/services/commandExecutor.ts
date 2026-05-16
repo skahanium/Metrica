@@ -731,6 +731,7 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         panelMethod: spec.panel_method || '',
         instruments: Array.isArray(spec.instruments) ? spec.instruments.join(',') : (spec.instruments || ''),
         endogColumns: Array.isArray(spec.endog_columns) ? spec.endog_columns.join(',') : (spec.endog_columns || ''),
+        gmmWeight: spec.gmm_weight || '',
         treatmentColumn: spec.treatment_column || spec.treated_column || '',
         postColumn: spec.post_column || '',
         eventTimeColumn: spec.event_time_column || '',

@@ -12,7 +12,8 @@ import { OddsRatioTable } from './OddsRatioTable';
 import { DEFFSummary } from './DEFFSummary';
 import { StrataSummary } from './StrataSummary';
 import { SurveyDesignPanel } from './SurveyDesignPanel';
-import type { ModelResult } from '../types/protocol';
+import { GmmDiagnosticsPanel } from './GmmDiagnosticsPanel';
+import type { GmmDiagnostics, ModelResult } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -27,6 +28,9 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
   const modelType = result.glance?.model;
   const isDiscrete = ['logit', 'probit', 'poisson', 'ordered_logit', 'multinomial_logit', 'negbin'].includes(modelType || '');
   const isSurvey = typeof modelType === 'string' && modelType.startsWith('survey_');
+
+  const isGmmLinear = modelType === 'gmm_linear';
+  const gmmDiagnostics = isGmmLinear ? (result.diagnostics as GmmDiagnostics | undefined) : undefined;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(command).catch(() => {});
@@ -46,6 +50,7 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       {modelType === 'did' && <DIDResultCards result={result} />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}
       {isDiscrete && (result.odds_ratios || (result as any).irr_entries) && <OddsRatioTable result={result} />}
+      {isGmmLinear && gmmDiagnostics && <GmmDiagnosticsPanel diagnostics={gmmDiagnostics} />}
       {result.tidy && result.tidy.length > 0 && <TidyTable result={result} />}
       {isSurvey && (
         <>

@@ -36,6 +36,7 @@ export interface FitModelParams {
   panelMethod?: string;
   instruments?: string;
   endogColumns?: string;
+  gmmWeight?: string;
   treatmentColumn?: string;
   postColumn?: string;
   eventTimeColumn?: string;
@@ -75,6 +76,7 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     panelMethod = 'fe',
     instruments = '',
     endogColumns = '',
+    gmmWeight = '',
     treatmentColumn = '',
     postColumn = '',
     eventTimeColumn = '',
@@ -118,6 +120,10 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
     if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
     if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
+  } else if (modelType === 'gmm_linear') {
+    if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
+    if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
+    if (gmmWeight.trim()) modelSpec.gmm_weight = gmmWeight.trim();
   } else if (modelType === 'gls') {
     modelSpec.vcov = { type: vcovType };
   } else if (modelType === 'did' || modelType === 'event_study') {

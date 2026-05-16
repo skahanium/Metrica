@@ -129,6 +129,26 @@ describe('parseToModelSpec', () => {
     }
   });
 
+  it('converts gmm to gmm_linear ModelSpec with weight', () => {
+    const r = parse('gmm y x1 x2, endogenous(x1) instruments(z1 z2) weight(one_step)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('gmm_linear');
+      expect(spec.endog_columns).toEqual(['x1']);
+      expect(spec.instruments).toEqual(['z1', 'z2']);
+      expect(spec.gmm_weight).toBe('one_step');
+    }
+  });
+
+  it('converts gmm without weight (defaults on backend)', () => {
+    const r = parse('gmm y x1 x2, endogenous(x1) instruments(z1 z2)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('gmm_linear');
+      expect(spec.gmm_weight).toBeUndefined();
+    }
+  });
+
   it('converts xtivreg to panel IV ModelSpec', () => {
     const r = parse('xtivreg y x1 x2, id(firm) time(year) endogenous(x1) instruments(z1 z2) robust');
     const spec = parseToModelSpec(r);

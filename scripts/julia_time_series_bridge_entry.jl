@@ -9,8 +9,26 @@ using JSON3
 using MetricaBase
 using MetricaTimeSeries
 
+# 与 `julia_bridge_entry.jl` 相同：`@__DIR__` 在 `-e` 内联执行时不可靠，优先使用第二参数（仓库根）。
+const METRICA_REPO_ROOT = let
+    root = if length(ARGS) >= 2
+        s = String(ARGS[2])
+        !isempty(strip(s)) ? s : nothing
+    else
+        nothing
+    end
+    if root !== nothing
+        root
+    else
+        cand = abspath(joinpath(@__DIR__, ".."))
+        isfile(joinpath(cand, "AGENTS.md")) ||
+            error("无法解析 Metrica 仓库根目录：Runtime 桥接应传入第二参数（仓库根）。")
+        cand
+    end
+end
+
 # 加载共享工具模块
-include(joinpath(@__DIR__, "daemon", "src", "MetricaDaemon.jl"))
+include(joinpath(METRICA_REPO_ROOT, "scripts", "daemon", "src", "MetricaDaemon.jl"))
 using .MetricaDaemon
 
 request = JSON3.read(ARGS[1])

@@ -121,6 +121,30 @@ fn fit_model_runs_unitroot_through_time_series_bridge() {
 }
 
 #[test]
+fn fit_model_runs_gmm_linear_with_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/gmm_linear_demo.csv".to_string();
+    request.model_spec.model_type = "gmm_linear".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+    request.model_spec.instruments = Some(vec!["z1".to_string(), "z2".to_string()]);
+    request.model_spec.endog_columns = Some(vec!["x1".to_string()]);
+    request.model_spec.gmm_weight = Some("two_step".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("glance").is_some());
+    assert!(payload.get("tidy").is_some());
+    let diag = payload
+        .get("diagnostics")
+        .expect("gmm diagnostics");
+    assert!(diag.get("j_statistic").is_some());
+    assert!(diag.get("j_df").is_some());
+}
+
+#[test]
 fn fit_model_runs_ipw_with_propensity_formula() {
     let path = std::env::temp_dir().join("metrica_ipw_bridge.csv");
     fs::write(

@@ -49,6 +49,7 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
     HashMap::from([
         ("ols", vec![]),
         ("iv", vec!["instruments", "endog_columns"]),
+        ("gmm_linear", vec!["instruments", "endog_columns"]),
         ("gls", vec![]),
         ("panel", vec!["panel_id", "panel_time"]),
         ("panel_iv", vec!["panel_id", "panel_time", "instruments", "endog_columns"]),
@@ -151,6 +152,20 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     }),
                 }
             }
+            if spec.model_type == "gmm_linear" {
+                if let Some(ref w) = spec.gmm_weight {
+                    let t = w.trim().to_ascii_lowercase();
+                    if !t.is_empty() && t != "one_step" && t != "two_step" {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!(
+                                "模型类型 `gmm_linear` 的 gmm_weight 只能为 one_step 或 two_step，收到 `{w}`。"
+                            ),
+                            hint: Some("请省略该字段以使用默认 two_step。".to_string()),
+                        });
+                    }
+                }
+            }
             None
         }
     }
@@ -251,6 +266,9 @@ pub struct ModelSpec {
     pub instruments: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub endog_columns: Option<Vec<String>>,
+    /// 仅 `gmm_linear`：`one_step` 或 `two_step`（默认 `two_step`）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gmm_weight: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub omega_spec: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -716,6 +734,7 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             panel_method: None,
             instruments: None,
             endog_columns: None,
+            gmm_weight: None,
             omega_spec: None,
             treatment_column: None,
             treated_column: None,
@@ -789,6 +808,7 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         panel_method: Some("fe".to_string()),
         instruments: None,
         endog_columns: None,
+        gmm_weight: None,
         omega_spec: None,
         treatment_column: None,
         treated_column: None,

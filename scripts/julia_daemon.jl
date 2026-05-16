@@ -13,6 +13,7 @@ using CSV
 using DataFrames
 using MetricaBase
 using MetricaLinear
+using MetricaGMM
 using MetricaOutput
 using MetricaDiscrete
 using MetricaCausal
@@ -23,8 +24,23 @@ using MetricaSurvey
 using MetricaTimeSeries
 using LinearAlgebra: I
 
+# Runtime 通过环境变量 `METRICA_REPO_ROOT` 传入仓库根（见 `julia_session.rs`）。
+# `julia -e` 内联执行时 `@__DIR__` 为进程 cwd，不可用于定位 `scripts/daemon`。
+const METRICA_REPO_ROOT = let
+    r = get(ENV, "METRICA_REPO_ROOT", "")
+    root = !isempty(strip(r)) ? String(strip(r)) : nothing
+    if root !== nothing
+        root
+    else
+        cand = abspath(joinpath(@__DIR__, ".."))
+        isfile(joinpath(cand, "AGENTS.md")) ||
+            error("无法解析 Metrica 仓库根目录：请设置环境变量 METRICA_REPO_ROOT。")
+        cand
+    end
+end
+
 # 加载共享工具模块
-include(joinpath(@__DIR__, "daemon", "src", "MetricaDaemon.jl"))
+include(joinpath(METRICA_REPO_ROOT, "scripts", "daemon", "src", "MetricaDaemon.jl"))
 using .MetricaDaemon
 
 function handle_request(req::Dict{String, Any})
@@ -111,7 +127,7 @@ function handle_request(req::Dict{String, Any})
                 # 构造 kwargs
                 kwargs = Dict{Symbol, Any}()
                 # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字。
-                if !(model_type in ("ipw", "aipw", "psm"))
+                if !(model_type in ("ipw", "aipw", "psm", "gmm_linear"))
                     vcov_type = get(params, "vcov", "classical")
                     vcov_key = lowercase(String(vcov_type))
                     vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -132,11 +148,15 @@ function handle_request(req::Dict{String, Any})
                     end
                 end
 
-                # IV 特有参数
-                if model_type == "iv"
+                # IV / GMM 特有参数
+                if model_type in ("iv", "gmm_linear")
                     kwargs[:instruments] = String.(params["instruments"])
                     kwargs[:endog] = String.(params["endog_columns"])
-                elseif model_type == "panel_iv"
+                end
+                if model_type == "gmm_linear"
+                    kwargs[:gmm_weight] = String(get(params, "gmm_weight", "two_step"))
+                end
+                if model_type == "panel_iv"
                     kwargs[:instruments] = String.(params["instruments"])
                     kwargs[:endog] = String.(params["endog_columns"])
                 elseif model_type == "gls"
@@ -189,6 +209,8 @@ function handle_request(req::Dict{String, Any})
                     payload = MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
                 elseif result isa MetricaSurvey.AbstractSurveyFitResult
                     payload = MetricaSurvey.result_to_payload(result; include_augment=include_augment)
+                elseif result isa MetricaGMM.GMMLinearFitResult
+                    payload = MetricaGMM.result_to_payload(result; include_augment=include_augment)
                 elseif model_type in ("panel", "panel_iv")
                     payload = MetricaPanel.result_to_payload(result; include_augment=include_augment)
                 else

@@ -310,6 +310,7 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(ref panel_method) = request.model_spec.panel_method { params["panel_method"] = json!(panel_method); }
     if let Some(ref instruments) = request.model_spec.instruments { params["instruments"] = json!(instruments); }
     if let Some(ref endog_columns) = request.model_spec.endog_columns { params["endog_columns"] = json!(endog_columns); }
+    if let Some(ref gw) = request.model_spec.gmm_weight { params["gmm_weight"] = json!(gw); }
     if let Some(ref omega_spec) = request.model_spec.omega_spec { params["omega_spec"] = json!(omega_spec); }
 
     // S4b: 因果推断字段

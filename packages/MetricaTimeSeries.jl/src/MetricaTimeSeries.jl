@@ -135,8 +135,10 @@ model = build_time_series_model("arima", params)
 function build_time_series_model(model_type::String, params::Dict)
     time_col = Symbol(get(params, "time_column", "time"))
 
+    # 注意：Julia 中 `get(d, k, default)` 的 default 会被**立即求值**；
+    # 不得写成 `get(..., error(...))`，否则无论键是否存在都会抛错。应使用 `get(() -> error(...), d, k)`。
     if model_type == "arima"
-        var_sym = Symbol(get(params, "variable", error("ARIMA 模型需要 variable 参数")))
+        var_sym = Symbol(get(() -> error("ARIMA 模型需要 variable 参数"), params, "variable"))
         order_arr = get(params, "order", [1, 1, 0])
         length(order_arr) == 3 || error("order 必须有 3 个元素 [p, d, q]")
         order_tuple = Tuple(Int.(order_arr))
@@ -153,7 +155,7 @@ function build_time_series_model(model_type::String, params::Dict)
         )
 
     elseif model_type == "var"
-        vars_raw = get(params, "variables", error("VAR 模型需要 variables 参数"))
+        vars_raw = get(() -> error("VAR 模型需要 variables 参数"), params, "variables")
         var_syms = Symbol.(String.(vars_raw))
         lags = Int(get(params, "lags", 1))
         return VARModel(
@@ -163,7 +165,7 @@ function build_time_series_model(model_type::String, params::Dict)
         )
 
     elseif model_type == "unitroot"
-        var_sym = Symbol(get(params, "variable", error("单位根检验需要 variable 参数")))
+        var_sym = Symbol(get(() -> error("单位根检验需要 variable 参数"), params, "variable"))
         det = Symbol(get(params, "deterministic", "constant"))
         max_lags = Int(get(params, "lags", 0))
         return UnitRootModel(
@@ -174,7 +176,7 @@ function build_time_series_model(model_type::String, params::Dict)
         )
 
     elseif model_type == "cointegration"
-        vars_raw = get(params, "variables", error("协整检验需要 variables 参数"))
+        vars_raw = get(() -> error("协整检验需要 variables 参数"), params, "variables")
         var_syms = Symbol.(String.(vars_raw))
         method = Symbol(get(params, "ts_method", "engle_granger"))
         lags = Int(get(params, "lags", 1))

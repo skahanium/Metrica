@@ -86,6 +86,20 @@ export interface DiscreteDiagnostics {
   deviance?: number;
 }
 
+/** 线性 GMM（Runtime `result_payload.diagnostics`） */
+export interface GmmDiagnostics {
+  j_statistic?: number;
+  j_df?: number;
+  j_pvalue?: number | null;
+  n_moments?: number;
+  n_params?: number;
+  overidentifying_restrictions?: number;
+  gmm_weight?: string;
+  weight_matrix_description?: string;
+  iterations?: number;
+  exactly_identified?: boolean;
+}
+
 export interface OddsRatioEntry {
   term: string;
   odds_ratio: number;
@@ -128,7 +142,7 @@ export interface AugmentRow {
 export interface ModelResult {
   glance: GlanceResult;
   tidy: TidyRow[];
-  diagnostics: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics;
+  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics;
   odds_ratios?: OddsRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
@@ -368,7 +382,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gls' | 'panel' | 'panel_iv' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'gls' | 'panel' | 'panel_iv' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -378,6 +392,8 @@ export interface ModelSpec {
   panel_method?: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv';
   instruments?: string[];
   endog_columns?: string[];
+  /** 仅 `gmm_linear`：`one_step` | `two_step` */
+  gmm_weight?: string;
   omega_spec?: string;
   treatment_column?: string;
   treated_column?: string;

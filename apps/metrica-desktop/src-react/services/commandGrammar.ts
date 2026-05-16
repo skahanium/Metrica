@@ -248,6 +248,11 @@ const grammars: CommandGrammar[] = [
     endogenous: optionValue('endogenous', false),
     instruments: optionValue('instruments', false),
   }),
+  makeModelGrammar('gmm', '线性 IV-GMM（一步 / 两步最优权重）', {
+    endogenous: optionValue('endogenous', false),
+    instruments: optionValue('instruments', false),
+    weight: { kind: 'option_value', label: 'weight', required: false, multiple: false, values: ['one_step', 'two_step'] },
+  }),
   makeModelGrammar('gls', '广义最小二乘法（GLS）', {
     weights: optionValue('weights', false),
   }),

@@ -59,6 +59,25 @@ const mockSurveyResult: ModelResult = {
   ],
 };
 
+const mockGmmResult: ModelResult = {
+  glance: { model: 'gmm_linear', nobs: 50, dof: 47, metrics: { j_stat: 2.1, j_df: 1 } },
+  tidy: [
+    { term: 'x1', estimate: 1.0, std_error: 0.2, statistic: 5.0, p_value: 0.01 },
+  ],
+  diagnostics: {
+    j_statistic: 2.1,
+    j_df: 1,
+    j_pvalue: 0.15,
+    n_moments: 3,
+    n_params: 2,
+    gmm_weight: 'two_step',
+    weight_matrix_description: "(Z'Z)^{-1} 起步",
+    exactly_identified: false,
+    iterations: 1,
+  },
+  warnings: [],
+};
+
 describe('ResultBlock', () => {
   it('renders command text and OLS glance for ols model', () => {
     render(
@@ -87,6 +106,14 @@ describe('ResultBlock', () => {
       <ResultBlock command="survey_ols(y ~ x1)" result={mockSurveyResult} />,
     );
     expect(screen.getByText('抽样设计概览')).toBeDefined();
+  });
+
+  it('renders GmmDiagnosticsPanel for gmm_linear model', () => {
+    render(
+      <ResultBlock command="gmm y x1 x2, endogenous(x1) instruments(z1 z2)" result={mockGmmResult} />,
+    );
+    expect(screen.getByText('GMM 诊断（过识别检验）')).toBeDefined();
+    expect(screen.getByText('Hansen J')).toBeDefined();
   });
 
   it('passes result prop to sub-components, not global store', () => {

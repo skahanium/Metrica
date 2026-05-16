@@ -11,6 +11,7 @@ using MetricaData
 using MetricaDiscrete
 using MetricaCausal
 using MetricaLinear
+using MetricaGMM
 using MetricaOutput
 using MetricaPanel
 using MetricaSurvey
@@ -19,8 +20,27 @@ using MetricaTimeSeries
 # 通过环境依赖加载，确保 `Distributions` 等传递依赖在 LOAD_PATH 中可用。
 using MetricaDiagnostics
 
+# Runtime 通过 `julia -e '...'` 内联本脚本时，`@__DIR__` 为进程 cwd（常为 `runtime/metrica-runtime`），
+# 不能用于定位 `scripts/daemon`。优先使用第二参数（仓库根）；否则回退为「本文件所在目录的上一级」。
+const METRICA_REPO_ROOT = let
+    root = if length(ARGS) >= 2
+        s = String(ARGS[2])
+        !isempty(strip(s)) ? s : nothing
+    else
+        nothing
+    end
+    if root !== nothing
+        root
+    else
+        cand = abspath(joinpath(@__DIR__, ".."))
+        isfile(joinpath(cand, "AGENTS.md")) ||
+            error("无法解析 Metrica 仓库根目录：Runtime 桥接应传入第二参数（仓库根）。")
+        cand
+    end
+end
+
 # 加载共享工具模块
-include(joinpath(@__DIR__, "daemon", "src", "MetricaDaemon.jl"))
+include(joinpath(METRICA_REPO_ROOT, "scripts", "daemon", "src", "MetricaDaemon.jl"))
 using .MetricaDaemon
 
 request = JSON3.read(ARGS[1])
@@ -162,7 +182,7 @@ else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()
         # IPW / AIPW / PSM 的 fit 不接受 vcov、weights、cluster 等线性族关键字，避免 MethodError。
-        if !(model_type in ("ipw", "aipw", "psm"))
+        if !(model_type in ("ipw", "aipw", "psm", "gmm_linear"))
             vcov_type = haskey(request.model_spec, :vcov) ? String(request.model_spec.vcov.type) : "classical"
             vcov_key = lowercase(vcov_type)
             vcov_symbol = vcov_key == "hc1" ? :HC1 : vcov_key == "cluster" ? :cluster : :classical
@@ -186,6 +206,15 @@ else
         if haskey(request.model_spec, :outcome_formula) && present(request.model_spec.outcome_formula)
             kwargs[:outcome_formula] = String(request.model_spec.outcome_formula)
         end
+        if model_type in ("iv", "gmm_linear")
+            kwargs[:instruments] = String.(collect(request.model_spec.instruments))
+            kwargs[:endog] = String.(collect(request.model_spec.endog_columns))
+        end
+        if model_type == "gmm_linear"
+            gw = haskey(request.model_spec, :gmm_weight) && !isnothing(request.model_spec.gmm_weight) ?
+                 String(request.model_spec.gmm_weight) : "two_step"
+            kwargs[:gmm_weight] = gw
+        end
         ModelT = MetricaBase.MODEL_REGISTRY[model_type]
         result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment
@@ -193,6 +222,8 @@ else
             MetricaCausal.result_to_payload(result; include_augment=include_augment)
         elseif result isa MetricaDiscrete.AbstractDiscreteFitResult
             MetricaDiscrete.result_to_payload(result; include_augment=include_augment)
+        elseif result isa MetricaGMM.GMMLinearFitResult
+            MetricaGMM.result_to_payload(result; include_augment=include_augment)
         else
             MetricaLinear.result_to_payload(result; include_augment=include_augment)
         end

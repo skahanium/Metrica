@@ -57,7 +57,7 @@
 
 | 模型族 | `model_type` 取值（当前） |
 |--------|---------------------------|
-| 线性 | `ols`、`iv`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
+| 线性 | `ols`、`iv`、`gmm_linear`、`gls`（WLS 等通过 `options` / 权重字段走线性流水线，见实现） |
 | 面板 | `panel`、`panel_iv` |
 | 时间序列 | `arima`、`var`、`unitroot`、`cointegration` |
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
@@ -70,6 +70,36 @@
 - 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
 - 在 Julia 侧注册 `MODEL_REGISTRY`（若适用）并在桥接入口增加派发分支；同步更新本文件上表与 CLI 语法文档。
 - 详见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
+
+### `gmm_linear`（线性 IV-GMM）
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `gmm_linear` |
+| `instruments` | 字符串数组 | 是 | 工具变量列名，与 `iv` 相同 |
+| `endog_columns` | 字符串数组 | 是 | 内生解释变量列名，须出现在公式右侧 |
+| `gmm_weight` | 字符串，可选 | 否 | `one_step` 或 `two_step`（大小写不敏感）；省略时 Julia 端默认 `two_step` |
+
+**不转发给 GMM 估计器的字段：** 桥接层对 `gmm_linear` 不传 `vcov` / `weights` / `cluster`（与 IPW 等因果模型处理方式一致），避免 `MethodError`。
+
+**`result_payload.diagnostics`（GMM 专用键名，JSON 字符串键）：**
+
+| 键 | 类型 | 说明 |
+|----|------|------|
+| `j_statistic` | 数 | Hansen / Sargan J |
+| `j_df` | 整数 | 过识别自由度 \(L-k\) |
+| `j_pvalue` | 数或 null | 恰识别时为 null |
+| `n_moments` | 整数 | 矩条件个数 \(L\) |
+| `n_params` | 整数 | 参数个数 \(k\) |
+| `overidentifying_restrictions` | 整数 | 与 `j_df` 同义，便于展示 |
+| `gmm_weight` | 字符串 | `one_step` / `two_step` |
+| `weight_matrix_description` | 字符串 | 人类可读权重矩阵说明（含恰识别时退回 `(Z'Z)^{-1}` 的说明） |
+| `iterations` | 整数 | 迭代次数 |
+| `exactly_identified` | 布尔 | 为 true 时 J 检验不适用 |
+
+**数值说明：** 过识别两步 GMM 中样本矩协方差 \(\hat\Omega\) 可能接近奇异；实现可对 \(\hat\Omega\) 施加极小对角收缩后再求逆。恰识别且请求 `two_step` 时，若 \(\hat\Omega\) 不可逆则退回与一步相同的权重 \((Z'Z)^{-1}\)，并在 `weight_matrix_description` 中说明。
 
 ## Julia 进程模型
 
@@ -97,7 +127,7 @@
 │  │  stdout → JSON Response (逐行)         │  │
 │  │  stderr → 日志/警告                    │  │
 │  └────────────────────────────────────────┘  │
-│  - 启动时加载 MetricaBase、MetricaLinear、MetricaPanel、MetricaData、MetricaOutput、MetricaDiscrete、MetricaCausal、MetricaSurvey、MetricaTimeSeries、MetricaDiagnostics（以 `scripts/julia_daemon.jl` 为准） │
+│  - 启动时加载 MetricaBase、MetricaLinear、MetricaGMM、MetricaPanel、MetricaData、MetricaOutput、MetricaDiscrete、MetricaCausal、MetricaSurvey、MetricaTimeSeries、MetricaDiagnostics（以 `scripts/julia_daemon.jl` 为准） │
 │  - 首次预热完成后通知前端就绪                  │
 │  - [计划] 支持 cancel 信号                    │
 │  - 进程崩溃自动重启（最多 3 次）              │

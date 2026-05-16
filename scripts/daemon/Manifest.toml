@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "5a8840d99d1d85a60ca8a25388ccb786e4bdfa7f"
+project_hash = "94beef11ea6d941c96723e32941e2b1870b88715"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -498,7 +498,7 @@ uuid = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
 version = "0.1.0"
 
 [[deps.MetricaDaemon]]
-deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaCausal", "MetricaData", "MetricaDiagnostics", "MetricaDiscrete", "MetricaLinear", "MetricaOutput", "MetricaPanel", "MetricaSurvey", "MetricaTimeSeries", "Optim", "SpecialFunctions", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaCausal", "MetricaData", "MetricaDiagnostics", "MetricaDiscrete", "MetricaGMM", "MetricaLinear", "MetricaOutput", "MetricaPanel", "MetricaSurvey", "MetricaTimeSeries", "Optim", "SpecialFunctions", "Statistics", "StatsModels"]
 path = "."
 uuid = "da000000-0000-0000-0000-000000000001"
 version = "0.1.0"
@@ -519,6 +519,12 @@ version = "0.1.0"
 deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "SpecialFunctions", "Statistics", "StatsModels"]
 path = "../../packages/MetricaDiscrete.jl"
 uuid = "d1e2f3a4-b5c6-7890-def0-123456789abc"
+version = "0.1.0"
+
+[[deps.MetricaGMM]]
+deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaOutput", "Statistics", "StatsModels"]
+path = "../../packages/MetricaGMM.jl"
+uuid = "c4f8e9a1-2b3d-5e6f-7a8b-9c0d1e2f3a4b"
 version = "0.1.0"
 
 [[deps.MetricaLinear]]
@@ -546,7 +552,7 @@ uuid = "7d3611f3-666b-40ba-b23f-c75757e1ca05"
 version = "0.1.0"
 
 [[deps.MetricaTimeSeries]]
-deps = ["DataFrames", "Distributions", "HypothesisTests", "LinearAlgebra", "MetricaBase", "Optim", "Random", "Statistics", "Test"]
+deps = ["CSV", "DataFrames", "Distributions", "HypothesisTests", "JSON3", "LinearAlgebra", "MetricaBase", "Optim", "Random", "Statistics", "Test"]
 path = "../../packages/MetricaTimeSeries.jl"
 uuid = "3da64bf2-aa4b-4146-a451-f808af01572a"
 version = "0.1.0"
