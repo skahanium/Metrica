@@ -5,6 +5,7 @@ using DataFrames
 using Distributions
 using LinearAlgebra
 using Optim
+using Random
 using Statistics
 using MetricaBase
 using MetricaOutput
@@ -26,6 +27,9 @@ include("slx_fit.jl")
 include("sdm_fit.jl")
 include("sdem_fit.jl")
 include("sac_fit.jl")
+include("gwr_fit.jl")
+include("gtwr_fit.jl")
+include("spatial_probit.jl")
 include("effects.jl")
 include("interfaces.jl")
 include("fit_spatial.jl")
