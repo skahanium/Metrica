@@ -34,9 +34,19 @@ garch ret, time(time) garch(1 1)
 
 拟合成功后，`result_payload` 含：
 
-- **`glance` / `tidy`：** 样本量、对数似然、信息准则、\(\mu,\omega,\alpha_i,\beta_j\) 等系数行（首期标准误可为空，见实现）。
-- **`diagnostics`：** **`persistence`**（\(\sum\alpha+\sum\beta\)）接近 1 表示冲击衰减很慢；**`conditional_volatility_preview`** 为条件波动序列的**前缀预览**，全长在 **`volatility_length`**；**`failure_code`** 在非收敛或数值失败时出现。
+- **`glance` / `tidy`：** 样本量、对数似然、信息准则、\(\mu,\omega,\alpha_i,\beta_j\) 等系数行（含 BFGS OPG 三明治标准误、z 值、p 值）。
+- **`diagnostics`：** **`persistence`**（\(\sum\alpha+\sum\beta\)）接近 1 表示冲击衰减很慢；**`conditional_volatility_preview`** 为条件波动序列前缀预览；**`volatility_forecast`** 为未来波动率预测；**`var_forecast`** / **`es_forecast`** 为 VaR/ES 预测；**`kupiec_test`** 为 Kupiec 回测；**`failure_code`** 在非收敛时出现。
 - **`warnings`：** 教学向提示（如优化未收敛）。
+
+## 4. GJR-GARCH 与 EGARCH
+
+```text
+arch ret, time(date) model(gjr) garch(1 1)
+arch ret, time(date) model(egarch) garch(1 1)
+```
+
+- GJR-GARCH 通过 `gamma` 系数捕捉杠杆效应（负冲击对波动率的影响大于正冲击）。
+- EGARCH 以对数方差建模，天然保证方差非负，`gamma` 系数反映非对称性。
 
 App 中 **`VolatilitySummaryPanel`** 仅展示上述结构化字段，**不在 UI 内重算**波动率路径。
 

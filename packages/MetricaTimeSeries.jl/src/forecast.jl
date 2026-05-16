@@ -304,6 +304,9 @@ Ljung-Box 自相关检验。
 # 返回
 - `(test_statistic, p_value, conclusion)`
 """
+forecast(result::ARCHFitResult; steps::Int=10) = forecast_arch(result; steps=steps)
+forecast(result::GARCHFitResult; steps::Int=10) = forecast_garch(result; steps=steps)
+
 function ljung_box_test(y::Vector{Float64}; lags::Int=10)
     n = length(y)
     acf_values = acf(y, max_lags=lags)

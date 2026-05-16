@@ -729,4 +729,43 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
         df_small = first(df, 20)
         @test_throws ErrorException fit(am, df_small)
     end
+
+    @testset "GJR-GARCH" begin
+        gm = GJRModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
+        r = fit(gm, df)
+        @test r isa GJRFitResult
+        @test isfinite(r.loglik)
+        @test length(r.gamma) == 1
+        pay = result_to_payload(r; include_augment=false)
+        @test pay["model_type"] == "gjr_garch"
+    end
+
+    @testset "EGARCH" begin
+        em = EGARCHModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
+        r = fit(em, df)
+        @test r isa EGARCHFitResult
+        @test isfinite(r.loglik)
+        pay = result_to_payload(r; include_augment=false)
+        @test pay["model_type"] == "egarch"
+    end
+
+    @testset "GARCH standard errors" begin
+        gm = GARCHModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
+        r = fit(gm, df)
+        t = tidy(r)
+        row = t.rows[2]  # omega
+        @test row.stderror !== nothing
+        @test row.stderror > 0
+    end
+
+    @testset "Volatility forecast + VaR" begin
+        gm = GARCHModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
+        r = fit(gm, df)
+        h_f = forecast(r; steps=5)
+        @test length(h_f) == 5
+        @test all(v -> v > 0, h_f)
+        diag = compute_volatility_diagnostics(r; steps=5, var_alpha=0.05)
+        @test haskey(diag, :var_forecast)
+        @test haskey(diag, :kupiec_test)
+    end
 end
