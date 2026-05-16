@@ -7,3 +7,5 @@
 #   - arima.jl: result_to_payload(::ARIMAFitResult)
 #   - var.jl: result_to_payload(::VARFitResult)
 #   - cointegration.jl: result_to_payload(::CointegrationFitResult)
+#   - arch.jl: result_to_payload(::ARCHFitResult)
+#   - garch.jl: result_to_payload(::GARCHFitResult)

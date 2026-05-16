@@ -54,7 +54,7 @@ describe('getPartial', () => {
 describe('getCompletions', () => {
   it('returns verb completions', () => {
     const ctx = { kind: 'verb' as const };
-    const c = getCompletions(ctx, mockVars, 'reg');
+    const c = getCompletions(ctx, mockVars, 'regre');
     expect(c.length).toBeGreaterThan(0);
     expect(c[0].text).toBe('regress');
     expect(c[0].kind).toBe('verb');
@@ -121,8 +121,8 @@ describe('getCorrections', () => {
 describe('getGhostText', () => {
   it('returns remainder for partial match', () => {
     const ctx = { kind: 'verb' as const };
-    const text = getGhostText(ctx, mockVars, 'reg', 3);
-    expect(text).toBe('ress'); // "reg" + "ress" = "regress"
+    const text = getGhostText(ctx, mockVars, 'regre', 5);
+    expect(text).toBe('ss'); // "regre" + "ss" = "regress"
   });
 
   it('returns null for complete match', () => {

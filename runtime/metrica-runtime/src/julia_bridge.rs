@@ -36,7 +36,10 @@ fn time_series_julia_project_path() -> String {
 }
 
 fn is_time_series_model(model_type: &str) -> bool {
-    matches!(model_type, "arima" | "var" | "unitroot" | "cointegration")
+    matches!(
+        model_type,
+        "arima" | "var" | "unitroot" | "cointegration" | "arch" | "garch"
+    )
 }
 
 // resolve_working_dir 已由 lib.rs 提供（通过 crate import 引用）

@@ -78,6 +78,41 @@ const mockGmmResult: ModelResult = {
   warnings: [],
 };
 
+/** ARCH 结果块：glance.model 须匹配 `ARCH(` 以挂载 VolatilitySummaryPanel */
+const mockArchResult: ModelResult = {
+  glance: {
+    model: 'ARCH(2)',
+    nobs: 400,
+    dof: 0,
+    metrics: {
+      loglik: -612.34,
+      aic: 1230.5,
+      bic: 1255.2,
+      arch_order: 2,
+      persistence: 0.42,
+      unconditional_variance: 1.05,
+    },
+  },
+  tidy: [
+    { term: 'mu', estimate: 0.01, std_error: null, statistic: null, p_value: null },
+    { term: 'omega', estimate: 0.05, std_error: null, statistic: null, p_value: null },
+    { term: 'alpha_1', estimate: 0.2, std_error: null, statistic: null, p_value: null },
+  ],
+  diagnostics: {
+    converged: true,
+    iterations: 120,
+    optimizer: 'NelderMead',
+    loglik: -612.34,
+    persistence: 0.42,
+    unconditional_variance: 1.05,
+    conditional_volatility_preview: [0.12, 0.15, 0.11],
+    volatility_length: 400,
+    arch_order: 2,
+    failure_code: null,
+  },
+  warnings: [],
+};
+
 describe('ResultBlock', () => {
   it('renders command text and OLS glance for ols model', () => {
     render(
@@ -114,6 +149,15 @@ describe('ResultBlock', () => {
     );
     expect(screen.getByText('GMM 与序列相关诊断')).toBeDefined();
     expect(screen.getByText('Hansen J')).toBeDefined();
+  });
+
+  it('matches snapshot for ARCH result with volatility diagnostics panel', () => {
+    const { asFragment } = render(
+      <ResultBlock command="arch ret, time(time) arch(2)" result={mockArchResult} />,
+    );
+    expect(screen.getByText('波动率模型诊断')).toBeDefined();
+    expect(screen.getByText('ARCH(2)')).toBeDefined();
+    expect(asFragment()).toMatchSnapshot();
   });
 
   it('passes result prop to sub-components, not global store', () => {

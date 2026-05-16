@@ -374,6 +374,19 @@ const grammars: CommandGrammar[] = [
     time: optionValue('time', false),
     deterministic: { kind: 'option_value', label: 'deterministic', required: false, multiple: false, values: ['constant', 'trend', 'none'] },
   }),
+  makeModelGrammar('arch', 'ARCH(q) 波动率模型（常数均值）', {
+    time: optionValue('time', false),
+    arch: { kind: 'option_value', label: 'arch', required: true, multiple: false },
+    maxiter: optionValue('maxiter', false),
+    tol: optionValue('tol', false),
+  }),
+  makeModelGrammar('garch', 'GARCH(p,q) 波动率模型（常数均值）', {
+    time: optionValue('time', false),
+    arch: optionValue('arch', false),
+    garch: optionValue('garch', false),
+    maxiter: optionValue('maxiter', false),
+    tol: optionValue('tol', false),
+  }),
   makeModelGrammar('coint', '协整检验', {
     time: optionValue('time', false),
     method: { kind: 'option_value', label: 'method', required: false, multiple: false, values: ['engle_granger', 'johansen'] },

@@ -123,7 +123,7 @@ export function parse(input: string): ParsedCommand {
 const MODEL_VERBS = new Set([
   'regress', 'ivregress', 'gmm', 'qreg', 'nls', 'threg', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
-  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3',
+  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3', 'garch', 'arch',
 ]);
 
 // ---- 动词 -> model_type 映射 ----
@@ -155,6 +155,8 @@ function verbToModelType(verb: string): string {
     var: 'var',
     dfuller: 'unitroot',
     coint: 'cointegration',
+    garch: 'garch',
+    arch: 'arch',
   };
   return map[verb] || verb;
 }
@@ -318,7 +320,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   if (optMap.has('time')) spec.panel_time = optMap.get('time');
   if (optMap.has('method') && modelType !== 'panel_iv' && modelType !== 'dynamic_panel_gmm'
     && modelType !== 'sur' && modelType !== 'system_2sls' && modelType !== 'system_3sls' && modelType !== 'quantile'
-    && modelType !== 'nls' && modelType !== 'threshold') {
+    && modelType !== 'nls' && modelType !== 'threshold' && modelType !== 'arch' && modelType !== 'garch') {
     spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
   }
 
@@ -453,7 +455,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   // ---- 时间序列选项 ----
 
-  if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration') {
+  if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration' || modelType === 'arch' || modelType === 'garch') {
     if (optMap.has('time')) spec.time_column = optMap.get('time');
     const ar = optMap.has('ar') ? parseInt(optMap.get('ar')!) : 1;
     const i = optMap.has('i') ? parseInt(optMap.get('i')!) : 0;
@@ -472,6 +474,60 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
       spec.variables = positionals;
     } else if (positionals.length >= 1 && spec.formula) {
       spec.variable = positionals[0];
+    }
+    if (modelType === 'arch') {
+      if (!optMap.has('arch')) {
+        return { error: 'arch 命令需要 arch(q) 指定阶数，例如 arch(ret), time(t) arch(1)。' };
+      }
+      const raw = String(optMap.get('arch')).trim();
+      const qv = parseInt(raw, 10);
+      if (Number.isNaN(qv)) {
+        return { error: 'arch(q) 须为整数。' };
+      }
+      if (qv < 1 || qv > 12) {
+        return { error: 'arch_order 须在 1–12 之间（与 Runtime 校验一致）。' };
+      }
+      spec.arch_order = qv;
+    }
+    if (modelType === 'garch') {
+      if (optMap.has('garch')) {
+        const parts = String(optMap.get('garch')).trim().split(/\s+/).filter(Boolean).map((s) => parseInt(s, 10));
+        if (parts.length === 2) {
+          if (parts.some((n) => Number.isNaN(n))) {
+            return { error: 'garch(p q) 须为两个整数。' };
+          }
+          spec.garch_p = parts[0];
+          spec.garch_q = parts[1];
+        } else if (parts.length === 1) {
+          if (Number.isNaN(parts[0])) {
+            return { error: 'garch(q) 须为整数。' };
+          }
+          spec.garch_p = 1;
+          spec.garch_q = parts[0];
+        } else {
+          return { error: 'garch(...) 须为 p q 两个整数，或单个整数 q（默认 p=1）。' };
+        }
+      }
+      if (optMap.has('arch')) {
+        const ap = parseInt(String(optMap.get('arch')), 10);
+        if (Number.isNaN(ap)) {
+          return { error: '在 garch 命令中 arch(p) 表示 GARCH 的 ARCH 阶 p，须为整数。' };
+        }
+        spec.garch_p = ap;
+      }
+      if (optMap.has('maxiter')) {
+        const m = parseInt(String(optMap.get('maxiter')), 10);
+        if (!Number.isNaN(m) && m >= 1) spec.garch_max_iter = m;
+      }
+      if (optMap.has('tol')) {
+        const t = parseFloat(String(optMap.get('tol')));
+        if (Number.isFinite(t) && t > 0) spec.garch_tol = t;
+      }
+      const pFin = spec.garch_p ?? 1;
+      const qFin = spec.garch_q ?? 1;
+      if (pFin < 1 || qFin < 1 || pFin > 5 || qFin > 5 || pFin + qFin > 8) {
+        return { error: 'garch_p/garch_q 须满足 1≤p,q≤5 且 p+q≤8。' };
+      }
     }
   }
 

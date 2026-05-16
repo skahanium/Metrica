@@ -143,6 +143,22 @@ export interface NlsDiagnostics {
   nls_family?: string;
 }
 
+/** ARCH / GARCH（`result_payload.diagnostics`） */
+export interface VolatilityDiagnostics {
+  converged?: boolean;
+  iterations?: number;
+  optimizer?: string;
+  loglik?: number;
+  persistence?: number;
+  unconditional_variance?: number;
+  conditional_volatility_preview?: number[];
+  volatility_length?: number;
+  arch_order?: number;
+  garch_p?: number;
+  garch_q?: number;
+  failure_code?: string | null;
+}
+
 /** 单门限回归（`result_payload.diagnostics`） */
 export interface ThresholdDiagnostics {
   gamma_hat?: number;
@@ -204,7 +220,7 @@ export interface ModelResult {
   /** 按方程的 glance（SUR / 系统 IV）；与顶层 `glance` 并存 */
   equation_glances?: GlanceResult[];
   tidy: TidyRow[];
-  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics;
+  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics | VolatilityDiagnostics;
   odds_ratios?: OddsRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
@@ -444,7 +460,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -478,6 +494,14 @@ export interface ModelSpec {
   ts_method?: 'mle' | 'css' | 'engle_granger' | 'johansen';
   lags?: number;
   deterministic?: 'constant' | 'trend' | 'none';
+  /** 仅 `arch`：ARCH 阶 q（1–12） */
+  arch_order?: number;
+  /** 仅 `garch`：默认 1 */
+  garch_p?: number;
+  garch_q?: number;
+  /** `arch` / `garch`：优化控制 */
+  garch_max_iter?: number;
+  garch_tol?: number;
   // S4d: Survey 字段
   weights_column?: string;
   strata_column?: string;

@@ -763,6 +763,11 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         thresholdVariable: spec.threshold_variable,
         thresholdGrid: spec.threshold_grid,
         thresholdTrimFrac: spec.threshold_trim_frac,
+        archOrder: spec.arch_order,
+        garchP: spec.garch_p,
+        garchQ: spec.garch_q,
+        garchMaxIter: spec.garch_max_iter,
+        garchTol: spec.garch_tol,
       });
       const payload = (result as TaskResponse).result_payload as Record<string, unknown> | undefined;
       const rr = (result as TaskResponse).run_record;

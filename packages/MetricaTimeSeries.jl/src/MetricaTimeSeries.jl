@@ -10,6 +10,8 @@ using Statistics
 
 export AbstractTimeSeriesModel, AbstractTSFitResult,
     ARIMAModel, ARIMAFitResult,
+    ARCHModel, ARCHFitResult,
+    GARCHModel, GARCHFitResult,
     VARModel, VARFitResult,
     UnitRootModel, UnitRootFitResult,
     CointegrationModel, CointegrationFitResult,
@@ -102,6 +104,9 @@ end
 # === 顺序加载各模块 =======================================================
 
 include("unitroot.jl")
+include("volatility_fit.jl")
+include("arch.jl")
+include("garch.jl")
 include("arima.jl")
 include("var.jl")
 include("cointegration.jl")
@@ -116,7 +121,7 @@ include("serialize.jl")
 从 JSON 参数统一构造时间序列模型实例。
 
 # 参数
-- `model_type`: 模型类型字符串，支持 "arima"、"var"、"unitroot"、"cointegration"
+- `model_type`: 模型类型字符串，支持 "arima"、"var"、"unitroot"、"cointegration"、"arch"、"garch"
 - `params`: 参数字典，包含模型构造所需的字段
 
 # 返回值
@@ -189,6 +194,36 @@ function build_time_series_model(model_type::String, params::Dict)
             deterministic=det,
         )
 
+    elseif model_type == "arch"
+        var_sym = Symbol(get(() -> error("ARCH 模型需要 variable 参数"), params, "variable"))
+        raw_q = get(params, "arch_order", nothing)
+        raw_q === nothing && error("ARCH 模型需要 arch_order 参数")
+        arch_order = Int(raw_q)
+        mi = Int(get(params, "garch_max_iter", 5000))
+        tol = Float64(get(params, "garch_tol", 1e-5))
+        return ARCHModel(
+            variable=var_sym,
+            time_column=time_col,
+            arch_order=arch_order,
+            max_iter=mi,
+            tol=tol,
+        )
+
+    elseif model_type == "garch"
+        var_sym = Symbol(get(() -> error("GARCH 模型需要 variable 参数"), params, "variable"))
+        gp = Int(get(params, "garch_p", 1))
+        gq = Int(get(params, "garch_q", 1))
+        mi = Int(get(params, "garch_max_iter", 8000))
+        tol = Float64(get(params, "garch_tol", 1e-5))
+        return GARCHModel(
+            variable=var_sym,
+            time_column=time_col,
+            garch_p=gp,
+            garch_q=gq,
+            max_iter=mi,
+            tol=tol,
+        )
+
     else
         error("未知时间序列模型类型：$model_type")
     end
@@ -210,6 +245,12 @@ function __init__()
         end
         if isdefined(@__MODULE__, :CointegrationModel)
             MetricaBase.MODEL_REGISTRY["cointegration"] = CointegrationModel
+        end
+        if isdefined(@__MODULE__, :ARCHModel)
+            MetricaBase.MODEL_REGISTRY["arch"] = ARCHModel
+        end
+        if isdefined(@__MODULE__, :GARCHModel)
+            MetricaBase.MODEL_REGISTRY["garch"] = GARCHModel
         end
     end
 end

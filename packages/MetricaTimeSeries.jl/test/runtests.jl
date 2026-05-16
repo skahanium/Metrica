@@ -2,6 +2,7 @@ using Test
 using Random
 using Statistics
 using DataFrames
+using CSV
 using MetricaBase
 using MetricaTimeSeries
 import MetricaBase: fit, glance, tidy, augment, coef, nobs
@@ -13,6 +14,8 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
         @test isdefined(MetricaTimeSeries, :AbstractTSFitResult)
         @test isdefined(MetricaTimeSeries, :UnitRootModel)
         @test isdefined(MetricaTimeSeries, :UnitRootFitResult)
+        @test isdefined(MetricaTimeSeries, :ARCHModel)
+        @test isdefined(MetricaTimeSeries, :GARCHModel)
         @test isdefined(MetricaTimeSeries, :sort_by_time)
         @test isdefined(MetricaTimeSeries, :create_lags)
         @test isdefined(MetricaTimeSeries, :difference)
@@ -689,5 +692,41 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
             lb_ar = ljung_box_test(y_ar, lags=10)
             @test lb_ar.conclusion == "reject"
         end
+    end
+
+    @testset "ARCH / GARCH" begin
+        root = joinpath(@__DIR__, "..", "..", "..")
+        demo_path = joinpath(root, "datasets", "demo", "garch_demo.csv")
+        df = CSV.read(demo_path, DataFrame)
+
+        gspec = Dict{String, Any}(
+            "variable" => "ret",
+            "time_column" => "time",
+            "garch_p" => 1,
+            "garch_q" => 1,
+        )
+        gm = MetricaTimeSeries.build_time_series_model("garch", gspec)
+        gr = fit(gm, df)
+        @test gr isa GARCHFitResult
+        @test isfinite(gr.loglik)
+        pay = MetricaTimeSeries.result_to_payload(gr; include_augment=false)
+        @test pay["model_type"] == "garch"
+        @test haskey(pay, "diagnostics")
+        @test pay["diagnostics"]["volatility_length"] == nrow(df)
+
+        aspec = Dict{String, Any}(
+            "variable" => "ret",
+            "time_column" => "time",
+            "arch_order" => 1,
+        )
+        am = MetricaTimeSeries.build_time_series_model("arch", aspec)
+        ar = fit(am, df)
+        @test ar isa ARCHFitResult
+        paya = MetricaTimeSeries.result_to_payload(ar; include_augment=false)
+        @test paya["model_type"] == "arch"
+        @test paya["diagnostics"]["arch_order"] == 1
+
+        df_small = first(df, 20)
+        @test_throws ErrorException fit(am, df_small)
     end
 end

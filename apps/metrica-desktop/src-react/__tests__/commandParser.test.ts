@@ -385,6 +385,37 @@ describe('parseToModelSpec', () => {
     }
   });
 
+  it('parses arch with arch(q)', () => {
+    const r = parse('arch ret, time(t) arch(2)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('arch');
+      expect(spec.arch_order).toBe(2);
+    }
+  });
+
+  it('rejects arch order out of bounds', () => {
+    const r = parse('arch ret, time(t) arch(15)');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(true);
+  });
+
+  it('parses garch with arch(p) garch(q) shorthand', () => {
+    const r = parse('garch ret, time(t) arch(1) garch(1)');
+    const spec = parseToModelSpec(r);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('garch');
+      expect(spec.garch_p).toBe(1);
+      expect(spec.garch_q).toBe(1);
+    }
+  });
+
+  it('rejects invalid garch p q sum', () => {
+    const r = parse('garch ret, time(t) garch(6 6)');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(true);
+  });
+
   it('summarize does not produce a ModelSpec', () => {
     const parsed = parse('summarize y x1');
     const spec = parseToModelSpec(parsed);

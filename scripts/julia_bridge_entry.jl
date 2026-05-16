@@ -116,7 +116,7 @@ else
     formula = String(request.model_spec.formula)
     model_type = String(request.model_spec.model_type)
 
-    if model_type in ("arima", "var", "unitroot", "cointegration")
+    if model_type in ("arima", "var", "unitroot", "cointegration", "arch", "garch")
         # 时间序列模型：构造结构体 + DataFrame 拟合
         using CSV, DataFrames
         data = CSV.read(dataset_path, DataFrame)

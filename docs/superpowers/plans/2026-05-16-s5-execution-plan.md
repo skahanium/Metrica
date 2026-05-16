@@ -285,6 +285,82 @@
 
 ---
 
+## S5.6 ARCH / GARCH
+
+### 1. 收口状态
+
+- **范围：** 在 `MetricaTimeSeries.jl` 与既有时间序列桥接分支上，新增 `model_type`：`arch`（ARCH(q)，常数均值）与 `garch`（GARCH(p,q)，常数均值）；Runtime 字段校验与垂直切片；App CLI + 结构化 `VolatilitySummaryPanel`；协议与教程。
+- **权威对齐：** 总规 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) §9；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
+
+### 2. 范围与非目标
+
+| 阶段 | `model_type` | 首期纳入 | 明确不做（首期） |
+|------|----------------|----------|------------------|
+| **6a** | `garch` | 单变量、常数均值 μ、**GARCH(p,q)**；默认 **GARCH(1,1)**；QMLE（Gaussian 条件似然）；`glance` / `tidy` / `diagnostics` / `warnings`；条件方差 **预览 + 全长元数据** | 均值 AR-X；BEKK/DCC；VaR/ES 产品化；用户自定义似然 |
+| **6b** | `arch` | **ARCH(q)** 常数均值；`arch_order` 上界与 Rust 一致 | GJR、EGARCH、成分模型（除非二次定稿） |
+
+**非目标：** 完整风险管理面板、滚动 forecast 流水线、由 Core 计算专用作图数据；App **仅消费** `diagnostics` 中结构化字段展示。
+
+### 3. 架构与数据流
+
+与 `arima` / `unitroot` 相同：`CSV.read` → `params` Dict → `MetricaTimeSeries.build_time_series_model` → `MetricaBase.fit` → `result_to_payload`。**不**走截面 `MODEL_REGISTRY` kwargs 路径。Rust 侧 `julia_bridge.rs` 将 `arch`/`garch` 与既有时间序列族一并派发到 **`julia_time_series_bridge_entry.jl`**（`packages/MetricaTimeSeries.jl` project）；`julia_bridge_entry.jl` / `julia_daemon.jl` 中的 TS 分支列表与之对齐，便于单进程宿主场景。
+
+### 4. 设计定稿（单一事实来源）
+
+1. **均值方程（首期）：** 仅常数均值 \(y_t=\mu+\varepsilon_t\)，\(\varepsilon_t=\sigma_t z_t\)，\(z_t\sim N(0,1)\)（QMLE 高斯对数似然）。不支持 `y ~ x` 型均值 + GARCH 残差。
+2. **时间与变量：** 与 ARIMA 一致：`variable` + `time_column`；`formula` 可为占位（与 `unitroot` 垂直切片一致）。
+3. **阶数字段（方案 A，已定稿）：** `arch_order: number`（仅 `arch`，整数 \(q\ge 1\)）；`garch_p`、`garch_q`（仅 `garch`，默认 `1`/`1`）。**不**采用单一 `variance_order: [p,q]`（方案 B 已否决）。
+4. **估计后端（S5.6-J0 结论）：** 曾对比 **ARCHModels.jl**（实现快）与 **Optim + 手写条件对数似然**（与包内现有依赖一致、教学透明）。**首期定稿：Optim + 手写 QMLE**（`MetricaTimeSeries.jl` 已依赖 `Optim.jl`；不新增 `[compat]` 依赖）。若未来需 stationarity 检验套件，可再评估引入 ARCHModels。
+5. **Runtime / Julia 数值上界（与实现对齐）：** `garch_p`、`garch_q` 各自 \(\le 5\)，且 `garch_p + garch_q \le 8\)；`arch_order` \(\le 12\)。**样本下界：** `garch` 要求 \(n \ge 50 + 5(p+q)\)；`arch` 要求 \(n \ge 30 + 5q\)。
+6. **字段互斥：** `model_type == "arch"` 时不得出现 `garch_p` / `garch_q`（JSON 中若存在任一则校验失败）；`model_type == "garch"` 时不得出现 `arch_order`。
+
+### 5. 协议定稿表（`model_spec`）
+
+**共同必填：** `dataset_ref`；`model_type`；`variable`；`time_column`。
+
+| 字段 | `garch` | `arch` | 说明 |
+|------|---------|--------|------|
+| `garch_p` / `garch_q` | 可选，默认 1 | **禁止** | 上界见上 |
+| `arch_order` | **禁止** | 必填，\(q\ge 1\) | 上界 12 |
+| `garch_max_iter` / `garch_tol` | 可选 | 可选（同名字段供优化控制） | `diagnostics` 记录实际使用值 |
+
+**`result_payload.diagnostics`（约定键）：** `converged`、`iterations`、`optimizer`、`loglik`、`persistence`（\(\sum\alpha+\sum\beta\)）、`unconditional_variance`（若可算）、`conditional_volatility_preview`、`volatility_length`、`arch_order` 或 `garch_p`/`garch_q`、`failure_code`（未收敛时）；**首期不做** `ljung_box_on_std_residuals`（列为非目标）。
+
+### 6. CLI 与 App（CLI-first）
+
+- **`garch`：** `garch <变量>, time(<时间列>) [garch(<p> <q>)]`，省略 `garch(...)` 时为 GARCH(1,1)。与总规兼容的等价写法：`garch y, time(date) arch(1) garch(1)` 表示 `garch_p=1`、`garch_q=1`（`arch(k)` 仅映射 ARCH 阶 \(p\)，`garch(k)` 映射 \(q\)）。
+- **`arch`：** `arch <变量>, time(<时间列>) arch(<q>)`，`arch(...)` 必填。
+
+### 7. Task 表
+
+| ID | 位置 | 一句话目标 |
+|----|------|------------|
+| S5.6-D0 | 本专节 + `s5-advanced-research-topics.md` | S5.6 专节 + 路线图锚点 |
+| S5.6-J0 | `MetricaTimeSeries.jl` | 后端选型结论写入专节（上文已定稿） |
+| S5.6-J1 | `arch.jl` / `garch.jl` | 类型、`fit`、`glance`/`tidy`、`result_to_payload` |
+| S5.6-J2 | `build_time_series_model` + 测试 + `datasets/demo/garch_demo.csv` | 边界与收敛路径 |
+| S5.6-B1 | `julia_bridge_entry.jl`、`julia_daemon.jl` | TS 分支纳入 `arch`/`garch` |
+| S5.6-R1 | `lib.rs`、`server.rs` | 字段、阶数上界、互斥校验 |
+| S5.6-R2 | `vertical_slice.rs` | `arch`/`garch` 各一条成功路径断言 `diagnostics` |
+| S5.6-A1 | App `command*`、`protocol`、`Result*` | CLI + `VolatilitySummaryPanel` |
+| S5.6-A2 | Vitest | 合法/非法阶数 |
+| S5.6-D1 | `runtime-protocol.md`、`tutorials/s5-arch-garch.md` | 协议 + 教学 |
+| S5.6-D2 | 总规 §9 | CLI 与字段名一致 |
+
+### 8. 验收
+
+- `Pkg.test(MetricaTimeSeries)`：短样本、非法阶数、未收敛路径与成功路径。
+- `cargo test vertical_slice`（或 workspace 等价）：`arch`、`garch` 各至少一条成功，`diagnostics` 含约定键。
+- App：Vitest 覆盖非法阶数；结果块只读消费 `diagnostics`。
+
+### 9. 风险
+
+- 似然平坦 / 初值敏感 → `failure_code` + `warnings`。
+- \(\omega>0,\alpha,\beta\ge 0\) 与平稳性 → 违反时高优先级 `warnings` 或 `ModelError`（Julia 定稿）。
+- 条件方差序列过长 → **预览 + `volatility_length`**，避免 JSON 爆量。
+
+---
+
 ## 验证与未覆盖风险（`S5.0`）
 
 - **已做：** 全仓 `grep` 旧 `spec`/`plan` 路径与 `ui-project-button-system-plan.md`；`docs/superpowers` 目录仅剩本计划与主设计；Runtime 路由与 `julia_bridge_entry.jl` / `julia_daemon.jl` 对照更新协议文档。

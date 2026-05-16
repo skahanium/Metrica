@@ -81,6 +81,11 @@ export interface FitModelParams {
   thresholdVariable?: string;
   thresholdGrid?: number[];
   thresholdTrimFrac?: number;
+  archOrder?: number;
+  garchP?: number;
+  garchQ?: number;
+  garchMaxIter?: number;
+  garchTol?: number;
 }
 
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
@@ -132,6 +137,11 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     thresholdVariable,
     thresholdGrid,
     thresholdTrimFrac,
+    archOrder,
+    garchP,
+    garchQ,
+    garchMaxIter,
+    garchTol,
   } = params;
 
   const modelSpec: FitModelRequest['model_spec'] = {
@@ -180,17 +190,36 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (outcomeColumn?.trim()) modelSpec.outcome_column = outcomeColumn.trim();
     if (propensityFormula?.trim()) modelSpec.propensity_formula = propensityFormula.trim();
     if (outcomeFormula?.trim()) modelSpec.outcome_formula = outcomeFormula.trim();
-  } else if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration') {
+  } else if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration' || modelType === 'arch' || modelType === 'garch') {
     if (timeColumn.trim()) modelSpec.time_column = timeColumn.trim();
     if (tsVariable.trim()) modelSpec.variable = tsVariable.trim();
     if (tsVariables.trim()) modelSpec.variables = tsVariables.split(',').map((v: string) => v.trim()).filter(Boolean);
-    modelSpec.order = [orderP, orderD, orderQ];
-    if (seasonalP > 0 || seasonalQ > 0) {
-      modelSpec.seasonal_order = [seasonalP, seasonalD, seasonalQ, seasonalS];
+    if (modelType === 'arima') {
+      modelSpec.order = [orderP, orderD, orderQ];
+      if (seasonalP > 0 || seasonalQ > 0) {
+        modelSpec.seasonal_order = [seasonalP, seasonalD, seasonalQ, seasonalS];
+      }
     }
-    if (tsLags > 0) modelSpec.lags = tsLags;
-    if (tsDeterministic !== 'constant') modelSpec.deterministic = tsDeterministic as 'constant' | 'trend' | 'none';
-    if (tsMethod.trim()) modelSpec.ts_method = tsMethod.trim() as 'mle' | 'css' | 'engle_granger' | 'johansen';
+    if (modelType !== 'arch' && modelType !== 'garch' && tsLags > 0) modelSpec.lags = tsLags;
+    if (modelType !== 'arch' && modelType !== 'garch' && tsDeterministic !== 'constant') {
+      modelSpec.deterministic = tsDeterministic as 'constant' | 'trend' | 'none';
+    }
+    if (modelType !== 'arch' && modelType !== 'garch' && tsMethod.trim()) {
+      modelSpec.ts_method = tsMethod.trim() as 'mle' | 'css' | 'engle_granger' | 'johansen';
+    }
+    if (modelType === 'arch' && typeof archOrder === 'number' && Number.isFinite(archOrder)) {
+      modelSpec.arch_order = archOrder;
+    }
+    if (modelType === 'garch') {
+      if (typeof garchP === 'number' && Number.isFinite(garchP)) modelSpec.garch_p = garchP;
+      if (typeof garchQ === 'number' && Number.isFinite(garchQ)) modelSpec.garch_q = garchQ;
+    }
+    if ((modelType === 'arch' || modelType === 'garch') && typeof garchMaxIter === 'number' && Number.isFinite(garchMaxIter)) {
+      modelSpec.garch_max_iter = garchMaxIter;
+    }
+    if ((modelType === 'arch' || modelType === 'garch') && typeof garchTol === 'number' && Number.isFinite(garchTol)) {
+      modelSpec.garch_tol = garchTol;
+    }
   } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin') {
     modelSpec.vcov = { type: vcovType };
   } else if (modelType === 'survey_ols' || modelType === 'survey_logit' || modelType === 'survey_probit' || modelType === 'survey_poisson') {

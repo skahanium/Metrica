@@ -61,7 +61,7 @@
 | 非线性与门限（S5.5） | `nls`、`threshold`（`packages/MetricaNonlinear.jl`；受控白名单与网格搜索） |
 | 系统方程（S5.3） | `sur`、`system_2sls`、`system_3sls`（`packages/MetricaSystem.jl`） |
 | 面板 | `panel`、`panel_iv`、`dynamic_panel_gmm` |
-| 时间序列 | `arima`、`var`、`unitroot`、`cointegration` |
+| 时间序列 | `arima`、`var`、`unitroot`、`cointegration`、`arch`、`garch`（`arch`/`garch` 走 `julia_time_series_bridge_entry.jl` + `MetricaTimeSeries.jl`） |
 | 离散 | `logit`、`probit`、`poisson`、`ordered_logit`、`multinomial_logit`、`negbin` |
 | 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
 | 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
@@ -122,6 +122,34 @@
 **`result_payload.diagnostics`：** `gamma_hat`、`n_below`、`n_above`、`rss_piecewise`、`search_grid_meta`（对象：`n_candidates`、`trim_frac_applied`、`grid_input_length`）。
 
 **CLI（App）：** 动词 **`threg`** 映射为 `model_type: "threshold"`；`threg y x1 q, qvar(q) grid(min max n)` 在解析器内将 `grid` 展开为等距单调数组（\(n\le 500\)）。教程见 [`tutorials/s5-nonlinear-threshold.md`](../../tutorials/s5-nonlinear-threshold.md)。
+
+### `arch` / `garch`（ARCH(q) 与 GARCH(p,q)，常数均值，S5.6）
+
+**路径：** 与 `arima` 相同，Runtime 将请求派发到 **`julia_time_series_bridge_entry.jl`**（`MetricaTimeSeries.jl` 独立 project），**不**走主 `julia_bridge_entry.jl` 截面 `MODEL_REGISTRY` 分支。
+
+**共同必填：** `variable`、`time_column`；`formula` 可为占位字符串。
+
+**`arch`：`ModelSpec` 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `arch` |
+| `arch_order` | 整数 | 是 | ARCH 阶 \(q\)，**1–12**；与 Runtime 校验一致。 |
+| `garch_max_iter` / `garch_tol` | 整数 / 数 | 否 | 优化控制；Julia 默认与 `garch` 共用键名。 |
+
+**`garch`：`ModelSpec` 字段**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `garch` |
+| `garch_p` / `garch_q` | 整数 | 否 | 默认 **1 / 1**；须满足 **1≤p,q≤5** 且 **p+q≤8**。 |
+| `garch_max_iter` / `garch_tol` | 整数 / 数 | 否 | 优化控制。 |
+
+**互斥：** `arch` 请求**不得**携带 `garch_p` / `garch_q`；`garch` 请求**不得**携带 `arch_order`。
+
+**`result_payload.diagnostics`（约定键）：** `converged`、`iterations`、`optimizer`、`loglik`、`persistence`、`unconditional_variance`、`conditional_volatility_preview`、`volatility_length`、`arch_order` 或 `garch_p`/`garch_q`、`failure_code`（未收敛或拟合失败时）。
+
+**CLI（App）：** `arch y, time(date) arch(q)`；`garch y, time(date) [arch(p)] [garch(p q)]`（省略 `garch(...)` 时为 GARCH(1,1)；与总规兼容写法 `garch y, time(date) arch(1) garch(1)` 表示 \(p=1,q=1\)）。演示数据：`datasets/demo/garch_demo.csv`。教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
 
 ### 非参数 / 半参数（5c 预留，非实现）
 

@@ -401,7 +401,7 @@ describe('CommandLine', () => {
     render(<CommandLine onExecute={vi.fn()} />);
     const input = screen.getByPlaceholderText(/输入命令/) as HTMLInputElement;
 
-    fireEvent.change(input, { target: { value: 'reg', selectionStart: 3 } });
+    fireEvent.change(input, { target: { value: 'regre', selectionStart: 5 } });
     expect(useCommandStore.getState().showCompletions).toBe(true);
 
     fireEvent.keyDown(input, { key: 'Enter' });

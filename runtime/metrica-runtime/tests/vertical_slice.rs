@@ -121,6 +121,48 @@ fn fit_model_runs_unitroot_through_time_series_bridge() {
 }
 
 #[test]
+fn fit_model_runs_garch_with_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/garch_demo.csv".to_string();
+    request.model_spec.model_type = "garch".to_string();
+    request.model_spec.formula = "ret".to_string();
+    request.model_spec.variable = Some("ret".to_string());
+    request.model_spec.time_column = Some("time".to_string());
+    request.model_spec.garch_p = Some(1);
+    request.model_spec.garch_q = Some(1);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("loglik").is_some());
+    assert!(diag.get("persistence").is_some());
+    assert!(diag.get("volatility_length").is_some());
+    assert!(diag.get("converged").is_some());
+}
+
+#[test]
+fn fit_model_runs_arch_with_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/garch_demo.csv".to_string();
+    request.model_spec.model_type = "arch".to_string();
+    request.model_spec.formula = "ret".to_string();
+    request.model_spec.variable = Some("ret".to_string());
+    request.model_spec.time_column = Some("time".to_string());
+    request.model_spec.arch_order = Some(1);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert!(diag.get("loglik").is_some());
+    assert_eq!(diag.get("arch_order").and_then(|v| v.as_i64()), Some(1));
+    assert!(diag.get("volatility_length").is_some());
+}
+
+#[test]
 fn fit_model_runs_gmm_linear_with_diagnostics() {
     let mut request = sample_fit_model_request();
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();

@@ -332,6 +332,11 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(ref m) = request.model_spec.ts_method { params["ts_method"] = json!(m); }
     if let Some(lags) = request.model_spec.lags { params["lags"] = json!(lags); }
     if let Some(ref det) = request.model_spec.deterministic { params["deterministic"] = json!(det); }
+    if let Some(ao) = request.model_spec.arch_order { params["arch_order"] = json!(ao); }
+    if let Some(gp) = request.model_spec.garch_p { params["garch_p"] = json!(gp); }
+    if let Some(gq) = request.model_spec.garch_q { params["garch_q"] = json!(gq); }
+    if let Some(n) = request.model_spec.garch_max_iter { params["garch_max_iter"] = json!(n); }
+    if let Some(t) = request.model_spec.garch_tol { params["garch_tol"] = json!(t); }
 
     // S4d: 调查模型字段
     if let Some(ref col) = request.model_spec.weights_column { params["weights_column"] = json!(col); }

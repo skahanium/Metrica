@@ -116,7 +116,7 @@ function handle_request(req::Dict{String, Any})
             model_type = get(params, "model_type", "ols")
             include_augment = get(params, "return_augment", false)
 
-            if model_type in ("arima", "var", "unitroot", "cointegration")
+            if model_type in ("arima", "var", "unitroot", "cointegration", "arch", "garch")
                 # 时间序列不在 MODEL_REGISTRY 中，必须先于注册表分支处理。
                 data = CSV.read(dataset_path, DataFrame)
                 model = MetricaTimeSeries.build_time_series_model(model_type, params)

@@ -73,6 +73,8 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("var", vec!["variables", "time_column", "lags"]),
         ("unitroot", vec!["variable", "time_column"]),
         ("cointegration", vec!["variables", "time_column", "method"]),
+        ("arch", vec!["variable", "time_column", "arch_order"]),
+        ("garch", vec!["variable", "time_column"]),
         // S4d: Survey 模型
         ("survey_ols", vec!["weights_column"]),
         ("survey_logit", vec!["weights_column"]),
@@ -152,6 +154,7 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                         .instrument_lags
                         .as_ref()
                         .map(|v| if v.len() >= 2 { "present" } else { "" }),
+                    "arch_order" => spec.arch_order.map(|_| "present"),
                     "equations" => spec
                         .equations
                         .as_ref()
@@ -339,6 +342,43 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                             hint: Some("请省略以使用默认 0.1。".to_string()),
                         });
                     }
+                }
+            }
+            if spec.model_type == "arch" {
+                if spec.garch_p.is_some() || spec.garch_q.is_some() {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: "arch 模型不得同时提供 garch_p / garch_q。".to_string(),
+                        hint: Some("请仅使用 arch_order 指定 ARCH 阶数。".to_string()),
+                    });
+                }
+                let ao = spec.arch_order.unwrap_or(0);
+                if ao < 1 || ao > 12 {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: format!("arch_order 须为 1–12 的整数，收到 {ao}。"),
+                        hint: None,
+                    });
+                }
+            }
+            if spec.model_type == "garch" {
+                if spec.arch_order.is_some() {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: "garch 模型不得同时提供 arch_order。".to_string(),
+                        hint: Some("请改用 model_type=arch 或移除 arch_order。".to_string()),
+                    });
+                }
+                let p = spec.garch_p.unwrap_or(1);
+                let q = spec.garch_q.unwrap_or(1);
+                if p < 1 || q < 1 || p > 5 || q > 5 || p + q > 8 {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: format!(
+                            "garch_p / garch_q 须满足 1≤p,q≤5 且 p+q≤8；收到 p={p}, q={q}。"
+                        ),
+                        hint: Some("可省略两字段以使用默认 GARCH(1,1)。".to_string()),
+                    });
                 }
             }
             None
@@ -529,6 +569,21 @@ pub struct ModelSpec {
     /// 仅 `threshold`：q 上修剪比例，默认 0.1。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub threshold_trim_frac: Option<f64>,
+    /// 仅 `arch`：ARCH 阶 q（1–12）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arch_order: Option<i32>,
+    /// 仅 `garch`：ARCH 项阶 p（默认 1，上界 5）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub garch_p: Option<i32>,
+    /// 仅 `garch`：GARCH 项阶 q（默认 1，上界 5，且 p+q≤8）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub garch_q: Option<i32>,
+    /// `arch` / `garch`：优化最大迭代次数。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub garch_max_iter: Option<i32>,
+    /// `arch` / `garch`：优化 f_reltol。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub garch_tol: Option<f64>,
 }
 
 // === 模型族类型（从 ModelSpec 转换，提供类型安全访问）=============================
@@ -991,6 +1046,11 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             threshold_variable: None,
             threshold_grid: None,
             threshold_trim_frac: None,
+            arch_order: None,
+            garch_p: None,
+            garch_q: None,
+            garch_max_iter: None,
+            garch_tol: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -1081,6 +1141,11 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         threshold_variable: None,
         threshold_grid: None,
         threshold_trim_frac: None,
+        arch_order: None,
+        garch_p: None,
+        garch_q: None,
+        garch_max_iter: None,
+        garch_tol: None,
     };
     request.options.return_augment = true;
     request

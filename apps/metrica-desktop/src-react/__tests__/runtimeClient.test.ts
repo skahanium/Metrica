@@ -130,6 +130,50 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.lags).toBe(2);
   });
 
+  it('passes arch fields (arch_order, optional garch_max_iter / garch_tol)', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'demo/garch_demo.csv',
+      formula: 'ret',
+      modelType: 'arch',
+      timeColumn: 'time',
+      tsVariable: 'ret',
+      archOrder: 2,
+      garchMaxIter: 3000,
+      garchTol: 1e-4,
+    });
+    expect(req.model_spec.model_type).toBe('arch');
+    expect(req.model_spec.time_column).toBe('time');
+    expect(req.model_spec.variable).toBe('ret');
+    expect(req.model_spec.arch_order).toBe(2);
+    expect(req.model_spec.garch_max_iter).toBe(3000);
+    expect(req.model_spec.garch_tol).toBe(1e-4);
+    expect(req.model_spec.order).toBeUndefined();
+    expect(req.model_spec.lags).toBeUndefined();
+  });
+
+  it('passes garch fields (garch_p / garch_q and shared optimizer keys)', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'demo/garch_demo.csv',
+      formula: 'ret',
+      modelType: 'garch',
+      timeColumn: 'time',
+      tsVariable: 'ret',
+      garchP: 1,
+      garchQ: 1,
+      garchMaxIter: 4000,
+      garchTol: 1e-5,
+    });
+    expect(req.model_spec.model_type).toBe('garch');
+    expect(req.model_spec.time_column).toBe('time');
+    expect(req.model_spec.variable).toBe('ret');
+    expect(req.model_spec.garch_p).toBe(1);
+    expect(req.model_spec.garch_q).toBe(1);
+    expect(req.model_spec.garch_max_iter).toBe(4000);
+    expect(req.model_spec.garch_tol).toBe(1e-5);
+    expect(req.model_spec.arch_order).toBeUndefined();
+    expect(req.model_spec.order).toBeUndefined();
+  });
+
   it('passes dynamic_panel_gmm panel index and instrument_lags', () => {
     const req = buildFitModelRequest({
       datasetPath: 'panel.csv',
