@@ -6,8 +6,10 @@ struct GJRModel <: AbstractTimeSeriesModel
     time_column::Symbol
     garch_p::Int
     garch_q::Int
+    mean_type::Symbol
     max_iter::Int
     tol::Float64
+    dist::Symbol
 end
 
 struct GJRFitResult <: AbstractTSFitResult
@@ -119,13 +121,24 @@ function MetricaBase.fit(model::GJRModel, data::DataFrame)
     nmin = 50 + 5 * (p + q)
     n < nmin && error("GJR-GARCH($p,$q) 需要至少 $nmin 个有效观测，当前 n=$n")
 
-    mu = mean(y)
-    e = y .- mu
-    ll, ω, α, γ, β, converged, iters, optname, h, se_all =
-        fit_gjr_garch_qmle(e, p, q; max_iter=model.max_iter, tol=model.tol)
+    if model.mean_type == :ar
+        ar_order = min(5, div(n, 10))
+        lags_y = create_lags(y, ar_order)
+        y_dep = lags_y[:, 1]; y_lag = lags_y[:, 2:end]
+        ar_beta = y_lag \ y_dep
+        e_ar = y_dep .- (y_lag * ar_beta)
+        mu = mean(e_ar); e = e_ar .- mu
+    else
+        mu = mean(y); e = y .- mu
+    end
+    ll, ω, α, γ, β, converged, iters, optname, h, se_all, hess_stat =
+        fit_gjr_garch_qmle(e, p, q; max_iter=model.max_iter, tol=model.tol, dist=model.dist)
 
-    failure = converged ? nothing : "optimizer_not_converged"
+    failure = converged ? nothing : (hess_stat != "ok" ? "singular_hessian" : nothing)
     warnings = MetricaBase.ModelWarning[]
+    if hess_stat != "ok"
+        push!(warnings, MetricaBase.ModelWarning(:singular_hessian, "Hessian 不可逆，OPG 标准误不可信", hess_stat, "", MetricaBase.warning))
+    end
     if !converged
         push!(warnings, MetricaBase.ModelWarning(:gjr_not_converged,
             "GJR-GARCH 优化未收敛", "", "可增大 max_iter。", MetricaBase.warning))

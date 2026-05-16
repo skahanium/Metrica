@@ -208,37 +208,37 @@ function build_time_series_model(model_type::String, params::Dict)
         arch_order = Int(raw_q)
         mi = Int(get(params, "garch_max_iter", 5000))
         tol = Float64(get(params, "garch_tol", 1e-5))
-        return ARCHModel(
-            variable=var_sym,
-            time_column=time_col,
-            arch_order=arch_order,
-            max_iter=mi,
-            tol=tol,
-        )
+        dist = Symbol(get(params, "volatility_dist", "gaussian"))
+        mt = Symbol(get(params, "mean_type", "constant"))
+        return ARCHModel(variable=var_sym, time_column=time_col, arch_order=arch_order,
+            mean_type=mt, max_iter=mi, tol=tol, dist=dist)
 
     elseif model_type == "garch"
         var_sym = Symbol(get(() -> error("GARCH 模型需要 variable 参数"), params, "variable"))
-        gp = Int(get(params, "garch_p", 1))
-        gq = Int(get(params, "garch_q", 1))
-        mi = Int(get(params, "garch_max_iter", 8000))
-        tol = Float64(get(params, "garch_tol", 1e-5))
-        return GARCHModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq, max_iter=mi, tol=tol)
+        gp = Int(get(params, "garch_p", 1)); gq = Int(get(params, "garch_q", 1))
+        mi = Int(get(params, "garch_max_iter", 8000)); tol = Float64(get(params, "garch_tol", 1e-5))
+        dist = Symbol(get(params, "volatility_dist", "gaussian"))
+        mt = Symbol(get(params, "mean_type", "constant"))
+        return GARCHModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq,
+            mean_type=mt, max_iter=mi, tol=tol, dist=dist)
 
     elseif model_type == "gjr_garch"
         var_sym = Symbol(get(() -> error("GJR-GARCH 模型需要 variable 参数"), params, "variable"))
-        gp = Int(get(params, "garch_p", 1))
-        gq = Int(get(params, "garch_q", 1))
-        mi = Int(get(params, "garch_max_iter", 8000))
-        tol = Float64(get(params, "garch_tol", 1e-5))
-        return GJRModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq, max_iter=mi, tol=tol)
+        gp = Int(get(params, "garch_p", 1)); gq = Int(get(params, "garch_q", 1))
+        mi = Int(get(params, "garch_max_iter", 8000)); tol = Float64(get(params, "garch_tol", 1e-5))
+        dist = Symbol(get(params, "volatility_dist", "gaussian"))
+        mt = Symbol(get(params, "mean_type", "constant"))
+        return GJRModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq,
+            mean_type=mt, max_iter=mi, tol=tol, dist=dist)
 
     elseif model_type == "egarch"
         var_sym = Symbol(get(() -> error("EGARCH 模型需要 variable 参数"), params, "variable"))
-        gp = Int(get(params, "garch_p", 1))
-        gq = Int(get(params, "garch_q", 1))
-        mi = Int(get(params, "garch_max_iter", 8000))
-        tol = Float64(get(params, "garch_tol", 1e-5))
-        return EGARCHModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq, max_iter=mi, tol=tol)
+        gp = Int(get(params, "garch_p", 1)); gq = Int(get(params, "garch_q", 1))
+        mi = Int(get(params, "garch_max_iter", 8000)); tol = Float64(get(params, "garch_tol", 1e-5))
+        dist = Symbol(get(params, "volatility_dist", "gaussian"))
+        mt = Symbol(get(params, "mean_type", "constant"))
+        return EGARCHModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq,
+            mean_type=mt, max_iter=mi, tol=tol, dist=dist)
 
     else
         error("未知时间序列模型类型：$model_type")

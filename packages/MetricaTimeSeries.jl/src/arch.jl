@@ -9,8 +9,10 @@ struct ARCHModel <: AbstractTimeSeriesModel
     variable::Symbol
     time_column::Symbol
     arch_order::Int
+    mean_type::Symbol
     max_iter::Int
     tol::Float64
+    dist::Symbol
 end
 
 """
@@ -71,10 +73,22 @@ function MetricaBase.fit(model::ARCHModel, data::DataFrame)
         error("ARCH(q=$q) 需要至少 $nmin 个有效观测，当前 n=$n")
     end
 
-    mu = mean(y)
-    e = y .- mu
+    # 均值方程：constant 或 AR(p)
+    if model.mean_type == :ar
+        ar_order = min(5, div(n, 10))
+        lags_y = create_lags(y, ar_order)
+        y_dep = lags_y[:, 1]; y_lag = lags_y[:, 2:end]
+        ar_beta = y_lag \ y_dep
+        ar_fitted = y_lag * ar_beta
+        e_ar = y_dep .- ar_fitted
+        mu = mean(e_ar)
+        e = e_ar .- mu
+    else
+        mu = mean(y)
+        e = y .- mu
+    end
 
-    ll, ω, α, converged, iters, optname, h, se_all = fit_arch_qmle(e, q; max_iter=model.max_iter, tol=model.tol)
+    ll, ω, α, converged, iters, optname, h, se_all, hess_stat = fit_arch_qmle(e, q; max_iter=model.max_iter, tol=model.tol, dist=model.dist)
     failure = nothing
     warnings = MetricaBase.ModelWarning[]
 

@@ -10,8 +10,10 @@ struct GARCHModel <: AbstractTimeSeriesModel
     time_column::Symbol
     garch_p::Int
     garch_q::Int
+    mean_type::Symbol
     max_iter::Int
     tol::Float64
+    dist::Symbol
 end
 
 """
@@ -75,11 +77,21 @@ function MetricaBase.fit(model::GARCHModel, data::DataFrame)
         error("GARCH($p,$q) 需要至少 $nmin 个有效观测，当前 n=$n")
     end
 
-    mu = mean(y)
-    e = y .- mu
+    if model.mean_type == :ar
+        ar_order = min(5, div(n, 10))
+        lags_y = create_lags(y, ar_order)
+        y_dep = lags_y[:, 1]; y_lag = lags_y[:, 2:end]
+        ar_beta = y_lag \ y_dep
+        e_ar = y_dep .- (y_lag * ar_beta)
+        mu = mean(e_ar)
+        e = e_ar .- mu
+    else
+        mu = mean(y)
+        e = y .- mu
+    end
 
-    ll, ω, α, β, converged, iters, optname, h, se_all =
-        fit_garch_qmle(e, p, q; max_iter=model.max_iter, tol=model.tol)
+    ll, ω, α, β, converged, iters, optname, h, se_all, hess_stat =
+        fit_garch_qmle(e, p, q; max_iter=model.max_iter, tol=model.tol, dist=model.dist)
     failure = nothing
     warnings = MetricaBase.ModelWarning[]
 
@@ -95,7 +107,11 @@ function MetricaBase.fit(model::GARCHModel, data::DataFrame)
                 MetricaBase.warning,
             ),
         )
-    elseif !converged
+    if hess_stat != "" && hess_stat != "ok"
+        push!(warnings, MetricaBase.ModelWarning(:singular_hessian, "Hessian 不可逆，OPG 标准误不可信", hess_stat, "", MetricaBase.warning))
+        failure = isnothing(failure) ? "singular_hessian" : failure
+    end
+    if !converged && isnothing(failure)
         failure = "optimizer_not_converged"
         push!(
             warnings,
