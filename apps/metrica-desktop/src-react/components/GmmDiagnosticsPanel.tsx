@@ -1,5 +1,5 @@
 import React from 'react';
-import { Descriptions, Typography } from 'antd';
+import { Descriptions, Typography, Tag } from 'antd';
 import type { GmmDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
@@ -76,6 +76,26 @@ export const GmmDiagnosticsPanel: React.FC<GmmDiagnosticsPanelProps> = ({ diagno
           <Descriptions.Item label="工具滞后层">
             [{diagnostics.instrument_lags[0]}, {diagnostics.instrument_lags[1]}]
           </Descriptions.Item>
+        )}
+        {(diagnostics as any).dpgmm_style !== undefined && (
+          <Descriptions.Item label="估计方法">
+            <Tag color={(diagnostics as any).dpgmm_style === 'system' ? 'green' : 'blue'}>
+              {(diagnostics as any).dpgmm_style === 'system' ? 'System GMM' : 'Difference GMM'}
+            </Tag>
+          </Descriptions.Item>
+        )}
+        {(diagnostics as any).diff_hansen !== undefined && (
+          <>
+            <Descriptions.Item label="Diff-Hansen C">
+              {(diagnostics as any).diff_hansen.c_statistic?.toFixed(4) ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Diff-Hansen df">
+              {(diagnostics as any).diff_hansen.df ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Diff-Hansen p">
+              {(diagnostics as any).diff_hansen.pvalue?.toFixed(4) ?? '—'}
+            </Descriptions.Item>
+          </>
         )}
       </Descriptions>
     </div>

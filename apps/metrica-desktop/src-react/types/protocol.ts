@@ -178,6 +178,8 @@ export interface GmmDiagnostics {
   n_obs_diff?: number;
   instrument_lags?: number[];
   dpgmm_style?: string;
+  collapse_instruments?: boolean;
+  diff_hansen?: { c_statistic?: number; df?: number; pvalue?: number | null };
 }
 
 /** 分位数回归（`result_payload.diagnostics`） */
