@@ -90,6 +90,14 @@ export interface FitModelParams {
   spatialWeightsPath?: string;
   spatialIdColumn?: string;
   spatialRowStandardize?: boolean;
+  spatialCoordColumns?: string[];
+  spatialDistance?: string;
+  gwrKernel?: string;
+  gwrBandwidth?: number;
+  gwrBandwidthSelection?: string;
+  gwrAdaptive?: boolean;
+  gtwrTimeColumn?: string;
+  gtwrTimeScale?: number | string;
   /** 仅 `duration_cox` */
   durationTimeColumn?: string;
   durationEventColumn?: string;
@@ -152,6 +160,14 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     spatialWeightsPath,
     spatialIdColumn,
     spatialRowStandardize,
+    spatialCoordColumns,
+    spatialDistance,
+    gwrKernel,
+    gwrBandwidth,
+    gwrBandwidthSelection,
+    gwrAdaptive,
+    gtwrTimeColumn,
+    gtwrTimeScale,
     durationTimeColumn,
     durationEventColumn,
   } = params;
@@ -264,7 +280,11 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (typeof thresholdTrimFrac === 'number' && Number.isFinite(thresholdTrimFrac)) {
       modelSpec.threshold_trim_frac = thresholdTrimFrac;
     }
-  } else if (modelType === 'spatial_lag' || modelType === 'spatial_error' || modelType === 'spatial_slx') {
+  } else if (
+    modelType === 'spatial_lag' || modelType === 'spatial_error' || modelType === 'spatial_slx' ||
+    modelType === 'spatial_sdm' || modelType === 'spatial_sdem' || modelType === 'spatial_sac' ||
+    modelType === 'spatial_probit'
+  ) {
     const sw = spatialWeightsPath?.trim();
     if (sw) modelSpec.spatial_weights_path = sw;
     const sid = spatialIdColumn?.trim();
@@ -272,8 +292,20 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (typeof spatialRowStandardize === 'boolean') {
       modelSpec.spatial_row_standardize = spatialRowStandardize;
     }
-    if (modelType === 'spatial_lag') {
+    if (modelType === 'spatial_lag' || modelType === 'spatial_sdm') {
       modelSpec.vcov = { type: vcovType };
+    }
+  } else if (modelType === 'spatial_gwr' || modelType === 'spatial_gtwr') {
+    const coordCols = spatialCoordColumns;
+    if (coordCols) modelSpec.spatial_coord_columns = coordCols;
+    if (spatialDistance) modelSpec.spatial_distance = spatialDistance;
+    if (gwrKernel) modelSpec.gwr_kernel = gwrKernel;
+    if (gwrBandwidth !== undefined) modelSpec.gwr_bandwidth = gwrBandwidth;
+    if (gwrBandwidthSelection) modelSpec.gwr_bandwidth_selection = gwrBandwidthSelection;
+    if (typeof gwrAdaptive === 'boolean') modelSpec.gwr_adaptive = gwrAdaptive;
+    if (modelType === 'spatial_gtwr') {
+      if (gtwrTimeColumn) modelSpec.gtwr_time_column = gtwrTimeColumn;
+      if (gtwrTimeScale !== undefined) modelSpec.gtwr_time_scale = gtwrTimeScale;
     }
   } else if (modelType === 'duration_cox') {
     const tcol = durationTimeColumn?.trim();

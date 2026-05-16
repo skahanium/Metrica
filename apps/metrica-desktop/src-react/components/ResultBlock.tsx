@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Typography } from 'antd';
+import { Button, Typography, Descriptions } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { GlanceTable } from './GlanceTable';
 import { TidyTable } from './TidyTable';
@@ -21,7 +21,8 @@ import { VolatilitySummaryPanel } from './VolatilitySummaryPanel';
 import { SpatialDiagnosticsPanel } from './SpatialDiagnosticsPanel';
 import { DurationDiagnosticsPanel } from './DurationDiagnosticsPanel';
 import { ModelCapabilitiesPanel } from './ModelCapabilitiesPanel';
-import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics, DurationDiagnostics } from '../types/protocol';
+import { GWRDiagnosticsPanel } from './GWRDiagnosticsPanel';
+import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics, DurationDiagnostics, GWRDiagnostics as GWRDiag } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -62,7 +63,9 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
     ? (result.diagnostics as VolatilityDiagnostics | undefined)
     : undefined;
 
-  const showSpatialDiagnostics = modelType === 'spatial_lag' || modelType === 'spatial_error' || modelType === 'spatial_slx';
+  const showSpatialDiagnostics = typeof modelType === 'string' && modelType.startsWith('spatial_') && modelType !== 'spatial_gwr' && modelType !== 'spatial_gtwr' && modelType !== 'spatial_probit';
+  const showGWR = modelType === 'spatial_gwr' || modelType === 'spatial_gtwr';
+  const showProbit = modelType === 'spatial_probit';
   const spatialDiagnostics = showSpatialDiagnostics
     ? (result.diagnostics as SpatialDiagnostics | undefined)
     : undefined;
@@ -102,6 +105,21 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
           diagnostics={durationDiagnostics}
           hazardRatios={result.hazard_ratios}
         />
+      )}
+      {showGWR && result.diagnostics && (
+        <GWRDiagnosticsPanel diagnostics={result.diagnostics as unknown as GWRDiag} />
+      )}
+      {showProbit && result.diagnostics && (
+        <div style={{ marginTop: 12, padding: 8, background: 'var(--m-surface)', borderRadius: 6, border: '1px solid var(--m-border)' }}>
+          <Descriptions size="small" column={2} title="空间 Probit 后验摘要">
+            <Descriptions.Item label="ρ 后验均值">{result.diagnostics.rho_posterior_mean?.toFixed(4) ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="ρ 后验标准差">{result.diagnostics.rho_posterior_sd?.toFixed(4) ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="ρ 95% HPD">[{result.diagnostics.rho_credible_lower?.toFixed(4)}, {result.diagnostics.rho_credible_upper?.toFixed(4)}]</Descriptions.Item>
+            <Descriptions.Item label="M-H 接受率">{result.diagnostics.rho_accept_rate?.toFixed(4) ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="迭代">{result.diagnostics.n_iter ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="Warmup">{result.diagnostics.n_warmup ?? '—'}</Descriptions.Item>
+          </Descriptions>
+        </div>
       )}
       {isDiscrete && <DiscreteGlanceCards result={result} />}
       {modelType === 'did' && <DIDResultCards result={result} />}

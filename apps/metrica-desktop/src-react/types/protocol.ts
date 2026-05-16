@@ -547,7 +547,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'duration_cox';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'spatial_sdm' | 'spatial_sdem' | 'spatial_sac' | 'spatial_gwr' | 'spatial_gtwr' | 'spatial_probit' | 'duration_cox';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -619,10 +619,63 @@ export interface ModelSpec {
   spatial_weights_path?: string;
   spatial_id_column?: string;
   spatial_row_standardize?: boolean;
+  /** GWR/GTWR：坐标列名数组，如 ["lon", "lat"] */
+  spatial_coord_columns?: string[];
+  /** 距离度量：euclidean / haversine / projected */
+  spatial_distance?: string;
+  /** 坐标参考系 */
+  spatial_crs?: string;
+  /** GWR 核函数：gaussian / bisquare */
+  gwr_kernel?: string;
+  /** GWR 固定带宽（与 bandwidth_selection 互斥） */
+  gwr_bandwidth?: number;
+  /** GWR 带宽选择：cv / aicc */
+  gwr_bandwidth_selection?: string;
+  /** GWR 自适应带宽 */
+  gwr_adaptive?: boolean;
+  /** GTWR 时间列名 */
+  gtwr_time_column?: string;
+  /** GTWR 时间尺度（数或 "auto"） */
+  gtwr_time_scale?: number | string;
   /** 仅 `duration_cox`：随访时间列名（须为正有限实数） */
   duration_time_column?: string;
   /** 仅 `duration_cox`：事件指示列（0=删失，1=事件） */
   duration_event_column?: string;
+}
+
+/** GWR/GTWR 局部系数预览行 */
+export interface GWRLocalCoefficientRow {
+  obs: number;
+  [coefName: string]: number;
+}
+
+/** GWR/GTWR 诊断 */
+export interface GWRDiagnostics {
+  bandwidth?: number;
+  bandwidth_selection?: string;
+  bandwidth_score?: number;
+  kernel?: string;
+  adaptive?: boolean;
+  effective_parameters?: number;
+  aicc?: number;
+  local_coefficients_preview?: GWRLocalCoefficientRow[];
+  local_r2?: number[];
+  time_scale?: number;
+  time_column?: string;
+  time_range?: number[];
+}
+
+/** 空间 Probit 诊断 */
+export interface SpatialProbitDiagnostics {
+  rho_accept_rate?: number;
+  n_iter?: number;
+  n_warmup?: number;
+  n_chains?: number;
+  inference_mode?: string;
+  rho_posterior_mean?: number;
+  rho_posterior_sd?: number;
+  rho_credible_lower?: number;
+  rho_credible_upper?: number;
 }
 
 export interface FitModelRequest {

@@ -296,6 +296,14 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     return parseSpregToModelSpec(positionals, optMap);
   }
 
+  if (verb === 'gwr' || verb === 'gtwr') {
+    return parseGwrToModelSpec(verb, positionals, optMap);
+  }
+
+  if (verb === 'spprobit') {
+    return parseSpprobitToModelSpec(positionals, optMap);
+  }
+
   const modelType = verbToModelType(verb);
 
   // 组装 formula：depvar ~ indepvar1 + indepvar2 + ...
@@ -617,8 +625,14 @@ function parseSpregToModelSpec(
     model_type = 'spatial_error';
   } else if (modelRaw === 'slx') {
     model_type = 'spatial_slx';
+  } else if (modelRaw === 'sdm') {
+    model_type = 'spatial_sdm';
+  } else if (modelRaw === 'sdem') {
+    model_type = 'spatial_sdem';
+  } else if (modelRaw === 'sac') {
+    model_type = 'spatial_sac';
   } else {
-    return { error: `spreg 的 model(...) 须为 lag / sar / error / sem / slx，收到：${modelRaw}` };
+    return { error: `spreg 的 model(...) 须为 lag / sar / error / sem / slx / sdm / sdem / sac，收到：${modelRaw}` };
   }
 
   const spec: ModelSpec = {
@@ -636,6 +650,60 @@ function parseSpregToModelSpec(
     spec.vcov = { type: 'HC1' };
   }
   return spec;
+}
+
+function parseGwrToModelSpec(verb: string, positionals: string[], optMap: Map<string, unknown>): ModelSpec | { error: string } {
+  if (positionals.length < 2) {
+    return { error: 'GWR/GTWR 需要至少一个因变量和一个自变量。' };
+  }
+  const yVar = positionals[0];
+  const xVars = positionals.slice(1);
+  const hasConstant = !optMap.has('noconstant');
+  const formula = hasConstant
+    ? `${yVar} ~ ${['(Intercept)', ...xVars].join(' + ')}`
+    : `${yVar} ~ ${xVars.join(' + ')}`;
+
+  const coordRaw = String(optMap.get('coords') ?? 'lon lat').trim().split(/\s+/);
+  const isGtwr = verb === 'gtwr';
+  const timeCol = String(optMap.get('time') ?? '').trim();
+  if (isGtwr && !timeCol) {
+    return { error: 'GTWR 需要 time(...) 选项。' };
+  }
+
+  return {
+    model_type: isGtwr ? 'spatial_gtwr' : 'spatial_gwr',
+    formula,
+    spatial_coord_columns: coordRaw.length >= 2 ? [coordRaw[0], coordRaw[1]] : ['lon', 'lat'],
+    spatial_distance: String(optMap.get('distance') ?? 'euclidean'),
+    gwr_kernel: String(optMap.get('kernel') ?? 'gaussian'),
+    gwr_bandwidth: optMap.has('bandwidth') ? Number(optMap.get('bandwidth')) : undefined,
+    gwr_bandwidth_selection: optMap.has('bandwidth') ? (String(optMap.get('bandwidth')) === 'cv' ? 'cv' : String(optMap.get('bandwidth')) === 'aicc' ? 'aicc' : undefined) : undefined,
+    gwr_adaptive: optMap.has('adaptive') ? String(optMap.get('adaptive')) !== 'false' : false,
+    gtwr_time_column: isGtwr ? timeCol : undefined,
+    gtwr_time_scale: isGtwr && optMap.has('time_scale') ? (String(optMap.get('time_scale')) === 'auto' ? 'auto' : Number(optMap.get('time_scale'))) : undefined,
+  };
+}
+
+function parseSpprobitToModelSpec(positionals: string[], optMap: Map<string, unknown>): ModelSpec | { error: string } {
+  if (positionals.length < 2) {
+    return { error: 'spprobit 需要至少一个因变量和一个自变量。' };
+  }
+  const yVar = positionals[0];
+  const xVars = positionals.slice(1);
+  const hasConstant = !optMap.has('noconstant');
+  const formula = hasConstant
+    ? `${yVar} ~ ${['(Intercept)', ...xVars].join(' + ')}`
+    : `${yVar} ~ ${xVars.join(' + ')}`;
+
+  const wp = String(optMap.get('spatial_weights') ?? optMap.get('weights') ?? '').trim();
+  const id = String(optMap.get('spatial_id') ?? optMap.get('id') ?? 'region').trim();
+
+  return {
+    model_type: 'spatial_probit',
+    formula,
+    spatial_weights_path: wp,
+    spatial_id_column: id,
+  };
 }
 
 // ---- 诊断命令解析 ----

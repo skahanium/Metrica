@@ -399,8 +399,33 @@ const grammars: CommandGrammar[] = [
     weights: optionValue('weights', false),
     id: optionValue('id', true),
     spatial_id: optionValue('spatial_id', false),
-    model: { kind: 'option_value', label: 'model', required: false, multiple: false, values: ['lag', 'error', 'sar', 'sem', 'slx'] },
+    model: { kind: 'option_value', label: 'model', required: false, multiple: false, values: ['lag', 'error', 'sar', 'sem', 'slx', 'sdm', 'sdem', 'sac'] },
     rowstd: optionValue('rowstd', false),
+  }),
+
+  makeModelGrammar('gwr', '地理加权回归（坐标+核函数+CV带宽选择）', {
+    coords: optionValue('coords', true),
+    kernel: optionValue('kernel', false),
+    bandwidth: optionValue('bandwidth', false),
+    adaptive: optionValue('adaptive', false),
+    distance: optionValue('distance', false),
+  }),
+
+  makeModelGrammar('gtwr', '地理时空加权回归（坐标+时间+核函数）', {
+    coords: optionValue('coords', true),
+    time: optionValue('time', true),
+    kernel: optionValue('kernel', false),
+    bandwidth: optionValue('bandwidth', false),
+    adaptive: optionValue('adaptive', false),
+    distance: optionValue('distance', false),
+    time_scale: optionValue('time_scale', false),
+  }),
+
+  makeModelGrammar('spprobit', '空间 Probit (Bayesian MCMC)', {
+    weights: optionValue('weights', true),
+    spatial_weights: optionValue('spatial_weights', false),
+    id: optionValue('id', true),
+    spatial_id: optionValue('spatial_id', false),
   }),
 
   {
