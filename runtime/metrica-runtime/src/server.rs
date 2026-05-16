@@ -715,12 +715,38 @@ async fn dispatch_export_via_channel(
 
     match result {
         Ok(Ok(resp)) => {
-            let jr: JuliaResponse = serde_json::from_value(resp).unwrap_or(JuliaResponse {
-                status: "error".to_string(),
-                messages: vec![],
-                result_payload: None,
-            });
-            Ok(jr.content().to_string())
+            let status = resp
+                .get("status")
+                .and_then(|value| value.as_str())
+                .unwrap_or("error");
+            if status != "success" {
+                let messages: Vec<Message> = resp
+                    .get("messages")
+                    .and_then(|value| serde_json::from_value(value.clone()).ok())
+                    .unwrap_or_default();
+                let text = messages
+                    .first()
+                    .map(|m| m.text.clone())
+                    .unwrap_or_else(|| "Julia 导出返回错误状态。".to_string());
+                return Err(json_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    task_id.to_string(),
+                    "RUNTIME_EXPORT_FAILED",
+                    text,
+                    None,
+                ));
+            }
+            let content = resp
+                .pointer("/result_payload/content")
+                .and_then(|value| value.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    serde_json::from_value::<JuliaResponse>(resp.clone())
+                        .ok()
+                        .map(|jr| jr.content().to_string())
+                })
+                .unwrap_or_default();
+            Ok(content)
         }
         Ok(Err(err)) => Err(json_error_response(
             StatusCode::INTERNAL_SERVER_ERROR,

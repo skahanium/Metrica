@@ -78,6 +78,31 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
 
 /// 校验：model_type 是否在已知注册表中，且必填字段非空。
 pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
+    // panel 族模型：索引字段缺失时统一错误码，便于 CLI / 测试与文档对齐。
+    if matches!(
+        spec.model_type.as_str(),
+        "panel" | "panel_iv" | "did" | "event_study"
+    ) {
+        let pid_ok = spec
+            .panel_id
+            .as_deref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        let ptime_ok = spec
+            .panel_time
+            .as_deref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        if !pid_ok || !ptime_ok {
+            return Some(ValidationError {
+                code: "RUNTIME_PANEL_INDEX_REQUIRED",
+                message: "panel 类模型需要同时提供非空的 panel_id 与 panel_time。"
+                    .to_string(),
+                hint: Some("请在 model_spec 中填写 panel_id 与 panel_time。".to_string()),
+            });
+        }
+    }
+
     let required = model_required_fields();
     match required.get(spec.model_type.as_str()) {
         None => Some(ValidationError {
@@ -752,7 +777,7 @@ pub fn sample_inspect_dataset_request() -> TaskRequest {
 pub fn sample_panel_fit_model_request() -> TaskRequest {
     let mut request = sample_request_base("fit_model", "panel-uuid");
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();
-    request.dataset_ref.path = "datasets/teaching/grunfeld.csv".to_string();
+    request.dataset_ref.path = "datasets/demo/grunfeld.csv".to_string();
     request.model_spec = ModelSpec {
         model_type: "panel".to_string(),
         formula: "invest ~ mvalue + capital".to_string(),
