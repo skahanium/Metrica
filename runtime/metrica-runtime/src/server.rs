@@ -400,6 +400,33 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(b) = request.model_spec.spatial_row_standardize {
         params["spatial_row_standardize"] = json!(b);
     }
+    if let Some(ref coords) = request.model_spec.spatial_coord_columns {
+        params["spatial_coord_columns"] = json!(coords);
+    }
+    if let Some(ref dist) = request.model_spec.spatial_distance {
+        params["spatial_distance"] = json!(dist);
+    }
+    if let Some(ref crs) = request.model_spec.spatial_crs {
+        params["spatial_crs"] = json!(crs);
+    }
+    if let Some(ref kern) = request.model_spec.gwr_kernel {
+        params["gwr_kernel"] = json!(kern);
+    }
+    if let Some(bw) = request.model_spec.gwr_bandwidth {
+        params["gwr_bandwidth"] = json!(bw);
+    }
+    if let Some(ref bwsel) = request.model_spec.gwr_bandwidth_selection {
+        params["gwr_bandwidth_selection"] = json!(bwsel);
+    }
+    if let Some(adp) = request.model_spec.gwr_adaptive {
+        params["gwr_adaptive"] = json!(adp);
+    }
+    if let Some(ref tc) = request.model_spec.gtwr_time_column {
+        params["gtwr_time_column"] = json!(tc);
+    }
+    if let Some(ref ts) = request.model_spec.gtwr_time_scale {
+        params["gtwr_time_scale"] = ts.clone();
+    }
     if let Some(ref c) = request.model_spec.duration_time_column {
         params["duration_time_column"] = json!(c);
     }

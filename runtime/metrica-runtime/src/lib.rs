@@ -86,6 +86,12 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("spatial_lag", vec!["spatial_weights_path", "spatial_id_column"]),
         ("spatial_error", vec!["spatial_weights_path", "spatial_id_column"]),
         ("spatial_slx", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("spatial_sdm", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("spatial_sdem", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("spatial_sac", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("spatial_gwr", vec!["spatial_coord_columns"]),
+        ("spatial_gtwr", vec!["spatial_coord_columns", "gtwr_time_column"]),
+        ("spatial_probit", vec!["spatial_weights_path", "spatial_id_column"]),
         ("duration_cox", vec!["duration_time_column", "duration_event_column"]),
     ])
 }
@@ -173,6 +179,8 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                         .map(|v| if v.is_empty() { "" } else { "present" }),
                     "spatial_weights_path" => spec.spatial_weights_path.as_deref(),
                     "spatial_id_column" => spec.spatial_id_column.as_deref(),
+                    "spatial_coord_columns" => spec.spatial_coord_columns.as_ref().map(|v| if v.len() >= 2 { "present" } else { "" }),
+                    "gtwr_time_column" => spec.gtwr_time_column.as_deref(),
                     "duration_time_column" => spec.duration_time_column.as_deref(),
                     "duration_event_column" => spec.duration_event_column.as_deref(),
                     _ => Some("present"),
@@ -389,6 +397,34 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                     });
                 }
             }
+            if matches!(spec.model_type.as_str(), "spatial_gwr" | "spatial_gtwr") {
+                if let Some(ref coords) = spec.spatial_coord_columns {
+                    if coords.len() != 2 {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: "spatial_coord_columns 必须是长度为 2 的数组。".to_string(),
+                            hint: Some("如 [\"lon\", \"lat\"]。".to_string()),
+                        });
+                    }
+                }
+                if let Some(ref kern) = spec.gwr_kernel {
+                    let k = kern.trim().to_ascii_lowercase();
+                    if k != "gaussian" && k != "bisquare" {
+                        return Some(ValidationError {
+                            code: "RUNTIME_INVALID_FIELD",
+                            message: format!("gwr_kernel 只能为 gaussian 或 bisquare，收到 `{kern}`。"),
+                            hint: Some("请省略以使用默认 gaussian。".to_string()),
+                        });
+                    }
+                }
+                if spec.gwr_bandwidth.is_some() && spec.gwr_bandwidth_selection.is_some() {
+                    return Some(ValidationError {
+                        code: "RUNTIME_INVALID_FIELD",
+                        message: "gwr_bandwidth 与 gwr_bandwidth_selection 互斥。".to_string(),
+                        hint: Some("请只提供一个。".to_string()),
+                    });
+                }
+            }
             None
         }
     }
@@ -398,7 +434,8 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
 pub fn validate_spatial_weights_on_disk(request: &TaskRequest) -> Option<ValidationError> {
     if !matches!(
         request.model_spec.model_type.as_str(),
-        "spatial_lag" | "spatial_error" | "spatial_slx"
+        "spatial_lag" | "spatial_error" | "spatial_slx" |
+        "spatial_sdm" | "spatial_sdem" | "spatial_sac" | "spatial_probit"
     ) {
         return None;
     }
@@ -635,6 +672,33 @@ pub struct ModelSpec {
     /// 是否对 \(W\) 行标准化；默认 `true`（省略时 Julia 端按 true 处理）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spatial_row_standardize: Option<bool>,
+    /// GWR/GTWR: 坐标列名数组，如 ["lon", "lat"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spatial_coord_columns: Option<Vec<String>>,
+    /// 距离度量: euclidean / haversine / projected
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spatial_distance: Option<String>,
+    /// 坐标参考系（可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spatial_crs: Option<String>,
+    /// GWR 核函数: gaussian / bisquare
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gwr_kernel: Option<String>,
+    /// GWR 带宽（数值），与 bandwidth_selection 互斥
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gwr_bandwidth: Option<f64>,
+    /// GWR 带宽选择: cv / aicc
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gwr_bandwidth_selection: Option<String>,
+    /// 自适应带宽（邻近点数）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gwr_adaptive: Option<bool>,
+    /// GTWR 时间列名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gtwr_time_column: Option<String>,
+    /// GTWR 时间尺度（数或 "auto"）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gtwr_time_scale: Option<serde_json::Value>,
     /// `duration_cox`：生存/随访时间列名（须为正有限实数）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_time_column: Option<String>,
@@ -1111,6 +1175,15 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             spatial_weights_path: None,
             spatial_id_column: None,
             spatial_row_standardize: None,
+            spatial_coord_columns: None,
+            spatial_distance: None,
+            spatial_crs: None,
+            gwr_kernel: None,
+            gwr_bandwidth: None,
+            gwr_bandwidth_selection: None,
+            gwr_adaptive: None,
+            gtwr_time_column: None,
+            gtwr_time_scale: None,
             duration_time_column: None,
             duration_event_column: None,
         },
@@ -1211,6 +1284,15 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         spatial_weights_path: None,
         spatial_id_column: None,
         spatial_row_standardize: None,
+        spatial_coord_columns: None,
+        spatial_distance: None,
+        spatial_crs: None,
+        gwr_kernel: None,
+        gwr_bandwidth: None,
+        gwr_bandwidth_selection: None,
+        gwr_adaptive: None,
+        gtwr_time_column: None,
+        gtwr_time_scale: None,
         duration_time_column: None,
         duration_event_column: None,
     };
