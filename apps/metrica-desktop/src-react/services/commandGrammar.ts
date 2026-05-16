@@ -403,6 +403,16 @@ const grammars: CommandGrammar[] = [
     rowstd: optionValue('rowstd', false),
   }),
 
+  {
+    verb: 'stcox',
+    description: 'Cox 比例风险模型（右删失；Breslow 并列；时间与事件列显式指定）',
+    category: 'model',
+    syntax: [
+      { kind: 'depvar', label: '时间列', required: true, multiple: false },
+      { kind: 'indepvar', label: '事件列与协变量', required: true, multiple: true },
+    ],
+  },
+
   // ===== SVY prefix command =====
   {
     verb: 'svy',

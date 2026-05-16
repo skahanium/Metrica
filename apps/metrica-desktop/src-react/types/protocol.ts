@@ -200,6 +200,30 @@ export interface ThresholdDiagnostics {
   };
 }
 
+export interface DurationDiagnostics {
+  n_obs?: number;
+  n_events?: number;
+  n_censored?: number;
+  censoring_fraction?: number;
+  risk_set_ties_method?: string;
+  converged?: boolean;
+  iterations?: number;
+  loglikelihood?: number;
+  baseline_hazard_summary?: {
+    n_event_times?: number;
+    preview?: Array<{ time: number; cumulative_hazard: number }>;
+    ties_method?: string;
+  };
+  ph_diagnostics?: null | Record<string, unknown>;
+}
+
+export interface HazardRatioEntry {
+  term: string;
+  hr: number;
+  ci_lower: number | null;
+  ci_upper: number | null;
+}
+
 export interface OddsRatioEntry {
   term: string;
   odds_ratio: number;
@@ -248,8 +272,9 @@ export interface ModelResult {
   /** 按方程的 glance（SUR / 系统 IV）；与顶层 `glance` 并存 */
   equation_glances?: GlanceResult[];
   tidy: TidyRow[];
-  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics | VolatilityDiagnostics | SpatialDiagnostics;
+  diagnostics?: OLSDiagnostics | PanelDiagnostics | DiscreteDiagnostics | GmmDiagnostics | SystemEquationsDiagnostics | QuantileDiagnostics | NlsDiagnostics | ThresholdDiagnostics | VolatilityDiagnostics | SpatialDiagnostics | DurationDiagnostics;
   odds_ratios?: OddsRatioEntry[];
+  hazard_ratios?: HazardRatioEntry[];
   incidence_rate_ratios?: IRREntry[];
   augment_preview?: AugmentRow[];
   warnings: Warning[];
@@ -488,7 +513,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'duration_cox';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -560,6 +585,10 @@ export interface ModelSpec {
   spatial_weights_path?: string;
   spatial_id_column?: string;
   spatial_row_standardize?: boolean;
+  /** 仅 `duration_cox`：随访时间列名（须为正有限实数） */
+  duration_time_column?: string;
+  /** 仅 `duration_cox`：事件指示列（0=删失，1=事件） */
+  duration_event_column?: string;
 }
 
 export interface FitModelRequest {

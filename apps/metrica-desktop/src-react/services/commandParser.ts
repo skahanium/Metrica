@@ -123,7 +123,7 @@ export function parse(input: string): ParsedCommand {
 const MODEL_VERBS = new Set([
   'regress', 'ivregress', 'gmm', 'qreg', 'nls', 'threg', 'gls', 'xtreg', 'xtivreg', 'xtabond', 'logit', 'probit', 'poisson',
   'ologit', 'mlogit', 'nbreg', 'did', 'eventstudy', 'ipw', 'psm', 'aipw',
-  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3', 'garch', 'arch', 'spreg',
+  'arima', 'var', 'dfuller', 'coint', 'svy', 'sur', 'reg3', 'garch', 'arch', 'spreg', 'stcox',
 ]);
 
 // ---- 动词 -> model_type 映射 ----
@@ -286,6 +286,10 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   // svy 前缀命令：提取子模型类型和选项
   if (verb === 'svy') {
     return parseSvyToModelSpec(positionals, optMap);
+  }
+
+  if (verb === 'stcox') {
+    return parseStcoxToModelSpec(positionals, optMap);
   }
 
   if (verb === 'spreg') {
@@ -536,6 +540,32 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   }
 
   return spec;
+}
+
+/**
+ * stcox：Cox PH。`stcox time_col event_col x1 x2` → `ph ~ x1 + x2` + duration_* 列映射。
+ */
+function parseStcoxToModelSpec(
+  positionals: string[],
+  _optMap: Map<string, string | undefined>,
+): ModelSpec | { error: string } {
+  if (positionals.length < 3) {
+    return { error: 'stcox 须提供 时间列、事件列与至少一个协变量（例如 stcox time fail x1 x2）。' };
+  }
+  const timeCol = positionals[0].trim();
+  const eventCol = positionals[1].trim();
+  const covars = positionals.slice(2).map((s) => s.trim()).filter(Boolean);
+  if (covars.length === 0) {
+    return { error: 'stcox 在事件列之后至少需要一个协变量列。' };
+  }
+  const rhs = covars.join(' + ');
+  const formula = `ph ~ ${rhs}`;
+  return {
+    model_type: 'duration_cox',
+    formula,
+    duration_time_column: timeCol,
+    duration_event_column: eventCol,
+  };
 }
 
 /** 去掉选项括号值的成对引号 */

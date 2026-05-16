@@ -12,6 +12,7 @@ MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 MetricaCausal = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
 MetricaData = "2248ac24-609b-424e-8643-ff19a1f22962"
 MetricaDiagnostics = "abc32a01-5d84-4d04-8d3a-5e57d4e8e25f"
+MetricaDuration = "d4e5f678-9012-4234-c567-89abcdef0123"
 MetricaDiscrete = "d1e2f3a4-b5c6-7890-def0-123456789abc"
 MetricaGMM = "c4f8e9a1-2b3d-5e6f-7a8b-9c0d1e2f3a4b"
 MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
@@ -30,6 +31,7 @@ MetricaBase = {path = "../MetricaBase.jl"}
 MetricaCausal = {path = "../MetricaCausal.jl"}
 MetricaData = {path = "../MetricaData.jl"}
 MetricaDiagnostics = {path = "../MetricaDiagnostics.jl"}
+MetricaDuration = {path = "../MetricaDuration.jl"}
 MetricaDiscrete = {path = "../MetricaDiscrete.jl"}
 MetricaGMM = {path = "../MetricaGMM.jl"}
 MetricaLinear = {path = "../MetricaLinear.jl"}

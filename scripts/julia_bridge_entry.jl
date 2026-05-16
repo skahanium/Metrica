@@ -17,6 +17,7 @@ using MetricaNonlinear
 using MetricaOutput
 using MetricaPanel
 using MetricaSpatial
+using MetricaDuration
 using MetricaSurvey
 using MetricaSystem
 using MetricaTimeSeries
@@ -225,6 +226,18 @@ else
             MetricaLinear.error_to_payload(result)
         else
             MetricaSpatial.result_to_payload(result; include_augment=include_augment)
+        end
+    elseif model_type == "duration_cox"
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+        tc = String(request.model_spec.duration_time_column)
+        ec = String(request.model_spec.duration_event_column)
+        result = MetricaDuration.fit_duration_cox(df, formula, tc, ec)
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        if result isa MetricaBase.ModelError
+            MetricaDuration.error_to_payload(result)
+        else
+            MetricaDuration.result_to_payload(result; include_augment=include_augment)
         end
     else
         # 通过 MODEL_REGISTRY 统一派发

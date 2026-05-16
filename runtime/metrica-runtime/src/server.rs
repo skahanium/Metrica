@@ -400,6 +400,12 @@ fn build_model_params(request: &TaskRequest) -> serde_json::Value {
     if let Some(b) = request.model_spec.spatial_row_standardize {
         params["spatial_row_standardize"] = json!(b);
     }
+    if let Some(ref c) = request.model_spec.duration_time_column {
+        params["duration_time_column"] = json!(c);
+    }
+    if let Some(ref c) = request.model_spec.duration_event_column {
+        params["duration_event_column"] = json!(c);
+    }
 
     params
 }

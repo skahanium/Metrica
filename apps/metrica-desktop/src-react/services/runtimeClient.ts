@@ -90,6 +90,9 @@ export interface FitModelParams {
   spatialWeightsPath?: string;
   spatialIdColumn?: string;
   spatialRowStandardize?: boolean;
+  /** 仅 `duration_cox` */
+  durationTimeColumn?: string;
+  durationEventColumn?: string;
 }
 
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
@@ -149,6 +152,8 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     spatialWeightsPath,
     spatialIdColumn,
     spatialRowStandardize,
+    durationTimeColumn,
+    durationEventColumn,
   } = params;
 
   const modelSpec: FitModelRequest['model_spec'] = {
@@ -270,6 +275,11 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     if (modelType === 'spatial_lag') {
       modelSpec.vcov = { type: vcovType };
     }
+  } else if (modelType === 'duration_cox') {
+    const tcol = durationTimeColumn?.trim();
+    const ecol = durationEventColumn?.trim();
+    if (tcol) modelSpec.duration_time_column = tcol;
+    if (ecol) modelSpec.duration_event_column = ecol;
   } else {
     modelSpec.vcov = { type: vcovType };
     if (weightsColumn.trim()) modelSpec.weights = weightsColumn.trim();

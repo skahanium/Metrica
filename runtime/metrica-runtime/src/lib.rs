@@ -85,6 +85,7 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("system_3sls", vec!["equations", "system_endogenous", "system_instruments"]),
         ("spatial_lag", vec!["spatial_weights_path", "spatial_id_column"]),
         ("spatial_error", vec!["spatial_weights_path", "spatial_id_column"]),
+        ("duration_cox", vec!["duration_time_column", "duration_event_column"]),
     ])
 }
 
@@ -171,6 +172,8 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
                         .map(|v| if v.is_empty() { "" } else { "present" }),
                     "spatial_weights_path" => spec.spatial_weights_path.as_deref(),
                     "spatial_id_column" => spec.spatial_id_column.as_deref(),
+                    "duration_time_column" => spec.duration_time_column.as_deref(),
+                    "duration_event_column" => spec.duration_event_column.as_deref(),
                     _ => Some("present"),
                 };
                 match value {
@@ -631,6 +634,12 @@ pub struct ModelSpec {
     /// 是否对 \(W\) 行标准化；默认 `true`（省略时 Julia 端按 true 处理）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spatial_row_standardize: Option<bool>,
+    /// `duration_cox`：生存/随访时间列名（须为正有限实数）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_time_column: Option<String>,
+    /// `duration_cox`：事件指示列名（0=删失，1=事件；亦支持布尔列）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_event_column: Option<String>,
 }
 
 // === 模型族类型（从 ModelSpec 转换，提供类型安全访问）=============================
@@ -1101,6 +1110,8 @@ fn sample_request_base(action: &str, task_id: &str) -> TaskRequest {
             spatial_weights_path: None,
             spatial_id_column: None,
             spatial_row_standardize: None,
+            duration_time_column: None,
+            duration_event_column: None,
         },
         options: RequestOptions {
             drop_missing: true,
@@ -1199,6 +1210,8 @@ pub fn sample_panel_fit_model_request() -> TaskRequest {
         spatial_weights_path: None,
         spatial_id_column: None,
         spatial_row_standardize: None,
+        duration_time_column: None,
+        duration_event_column: None,
     };
     request.options.return_augment = true;
     request

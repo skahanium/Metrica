@@ -437,6 +437,24 @@ describe('parseToModelSpec', () => {
     }
   });
 
+  it('parses stcox to duration_cox with ph formula and duration columns', () => {
+    const r = parse('stcox time fail x1 x2');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(false);
+    if (!('error' in spec)) {
+      expect(spec.model_type).toBe('duration_cox');
+      expect(spec.formula).toBe('ph ~ x1 + x2');
+      expect(spec.duration_time_column).toBe('time');
+      expect(spec.duration_event_column).toBe('fail');
+    }
+  });
+
+  it('rejects stcox with too few positionals', () => {
+    const r = parse('stcox time fail');
+    const spec = parseToModelSpec(r);
+    expect('error' in spec).toBe(true);
+  });
+
   it('summarize does not produce a ModelSpec', () => {
     const parsed = parse('summarize y x1');
     const spec = parseToModelSpec(parsed);

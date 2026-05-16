@@ -40,7 +40,8 @@
 - **S5.5**（非线性、门限；非参数/半参数预留）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.5」；教程见 [`tutorials/s5-nonlinear-threshold.md`](../../tutorials/s5-nonlinear-threshold.md)。
 - **S5.6**（ARCH / GARCH）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.6 ARCH / GARCH」；教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
 - **S5.7**（空间计量）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.7 空间计量」；教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
-- **S5.8–S5.9：** 见总规 §11–§12。
+- **S5.8**（久期模型 / Cox）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.8 久期模型」；教程见 [`tutorials/s5-duration.md`](../../tutorials/s5-duration.md)。
+- **S5.9：** 见总规 §12。
 
 ## 活跃实施计划
 

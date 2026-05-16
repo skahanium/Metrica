@@ -771,6 +771,8 @@ export const handleModel: CmdHandler = (parsed, input, feedback) => {
         spatialWeightsPath: spec.spatial_weights_path ?? '',
         spatialIdColumn: spec.spatial_id_column ?? '',
         spatialRowStandardize: spec.spatial_row_standardize,
+        durationTimeColumn: spec.duration_time_column ?? '',
+        durationEventColumn: spec.duration_event_column ?? '',
       });
       const payload = (result as TaskResponse).result_payload as Record<string, unknown> | undefined;
       const rr = (result as TaskResponse).run_record;

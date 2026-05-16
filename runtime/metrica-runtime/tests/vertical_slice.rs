@@ -206,6 +206,27 @@ fn fit_model_runs_spatial_error_with_spatial_diagnostics() {
 }
 
 #[test]
+fn fit_model_runs_duration_cox_with_hazard_ratios_and_diagnostics() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/duration_demo.csv".to_string();
+    request.model_spec.model_type = "duration_cox".to_string();
+    request.model_spec.formula = "ph ~ x1".to_string();
+    request.model_spec.duration_time_column = Some("time".to_string());
+    request.model_spec.duration_event_column = Some("fail".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let diag = payload.get("diagnostics").expect("diagnostics");
+    assert_eq!(diag.get("n_events").and_then(|v| v.as_i64()), Some(7));
+    let hrs = payload.get("hazard_ratios").expect("hazard_ratios");
+    let arr = hrs.as_array().expect("array");
+    assert_eq!(arr.len(), 1);
+    assert!(arr[0].get("hr").and_then(|v| v.as_f64()).unwrap_or(0.0).is_finite());
+}
+
+#[test]
 fn fit_model_runs_gmm_linear_with_diagnostics() {
     let mut request = sample_fit_model_request();
     request.project_context.working_dir = repo_root().to_string_lossy().to_string();

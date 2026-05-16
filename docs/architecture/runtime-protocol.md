@@ -66,6 +66,7 @@
 | 因果 | `did`、`event_study`、`ipw`、`psm`、`aipw` |
 | 复杂抽样 | `survey_ols`、`survey_logit`、`survey_probit`、`survey_poisson` |
 | 空间（S5.7） | `spatial_lag`（SAR）、`spatial_error`（SEM）（`packages/MetricaSpatial.jl`；**不在** `MODEL_REGISTRY`，走 `julia_bridge_entry.jl` / `julia_daemon.jl` 专用分支） |
+| 久期（S5.8） | `duration_cox`（Cox PH；`packages/MetricaDuration.jl`；**不在** `MODEL_REGISTRY`，走专用分支） |
 
 ### `S5` 扩展规则（摘要）
 
@@ -172,6 +173,27 @@
 
 **CLI（App）：** 动词 **`spreg`**，例如  
 `spreg y x1, spatial_weights("datasets/demo/spatial_demo_W.csv") id(region) model(lag)`；`weights("...")` 为 **`spatial_weights` 的别名**。教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
+
+### `duration_cox`（Cox 比例风险，右删失，S5.8）
+
+**路径：** 与 `MODEL_REGISTRY` 并行；`julia_bridge_entry.jl` / `julia_daemon.jl` 专用分支调用 `MetricaDuration.fit_duration_cox`。
+
+**`ModelSpec` 字段（除通用 `formula` / `dataset_ref` 外）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `model_type` | 字符串 | 是 | 固定为 `duration_cox` |
+| `formula` | 字符串 | 是 | 固定形态 **`ph ~ x1 + x2`**：`ph` 为占位左侧，**不要求**数据中存在该列；协变量仅出现在右侧 |
+| `duration_time_column` | 字符串 | 是 | 随访时间列名；须为**正有限**实数（首期拒绝 0 与负值） |
+| `duration_event_column` | 字符串 | 是 | 事件指示列名：**0=删失，1=事件**；亦支持布尔列 |
+
+**不转发字段：** 桥接不传 `vcov` / `weights` / `cluster` 等线性族关键字。
+
+**并列：** Breslow（`diagnostics.risk_set_ties_method` 为 `breslow`）。
+
+**`result_payload`：** 与线性族相同的 `glance` / `tidy` / `warnings`；额外 **`hazard_ratios`** 数组（元素含 `term`、`hr`、`ci_lower`、`ci_upper`，基于 log 系数正态近似）；`tidy` 中 `estimate` 为 **log(HR)** 尺度。`diagnostics` 含 `n_obs`、`n_events`、`n_censored`、`censoring_fraction`、`converged`、`iterations`、`loglikelihood`、`baseline_hazard_summary`（含长度有界的 `preview`）、`ph_diagnostics`（首期 **`null`**）。
+
+**CLI（App）：** `stcox time fail x1 x2` → `duration_time_column=time`、`duration_event_column=fail`、`formula="ph ~ x1 + x2"`。演示数据：`datasets/demo/duration_demo.csv`。教程见 [`tutorials/s5-duration.md`](../../tutorials/s5-duration.md)。
 
 ### 非参数 / 半参数（5c 预留，非实现）
 

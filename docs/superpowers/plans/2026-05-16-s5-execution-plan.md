@@ -450,6 +450,89 @@
 
 ---
 
+## S5.8 久期模型
+
+### 1. 收口状态
+
+- **范围：** 新建 `MetricaDuration.jl`；`model_type`：**`duration_cox`**（Cox 比例风险、右删失）；`model_spec` 显式 **时间列 / 事件列** + 协变量公式（占位左值）；Runtime 白名单与必填字段；App **`stcox`** CLI + **`DurationDiagnosticsPanel`**；协议与教程。
+- **权威对齐：** 总规 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) §11；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
+
+### 2. 范围与非目标
+
+| 阶段 | 首期纳入 | 明确不做（首期） |
+|------|----------|------------------|
+| **8a** | 右删失 Cox PH；**Breslow** 并列处理；`glance` / `tidy` / `hazard_ratios` / `diagnostics` / `warnings` | AFT、竞争风险、区间删失、时依协变量、分层（strata）、生存曲线编辑器 |
+| **8b** | 自研 **部分似然 + Optim（Nelder-Mead）** 估计 `β`；**FiniteDiff** 有限差分近似观测信息矩阵与标准误；基准风险 **Breslow** 累积增量摘要（有界预览） | 新增 Survival 类大包依赖；Schoenfeld 等 PH 检验产品化（**键预留**） |
+
+**非目标：** 参数久期族主路径、复杂曲线 UI、将 Cox 塞进 `MetricaDiscrete` / `MetricaLinear`。
+
+### 3. S5.8-J0 设计定稿（单一事实来源）
+
+1. **时间与事件**  
+   - `duration_time_column`：非负有限实数；**删失**观测为观察到的时间（右删失）。**零或负时间**、缺失 → `ModelError`。  
+   - `duration_event_column`：**数值** `0`/`1` 或 **Bool**（首期 `true`/`false` 与 `0`/`1` 均支持，读入后规范为 0/1）；`1` 为事件发生，`0` 为删失。  
+   - **全删失**或 **零个事件**（无 `event==1`）→ `ModelError`。  
+2. **公式（占位左值）**  
+   - `MetricaBase.parse_metrica_formula` 要求非空左侧，故 Cox 协变量公式固定为 **`ph ~ x1 + x2 + ...`**：`ph` **不要求**主数据中存在该列；实现仅校验 **右侧** 列名 + 时间/事件列。  
+   - CLI `stcox time event x1 x2` → `duration_time_column=time`，`duration_event_column=event`，`formula=ph ~ x1 + x2`（`ph` 字面固定）。  
+3. **并列（ties）**  
+   - **Breslow**：在事件时间 τ 上若有 \(d\) 个失败，偏似然贡献为 \(\sum_{i\in D_\tau} x_i'\beta - d \log S_0(\tau)\)，\(S_0(\tau)=\sum_{j\in R_\tau}\exp(x_j'\beta)\)，\(R_\tau=\{j:T_j\ge\tau\}\)。  
+4. **系数与风险比**  
+   - `tidy`：`estimate` 为 **log(HR)**（与文献偏似然系数一致），`stderror` / `statistic` / `pvalue` / `ci_lower` / `ci_upper` 在 **log 尺度**；`name` 为项名。  
+   - `result_payload.hazard_ratios`：数组 `{ term, hr, ci_lower, ci_upper }`，满足总规「默认展示 HR 与 CI」且避免与 `tidy` 双真来源冲突。  
+5. **估计后端（已定稿）**  
+   - **不**新增 Survival 类大包依赖；`Optim` + `FiniteDiff`（与仓库 `julia = 1.12` 兼容区间写入 `[compat]`）。  
+6. **规模**  
+   - \(n \le 10000\)；协变量数 \(p\) 合理上界（如 \(\le 200\)，Runtime 可省略首期仅 Julia 硬校验）。  
+7. **基准风险 JSON**  
+   - `diagnostics.baseline_hazard_summary`：`n_event_times`、`preview`（至多 **30** 个 `{time, cumulative_hazard}`）、`ties_method: "breslow"`。  
+8. **PH 诊断**  
+   - `diagnostics.ph_diagnostics`：**首期恒为 `null`**，教程说明二期。
+
+### 4. 协议定稿表（`model_spec`）
+
+**共同必填：** `formula`（`ph ~ ...`）；`duration_time_column`；`duration_event_column`。
+
+| 字段 | `duration_cox` | 说明 |
+|------|----------------|------|
+| `vcov` | 省略 | 首期不显式区分；标准误来自观测信息矩阵近似 |
+
+### 5. CLI 与 App（CLI-first）
+
+- **动词：** `stcox`  
+- **位置参数顺序：** `time_col event_col` 后接协变量名（空格分隔），与 Stata 习惯对齐：`stcox week failed x1 x2`。  
+- **生成：** `duration_time_column`、`duration_event_column`、`formula: "ph ~ " * join(xvars, " + ")`。
+
+### 6. Task 表
+
+| ID | 位置 | 一句话目标 |
+|----|------|------------|
+| S5.8-D0 | 本专节 + `s5-advanced-research-topics.md` | S5.8 锚点与验收摘要 |
+| S5.8-J0 | 本专节 §3 | 见上 J0 |
+| S5.8-J1 | `packages/MetricaDuration.jl` | Cox 偏似然、`fit_duration_cox`、`glance`/`tidy`、`result_to_payload` |
+| S5.8-J2 | `runtests.jl` + `datasets/demo/duration_demo.csv` | 成功 + 负时间 / 全删失 |
+| S5.8-B1 | `julia_bridge_entry.jl`、`julia_daemon.jl` | `duration_cox` 分支 |
+| S5.8-R1 | `lib.rs`、`server.rs`、`julia_bridge.rs` | 白名单与必填 |
+| S5.8-R2 | `vertical_slice.rs` | 一条成功 + `n_events` 与 `hazard_ratios` |
+| S5.8-A1 | App `command*`、`protocol`、`DurationDiagnosticsPanel`、`ResultBlock` | `stcox` 展示 |
+| S5.8-A2 | Vitest | 解析与 `buildFitModelRequest` |
+| S5.8-D1 | `runtime-protocol.md`、`tutorials/s5-duration.md` | 协议 + 教学 |
+| S5.8-D2 | 总规 §11 | 字段与 CLI 一句对齐 |
+
+### 7. 验收
+
+- `Pkg.test(MetricaDuration)`：成功路径 + 至少两类错误（负时间、全删失）。  
+- `cargo test --test vertical_slice`：`duration_cox` 一条，`diagnostics.n_events` 与 `hazard_ratios` 非空。  
+- App：Vitest 覆盖 `stcox` 与请求构造。
+
+### 8. 风险
+
+- 信息矩阵接近奇异 → `ModelError` + 明确 `code`。  
+- 大 \(n\) 风险集循环慢 → 首期硬上界 + 教程说明。  
+- 用户误读 HR → 教程与面板标题强调「非 OLS 斜率」。
+
+---
+
 ## 验证与未覆盖风险（`S5.0`）
 
 - **已做：** 全仓 `grep` 旧 `spec`/`plan` 路径与 `ui-project-button-system-plan.md`；`docs/superpowers` 目录仅剩本计划与主设计；Runtime 路由与 `julia_bridge_entry.jl` / `julia_daemon.jl` 对照更新协议文档。

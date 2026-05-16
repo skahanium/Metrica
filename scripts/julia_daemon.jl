@@ -22,6 +22,7 @@ using MetricaCausal
 using MetricaDiagnostics
 using MetricaPanel
 using MetricaSpatial
+using MetricaDuration
 using MetricaData
 using MetricaSurvey
 using MetricaSystem
@@ -143,6 +144,16 @@ function handle_request(req::Dict{String, Any})
                     MetricaSpatial.error_to_payload(result)
                 else
                     MetricaSpatial.result_to_payload(result; include_augment=include_augment)
+                end
+            elseif model_type == "duration_cox"
+                data = CSV.read(dataset_path, DataFrame)
+                tc = String(get(params, "duration_time_column", ""))
+                ec = String(get(params, "duration_event_column", ""))
+                result = MetricaDuration.fit_duration_cox(data, formula, tc, ec)
+                payload = if result isa MetricaBase.ModelError
+                    MetricaDuration.error_to_payload(result)
+                else
+                    MetricaDuration.result_to_payload(result; include_augment=include_augment)
                 end
             elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]

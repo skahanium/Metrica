@@ -22,6 +22,7 @@ describe('commandGrammar', () => {
     expect(getGrammar('test')).toBeDefined();
     expect(getGrammar('export')).toBeDefined();
     expect(getGrammar('spreg')).toBeDefined();
+    expect(getGrammar('stcox')).toBeDefined();
   });
 
   it('returns undefined for unknown verb', () => {
@@ -32,7 +33,7 @@ describe('commandGrammar', () => {
     const modelVerbs = ['regress', 'ivregress', 'gmm', 'qreg', 'gls', 'xtreg', 'xtivreg',
       'logit', 'probit', 'poisson', 'ologit', 'mlogit', 'nbreg',
       'did', 'eventstudy', 'ipw', 'psm', 'aipw',
-      'arima', 'var', 'dfuller', 'coint', 'garch', 'arch', 'spreg'];
+      'arima', 'var', 'dfuller', 'coint', 'garch', 'arch', 'spreg', 'stcox'];
     for (const verb of modelVerbs) {
       const g = getGrammar(verb);
       expect(g, `Missing grammar for ${verb}`).toBeDefined();

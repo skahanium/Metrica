@@ -19,7 +19,8 @@ import { ThresholdSummaryPanel } from './ThresholdSummaryPanel';
 import { SystemEquationsPanel } from './SystemEquationsPanel';
 import { VolatilitySummaryPanel } from './VolatilitySummaryPanel';
 import { SpatialDiagnosticsPanel } from './SpatialDiagnosticsPanel';
-import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics } from '../types/protocol';
+import { DurationDiagnosticsPanel } from './DurationDiagnosticsPanel';
+import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics, DurationDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -65,6 +66,11 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
     ? (result.diagnostics as SpatialDiagnostics | undefined)
     : undefined;
 
+  const showDurationDiagnostics = modelType === 'duration_cox';
+  const durationDiagnostics = showDurationDiagnostics
+    ? (result.diagnostics as DurationDiagnostics | undefined)
+    : undefined;
+
   const showSystemEquations =
     modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls';
 
@@ -90,6 +96,12 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       {showVolatilitySummary && <VolatilitySummaryPanel diagnostics={volatilityDiagnostics} />}
       {showSystemEquations && <SystemEquationsPanel result={result} />}
       {showSpatialDiagnostics && <SpatialDiagnosticsPanel diagnostics={spatialDiagnostics} />}
+      {showDurationDiagnostics && (
+        <DurationDiagnosticsPanel
+          diagnostics={durationDiagnostics}
+          hazardRatios={result.hazard_ratios}
+        />
+      )}
       {isDiscrete && <DiscreteGlanceCards result={result} />}
       {modelType === 'did' && <DIDResultCards result={result} />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}

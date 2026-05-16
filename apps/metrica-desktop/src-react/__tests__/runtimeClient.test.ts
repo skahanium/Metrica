@@ -49,6 +49,21 @@ describe('buildFitModelRequest', () => {
     expect(req.model_spec.vcov?.type).toBe('classical');
   });
 
+  it('builds duration_cox request with duration columns', () => {
+    const req = buildFitModelRequest({
+      datasetPath: 'datasets/demo/duration_demo.csv',
+      formula: 'ph ~ x1',
+      modelType: 'duration_cox',
+      workingDir: '/repo/root',
+      durationTimeColumn: 'time',
+      durationEventColumn: 'fail',
+    });
+    expect(req.model_spec.model_type).toBe('duration_cox');
+    expect(req.model_spec.duration_time_column).toBe('time');
+    expect(req.model_spec.duration_event_column).toBe('fail');
+    expect(req.model_spec.vcov).toBeUndefined();
+  });
+
   it('includes weights and cluster for OLS', () => {
     const req = buildFitModelRequest({
       datasetPath: '/tmp/demo.csv',
