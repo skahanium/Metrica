@@ -61,6 +61,34 @@ export const VolatilitySummaryPanel: React.FC<VolatilitySummaryPanelProps> = ({ 
             ? '—'
             : String(diagnostics.failure_code)}
         </Descriptions.Item>
+        {(diagnostics as any).volatility_forecast !== undefined && (
+          <Descriptions.Item label="波动率预测（首步）">
+            {String((diagnostics as any).volatility_forecast?.slice(0, 5).map((v: number) => v.toFixed(6)).join(', '))}
+          </Descriptions.Item>
+        )}
+        {(diagnostics as any).var_forecast !== undefined && (
+          <Descriptions.Item label="VaR 预测 (α={(diagnostics as any).var_alpha ?? 0.05})">
+            {String((diagnostics as any).var_forecast?.slice(0, 5).map((v: number) => v.toFixed(6)).join(', '))}
+          </Descriptions.Item>
+        )}
+        {(diagnostics as any).es_forecast !== undefined && (
+          <Descriptions.Item label="ES 预测">
+            {String((diagnostics as any).es_forecast?.slice(0, 5).map((v: number) => v.toFixed(6)).join(', '))}
+          </Descriptions.Item>
+        )}
+        {(diagnostics as any).kupiec_test !== undefined && (
+          <>
+            <Descriptions.Item label="Kupiec LR_uc">
+              {(diagnostics as any).kupiec_test.LR_uc?.toFixed(4) ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Kupiec p">
+              {(diagnostics as any).kupiec_test.pvalue?.toFixed(4) ?? '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="预期/实际 hit">
+              {(diagnostics as any).kupiec_test.expected_hits?.toFixed(1)} / {(diagnostics as any).kupiec_test.actual_hits}
+            </Descriptions.Item>
+          </>
+        )}
       </Descriptions>
     </div>
   );

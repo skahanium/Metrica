@@ -75,6 +75,8 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("cointegration", vec!["variables", "time_column", "method"]),
         ("arch", vec!["variable", "time_column", "arch_order"]),
         ("garch", vec!["variable", "time_column"]),
+        ("gjr_garch", vec!["variable", "time_column"]),
+        ("egarch", vec!["variable", "time_column"]),
         // S4d: Survey 模型
         ("survey_ols", vec!["weights_column"]),
         ("survey_logit", vec!["weights_column"]),
