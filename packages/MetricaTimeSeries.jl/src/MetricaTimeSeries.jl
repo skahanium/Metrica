@@ -12,6 +12,10 @@ export AbstractTimeSeriesModel, AbstractTSFitResult,
     ARIMAModel, ARIMAFitResult,
     ARCHModel, ARCHFitResult,
     GARCHModel, GARCHFitResult,
+    GJRModel, GJRFitResult,
+    EGARCHModel, EGARCHFitResult,
+    forecast_arch, forecast_garch,
+    compute_var, compute_es_normal, kupiec_test, compute_volatility_diagnostics,
     VARModel, VARFitResult,
     UnitRootModel, UnitRootFitResult,
     CointegrationModel, CointegrationFitResult,
@@ -107,10 +111,13 @@ include("unitroot.jl")
 include("volatility_fit.jl")
 include("arch.jl")
 include("garch.jl")
+include("gjr_garch.jl")
+include("egarch.jl")
 include("arima.jl")
 include("var.jl")
 include("cointegration.jl")
 include("forecast.jl")
+include("volatility_forecast.jl")
 include("serialize.jl")
 
 # === 统一构造函数 ==========================================================
@@ -215,14 +222,23 @@ function build_time_series_model(model_type::String, params::Dict)
         gq = Int(get(params, "garch_q", 1))
         mi = Int(get(params, "garch_max_iter", 8000))
         tol = Float64(get(params, "garch_tol", 1e-5))
-        return GARCHModel(
-            variable=var_sym,
-            time_column=time_col,
-            garch_p=gp,
-            garch_q=gq,
-            max_iter=mi,
-            tol=tol,
-        )
+        return GARCHModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq, max_iter=mi, tol=tol)
+
+    elseif model_type == "gjr_garch"
+        var_sym = Symbol(get(() -> error("GJR-GARCH 模型需要 variable 参数"), params, "variable"))
+        gp = Int(get(params, "garch_p", 1))
+        gq = Int(get(params, "garch_q", 1))
+        mi = Int(get(params, "garch_max_iter", 8000))
+        tol = Float64(get(params, "garch_tol", 1e-5))
+        return GJRModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq, max_iter=mi, tol=tol)
+
+    elseif model_type == "egarch"
+        var_sym = Symbol(get(() -> error("EGARCH 模型需要 variable 参数"), params, "variable"))
+        gp = Int(get(params, "garch_p", 1))
+        gq = Int(get(params, "garch_q", 1))
+        mi = Int(get(params, "garch_max_iter", 8000))
+        tol = Float64(get(params, "garch_tol", 1e-5))
+        return EGARCHModel(variable=var_sym, time_column=time_col, garch_p=gp, garch_q=gq, max_iter=mi, tol=tol)
 
     else
         error("未知时间序列模型类型：$model_type")
