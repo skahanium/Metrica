@@ -490,3 +490,21 @@ function MetricaBase.fit(::Type{GMMLinearModel}, formula::AbstractString, data;
         gmm_diag,
     )
 end
+
+# === C-stat (Difference-in-Sargan) ===========================================
+function gmm_c_stat(result::GMMLinearFitResult, constrained_j_stat::Float64, constrained_j_df::Int)
+    j_full = result.gmm_diagnostics[:j_statistic]
+    df_full = result.gmm_diagnostics[:j_df]
+    c = constrained_j_stat - j_full
+    df_c = constrained_j_df - df_full
+    pv_c = df_c > 0 && c > 0 ? 1 - cdf(Chisq(df_c), c) : NaN
+    return Dict{Symbol, Any}(:c_statistic => c, :df => df_c, :pvalue => pv_c)
+end
+
+function gmm_diff_hansen(full_result::GMMLinearFitResult, step1_result::GMMLinearFitResult)
+    j_full = full_result.gmm_diagnostics[:j_statistic]
+    j_step1 = step1_result.gmm_diagnostics[:j_statistic]
+    d = j_step1 - j_full
+    pv = d > 0 ? 1 - cdf(Chisq(1), d) : NaN
+    return Dict{Symbol, Any}(:diff_hansen => d, :pvalue => pv)
+end

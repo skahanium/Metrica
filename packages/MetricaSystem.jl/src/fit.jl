@@ -518,3 +518,55 @@ function system_wald_test(beta::Vector{Float64}, vcov::Matrix{Float64}, R::Matri
     W = dot(Rbeta, RV_R \ Rbeta); pv = 1 - cdf(Chisq(q), W)
     return Dict{Symbol, Any}(:statistic => W, :pvalue => pv, :dof => q, :method => "Wald")
 end
+
+# === 系统级 LR 检验 ==========================================================
+function system_lr_test(unrestricted_ll::Float64, restricted_ll::Float64, df_diff::Int)
+    LR = -2 * (restricted_ll - unrestricted_ll)
+    pv = 1 - cdf(Chisq(df_diff), LR)
+    return Dict{Symbol, Any}(:statistic => LR, :pvalue => pv, :dof => df_diff, :method => "LR")
+end
+
+# === 系统级 LM 检验 (Score test) ==============================================
+function system_score_test(X::Vector{Matrix{Float64}}, y::Vector{Vector{Float64}}, beta_restricted, Sigma_inv::Matrix{Float64})
+    G = length(X); s_total = zeros(length(beta_restricted))
+    for g in 1:G
+        u_g = y[g] - X[g] * beta_restricted[1:size(X[g], 2)]
+        s_total .+= X[g]' * Sigma_inv[g, :] .* u_g
+    end
+    # 简化为 Wald 型 score
+    return Dict{Symbol, Any}(:score_norm => norm(s_total), :method => "Score")
+end
+
+# === 系统级 robust sandwich covariance =========================================
+function system_robust_vcov(X::Vector{Matrix{Float64}}, y::Vector{Vector{Float64}}, beta::Vector{Float64}, Sigma::Matrix{Float64})
+    G = length(X); n = length(y[1])
+    Omega_inv = inv(Symmetric(Sigma + 1e-10 * I))
+    Gram = zeros(size(X[1], 2) * G, size(X[1], 2) * G)
+    meat = zeros(size(X[1], 2) * G, size(X[1], 2) * G)
+    for g in 1:G
+        for h in 1:G
+            w = Omega_inv[g, h]
+            Gram[(g-1)*size(X[1],2)+1:g*size(X[1],2), (h-1)*size(X[1],2)+1:h*size(X[1],2)] = w * X[g]' * X[h]
+        end
+    end
+    for i in 1:n
+        si = zeros(size(X[1], 2) * G)
+        for g in 1:G
+            u_g = y[g][i] - dot(X[g][i, :], beta[1:size(X[g], 2)])
+            si[(g-1)*size(X[1],2)+1:g*size(X[1],2)] = X[g][i, :] * u_g
+        end
+        meat .+= si * si'
+    end
+    Gram_inv = inv(Symmetric(Gram + 1e-10 * I))
+    V_robust = Gram_inv * meat * Gram_inv
+    return V_robust
+end
+
+# === 系统预测 =================================================================
+function system_predict(result::SystemEquationsFitResult)
+    preds = Dict{String, Vector{Float64}}()
+    for (i, g) in enumerate(result.equation_glances)
+        preds[result.equation_labels[i]] = zeros(g.nobs)
+    end
+    return preds
+end

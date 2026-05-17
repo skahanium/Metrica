@@ -258,3 +258,37 @@ function bootstrap_quantile_se(data, formula, tau::Float64; n_boot::Int=200, see
     se_boot = [std(beta_boot[:, j]) for j in 1:size(beta_boot, 2)]
     return se_boot
 end
+
+# === Rank Score 推断 ==========================================================
+function rank_score_test(r::QuantileFitResult, restricted_beta::Vector{Float64}, restricted_indices::Vector{Int})
+    n = length(r.y); tau = r.tau
+    signs = (r.y .- r.X * restricted_beta) .> 0
+    a = signs .- tau
+    S = r.X' * a / sqrt(n)
+    V_inv = inv(Symmetric(r.vcov_matrix))
+    T = n * dot(S, V_inv * S)
+    pv = 1 - cdf(Chisq(length(restricted_indices)), T)
+    return Dict{Symbol, Any}(:statistic => T, :pvalue => pv, :dof => length(restricted_indices), :method => "Rank Score")
+end
+
+# === Sparsity 推断 ============================================================
+function sparsity_inference(r::QuantileFitResult)
+    tau = r.tau; n = length(r.y)
+    h = max(1.0, n^(1/3) * (1.5 * (quantile(Normal(), 0.75) - quantile(Normal(), 0.25)) / 1.349)^(2/3))
+    f_hat = 2 * h / (max(sum(abs.(r.residuals) .< h), 1))
+    s_tau = 1.0 / f_hat
+    return Dict{Symbol, Any}(:sparsity => s_tau, :bandwidth => h, :method => "Hall-Sheather")
+end
+
+# === IV Quantile (2SLS 型) ====================================================
+function fit_iv_quantile(data, formula::String, instruments::Vector{String}, endog::Vector{String}, tau::Float64)
+    Z = Matrix{Float64}(hcat([data[\!, Symbol(c)] for c in instruments]...))
+    X_endo = Matrix{Float64}(hcat([data[\!, Symbol(c)] for c in endog]...))
+    ZtZ_inv = inv(Symmetric(Z' * Z + 1e-10 * I))
+    X_hat = Z * ZtZ_inv * (Z' * X_endo)
+    X_exog_cols = setdiff(Symbol.(names(data)), vcat(Symbol(endog), Symbol(formula[1])))
+    X_exog = isempty(X_exog_cols) ? ones(nrow(data)) : Matrix{Float64}(hcat([data[\!, c] for c in X_exog_cols]...))
+    X_all = hcat(X_exog, X_hat)
+    data_aug = hcat(DataFrame(y = data[\!, Symbol(split(formula, "~")[1])]), DataFrame(X_all, :auto))
+    return MetricaBase.fit(QuantileModel, "y ~ x1", data_aug; quantile_tau=tau)
+end

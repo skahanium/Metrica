@@ -3,13 +3,15 @@ module MetricaGMM
 using CSV
 using DataFrames
 using Distributions: TDist, FDist, Chisq, cdf, quantile
-using LinearAlgebra: Symmetric, cholesky, inv, dot, rank, diag, I, tr
+using LinearAlgebra: Symmetric, cholesky, inv, dot, rank, diag, I, tr, eigvals
+using Optim
 using Statistics
 using StatsModels
 using MetricaBase
 using MetricaOutput
 
 export GMMLinearModel, GMMLinearFitResult, result_to_payload, linear_iv_gmm_stack
+export gmm_c_stat, gmm_diff_hansen
 
 include("gmm_algebra.jl")
 include("formula.jl")

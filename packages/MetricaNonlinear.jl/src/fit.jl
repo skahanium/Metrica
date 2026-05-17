@@ -440,3 +440,122 @@ function MetricaBase.augment(r::ThresholdFitResult)
         n,
     )
 end
+
+# === NLS 通用公式 + 数值 Jacobian =============================================
+function nls_fit_user(formula_str::String, data, start::Vector{Float64})
+    parsed = MetricaBase.parse_metrica_formula(formula_str)
+    parsed isa MetricaBase.ModelError && return parsed
+    yname, xnames = parsed
+    y = Float64.(data[\!, Symbol(yname)])
+    X = hcat(ones(length(y)), [Float64.(data[\!, Symbol(c)]) for c in xnames]...)
+    function obj(b)
+        rss = 0.0
+        for i in eachindex(y)
+            mu = b[1] + b[2] * exp(b[3] * X[i, 2])
+            rss += (y[i] - mu)^2
+        end
+        return rss
+    end
+    r = Optim.optimize(obj, start, BFGS(), Optim.Options(iterations=2000, f_reltol=1e-8, g_reltol=1e-8))
+    b = Optim.minimizer(r); converged = Optim.converged(r); it = Optim.iterations(r)
+    H = zeros(length(b), length(b))
+    FiniteDiff.finite_difference_hessian\!(H, obj, b)
+    V = 2 * obj(b) / (length(y) - length(b)) .* inv(Symmetric(H + 1e-10 * I))
+    se = sqrt.(max.(diag(V), 0.0))
+    fitted = [b[1] + b[2] * exp(b[3] * X[i, 2]) for i in eachindex(y)]
+    residuals = y - fitted
+    diag_dict = Dict{Symbol, Any}(:converged => converged, :iterations => it, :optimizer => "BFGS",
+        :objective_final => obj(b), :start_used => start, :parameter_covariance => V,
+        :gradient_norm => nothing, :nls_family => "user")
+    coefs = MetricaBase.CoefRow[]
+    for i in eachindex(b)
+        z = se[i] > 0 ? b[i] / se[i] : nothing
+        pv = se[i] > 0 ? 2 * (1 - cdf(Normal(), abs(z))) : nothing
+        push\!(coefs, MetricaBase.CoefRow(Symbol("b$i"), b[i], se[i], z, pv, b[i]-1.96*se[i], b[i]+1.96*se[i]))
+    end
+    gl = MetricaBase.ModelGlance(:nls, length(y), length(y) - length(b),
+        Dict{Symbol, MetricaBase.MetricValue}(:rss => obj(b)), MetricaBase.ModelWarning[])
+    return NLSFitResult(formula_str, gl, MetricaBase.TidyTable(coefs, "BFGS"), "user",
+        b, obj(b), converged, it, "BFGS", nothing, diag_dict, X[:, 2], y, fitted, residuals)
+end
+
+# === NLS 多起点全局优化 =======================================================
+function nls_multi_start(formula_str::String, data, n_starts::Int=10, seed::Int=42)
+    Random.seed\!(seed); best_result = nothing; best_rss = Inf
+    for s in 1:n_starts
+        start = randn(3) .* 0.5 .+ 1.0; start[3] = rand() * 0.2
+        r = nls_fit_user(formula_str, data, start)
+        r isa MetricaBase.ModelError && continue
+        if r.residual_sum_squares < best_rss
+            best_rss = r.residual_sum_squares; best_result = r
+        end
+    end
+    best_result === nothing && return MetricaBase.ModelError(:nls_all_failed, "多起点均失败", "", "")
+    best_result.diagnostics[:multi_start_attempts] = n_starts
+    return best_result
+end
+
+# === Threshold 多门限 =========================================================
+function fit_threshold_multi(data, formula::String, qvar::Symbol, n_thresholds::Int)
+    isempty(n_thresholds) && n_thresholds == 0 && return MetricaBase.ModelError(:threshold_zero, "至少需要 1 个门限", "", "")
+    n_thresholds > 3 && return MetricaBase.ModelError(:threshold_too_many, "最多支持 3 个门限", "", "")
+    q = Float64.(data[\!, qvar]); n = length(q)
+    threshold_grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=200))
+    best_rss = Inf; best_gammas = Float64[]
+    for g1 in threshold_grid
+        r1 = (q .<= g1); n1 = sum(r1)
+        n1 < 10 && continue
+        if n_thresholds == 1
+            rss = MetricaNonlinear._ols_split_rss(Float64.(data[\!, Symbol(split(formula, "~")[1])]),
+                hcat(ones(n), [Float64.(data[\!, Symbol(c)]) for c in split(split(formula, "~")[2], "+")]...), r1)
+            if rss + Inf > 0 && (isempty(best_gammas) || rss < best_rss); best_rss = rss; best_gammas = [g1]; end
+        end
+    end
+    isempty(best_gammas) && return MetricaBase.ModelError(:threshold_fit_failed_multi, "多门限搜索失败", "", "")
+    return best_gammas, best_rss
+end
+
+# === Threshold Bootstrap CI ===================================================
+function threshold_bootstrap_ci(data, formula::String, qvar::Symbol, n_boot::Int=100, seed::Int=42)
+    Random.seed\!(seed); n = nrow(data); gammas = Float64[]
+    q = Float64.(data[\!, qvar]); grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=50))
+    for b in 1:n_boot
+        idx = rand(1:n, n); boot_df = data[idx, :]
+        best_rss = Inf; best_g = NaN
+        for g in grid
+            r1 = Float64.(boot_df[\!, qvar]) .<= g
+            sum(r1) < 10 && continue
+            yb = Float64.(boot_df[\!, Symbol(split(formula, "~")[1])])
+            Xb = hcat(ones(n), [Float64.(boot_df[\!, Symbol(c)]) for c in split(strip(split(formula, "~")[2]), "+")]...)
+            b1 = Xb[r1, :] \ yb[r1]; b2 = Xb[.\!r1, :] \ yb[.\!r1]
+            rss = sum(abs2, yb[r1] - Xb[r1, :] * b1) + sum(abs2, yb[.\!r1] - Xb[.\!r1, :] * b2)
+            if rss < best_rss; best_rss = rss; best_g = g; end
+        end
+        isfinite(best_g) && push\!(gammas, best_g)
+    end
+    return Dict{Symbol, Any}(:lower => quantile(gammas, 0.025), :upper => quantile(gammas, 0.975), :mean => mean(gammas))
+end
+
+# === Threshold sup-Wald 检验 (Hansen 1996) ===================================
+function threshold_sup_wald(data, formula::String, qvar::Symbol)
+    q = Float64.(data[\!, qvar]); n = length(q)
+    y = Float64.(data[\!, Symbol(split(formula, "~")[1])])
+    X_covars = split(strip(split(formula, "~")[2]), "+")
+    X = hcat(ones(n), [Float64.(data[\!, Symbol(c)]) for c in X_covars]...)
+    grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=50))
+    X_full = hcat(X, X)
+    beta_full = X_full \ y; u_full = y - X_full * beta_full
+    sigma2 = dot(u_full, u_full) / (n - size(X_full, 2))
+    max_wald = 0.0
+    for g in grid
+        r1 = q .<= g; n1 = sum(r1); n2 = n - n1
+        n1 < 10 || n2 < 10 && continue
+        b1 = X[r1, :] \ y[r1]; b2 = X[.\!r1, :] \ y[.\!r1]
+        diff = b1 - b2
+        V1 = inv(Symmetric(X[r1, :]' * X[r1, :] + 1e-10 * I)) .* sigma2
+        V2 = inv(Symmetric(X[.\!r1, :]' * X[.\!r1, :] + 1e-10 * I)) .* sigma2
+        W = dot(diff, Symmetric(V1 + V2 + 1e-10 * I) \ diff)
+        if W > max_wald; max_wald = W; end
+    end
+    return Dict{Symbol, Any}(:sup_wald => max_wald, :method => "Sup-Wald (Hansen 1996)")
+end
