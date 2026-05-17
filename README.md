@@ -83,6 +83,11 @@ datasets/demo/     教学演示数据（16 个）
 - [docs/quality/package-status.md](docs/quality/package-status.md) — 包级 CI / golden / benchmark 状态矩阵
 - [docs/quality/golden-values.md](docs/quality/golden-values.md) — golden-value 验证政策
 - [docs/quality/release-checklist.md](docs/quality/release-checklist.md) — 发布前质量门禁
+- [docs/governance/versioning.md](docs/governance/versioning.md) — SemVer 与破坏性变更规则
+- [docs/governance/release-process.md](docs/governance/release-process.md) — 手动发布流程
+- [docs/governance/support-policy.md](docs/governance/support-policy.md) — 个人维护者支持边界
+- [docs/governance/maintainers.md](docs/governance/maintainers.md) — 维护者职责与决策权限
+- [docs/governance/decision-records.md](docs/governance/decision-records.md) — ADR/RFC 决策记录流程
 - [tutorials/](tutorials/) — 全部模型族 CLI 教程
 
 ## 许可证

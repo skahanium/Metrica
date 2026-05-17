@@ -83,6 +83,7 @@ bash scripts/dev/test-package.sh MetricaLinear.jl
 - 测试覆盖不得降低
 - 数值结果变更应补充或更新 golden-value fixture，格式见 [docs/quality/golden-values.md](docs/quality/golden-values.md)
 - 发布前质量门禁见 [docs/quality/release-checklist.md](docs/quality/release-checklist.md)
+- 版本和破坏性变更规则见 [docs/governance/versioning.md](docs/governance/versioning.md)
 - 所有 Julia 包：`julia --project=<pkg> -e 'using Pkg; Pkg.test()'`
 - PR 阻塞 Julia 核心链路：`make test-julia-core`
 - Runtime：`cargo test --lib`
@@ -92,6 +93,8 @@ bash scripts/dev/test-package.sh MetricaLinear.jl
 
 - Review 关注点见 [docs/contributing/review-guide.md](docs/contributing/review-guide.md)
 - Issue 分流与标签规则见 [docs/contributing/triage-guide.md](docs/contributing/triage-guide.md)
+- 维护者职责见 [docs/governance/maintainers.md](docs/governance/maintainers.md)
+- 涉及架构边界、协议字段、`model_type` 语义、版本策略或破坏性变更时，请先按 [docs/governance/decision-records.md](docs/governance/decision-records.md) 写 Issue 或决策记录。
 
 ## AI 协作
 

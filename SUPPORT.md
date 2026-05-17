@@ -7,18 +7,20 @@
 - [docs/architecture/](docs/architecture/) — 架构与协议文档
 - [docs/contributing/](docs/contributing/) — review 与 Issue 分流规则
 - [docs/quality/](docs/quality/) — CI、golden-value、benchmark 与发布门禁
+- [docs/governance/support-policy.md](docs/governance/support-policy.md) — 支持范围与维护边界
 - [tutorials/](tutorials/) — 模型族 CLI 教程
 
 ## 社区支持
 
 - [GitHub Issues](https://github.com/skahanium/Metrica/issues) — Bug 报告和功能请求
-- [GitHub Discussions](https://github.com/skahanium/Metrica/discussions) — 使用问题和一般讨论（如果已启用）
+
+当前以 GitHub Issues 为主要入口。若未来启用 GitHub Discussions，使用问答会迁移到 Discussions。
 
 ## 常见问题
 
 ### 项目可用吗
 
-当前处于早期建设阶段，不可用于生产或正式研究。
+当前处于回顾完善阶段，不可用于生产或正式研究。
 
 ### 支持哪些平台
 

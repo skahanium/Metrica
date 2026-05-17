@@ -6,7 +6,7 @@
 
 Metrica 是一个开源计量经济学框架，为学术研究和数据分析提供高性能、结构化、可扩展的现代工具链。
 
-- 20 个 Julia Core 包，覆盖从 OLS 到贝叶斯的全部主流模型族
+- 18 个 Julia Core 包，覆盖从 OLS 到贝叶斯的全部主流模型族
 - CLI-first 桌面工作台（Rust + Tauri + React）
 - GPL v3 许可
 - AI 协作构建（本文件为 AI 助手的项目指令中枢）
