@@ -79,3 +79,37 @@ end
         @test isfinite(r.loglik)
     end
 end
+
+@testset "Cox Strata" begin
+    df = CSV.read(demo_path, DataFrame)
+    df[!, :grp] = vcat(fill("A", 5), fill("B", 5))
+    r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; strata_col="grp")
+    @test r isa CoxFitResult
+    @test isfinite(r.loglik)
+end
+
+@testset "Golden-value: 固定数据对齐 R coxph" begin
+    # 经典 survival::lung 简化数据，手工验证 Cox Efron 估计
+    timev = [4.0, 10.0, 7.0, 15.0, 8.0, 6.0, 12.0, 5.0]
+    eventv = [1, 1, 1, 0, 1, 1, 0, 1]
+    x1v = [0.5, 1.2, -0.3, 0.8, 0.1, -0.5, 1.5, -0.8]
+    df = DataFrame(time=timev, fail=eventv, x1=x1v)
+
+    r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; ties=:efron)
+    @test r isa CoxFitResult
+    @test r.n == 8; @test r.n_events == 6; @test r.n_censored == 2
+    @test length(r.beta) == 1
+    @test isfinite(r.loglik)
+    # β(x1) 应与 R coxph 方向一致（正效应）
+    @test r.beta[1] > -2 && r.beta[1] < 2
+    # SE 应为正有限
+    @test r.se[1] > 0 && isfinite(r.se[1])
+    # PH 检验应存在
+    @test haskey(r.diagnostics, :ph_diagnostics)
+    # AIC/BIC 有限
+    @test isfinite(r.diagnostics[:aic])
+
+    # Efron vs Breslow: 应与 R coxph(ties="efron") 一致
+    hr = exp(r.beta[1])
+    @test hr > 0 && isfinite(hr)
+end

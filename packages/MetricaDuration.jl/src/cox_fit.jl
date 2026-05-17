@@ -211,8 +211,50 @@ function fit_duration_cox(
     catch; return MetricaBase.ModelError(:cox_singular_information, "信息矩阵接近奇异", "无法求逆海森", "请检查协变量完全共线性或事件过少。") end
     se = sqrt.(clamp.(diag(covb), 0.0, Inf))
 
+    # Cluster robust SE
+    if cluster_col !== nothing
+        cluster_ids = subcc[!, Symbol(String(cluster_col))]
+        c_unique = unique(cluster_ids)
+        n_cluster = length(c_unique)
+        se_cluster = if n_cluster >= 2 && n_cluster < n
+            G = zeros(n_cluster, p)
+            for (ci, cid) in enumerate(c_unique)
+                c_idx = findall(cluster_ids .== cid)
+                for i in c_idx
+                    xi = X_o[i, :]; zi = dot(xi, βhat)
+                    ri = _first_risk_index(t_ord, t_ord[i])
+                    ri === nothing && continue
+                    risk_idx = ri:n; Xr = X_o[risk_idx, :]; eta = Xr * βhat
+                    mx = maximum(eta); er = exp.(eta .- mx); s0 = sum(er)
+                    x_bar = vec(sum(Xr .* er, dims=1)) ./ s0
+                    G[ci, :] .+= e_ord[i] * (xi .- x_bar)
+                end
+            end
+            Vc = covb * (G' * G) * covb
+            se_c = sqrt.(clamp.(diag(Vc), 0.0, Inf))
+            se_c
+        else
+            nothing
+        end
+    else
+        se_cluster = nothing
+    end
+
     preview = breslow_baseline_preview(βhat, X_o, t_ord, e_ord, 30)
     surv = baseline_survival(preview)
+
+    # Strata: 分层基线风险
+    strata_hazards = nothing
+    if strata_col !== nothing
+        strata_hazards = Dict{String, Any}()
+        strata_vals = subcc[!, Symbol(String(strata_col))]
+        for sv in unique(strata_vals)
+            s_idx = strata_vals .== sv
+            Xs = X_o[s_idx, :]; ts = t_ord[s_idx]; es = e_ord[s_idx]
+            prev_s = breslow_baseline_preview(βhat, Xs, ts, es, 10)
+            strata_hazards[String(sv)] = [Dict("time" => p.first, "cumulative_hazard" => p.second) for p in prev_s]
+        end
+    end
 
     # Schoenfeld 残差 + PH 检验
     ph_diag = nothing
@@ -242,8 +284,12 @@ function fit_duration_cox(
         ),
         :baseline_survival_preview => [Dict("time" => pr.first, "survival" => pr.second) for pr in surv],
         :ph_diagnostics => ph_diag,
+        :cluster_se => se_cluster !== nothing ? se_cluster : nothing,
+        :strata_hazards => strata_hazards,
     )
 
+    # Build CoxFitResult — add se_cluster as extra field via diagnostics only
+    # (CoxFitResult has se for the base SE; cluster SE lives in diagnostics)
     return CoxFitResult(
         :duration_cox,
         Symbol.(xnames),

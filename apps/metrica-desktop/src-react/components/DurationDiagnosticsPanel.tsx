@@ -15,6 +15,7 @@ export function DurationDiagnosticsPanel({
 
   const bh = diagnostics?.baseline_hazard_summary;
   const preview = bh?.preview;
+  const survPreview = (diagnostics as any)?.baseline_survival_preview;
 
   return (
     <>
@@ -47,7 +48,7 @@ export function DurationDiagnosticsPanel({
               {bh?.n_event_times ?? '—'}
             </Descriptions.Item>
           </Descriptions>
-          {preview && preview.length > 0 && (
+          {preview && preview.length > 0 &&
             <Table
               style={{ marginTop: 12 }}
               size="small"
@@ -58,7 +59,19 @@ export function DurationDiagnosticsPanel({
                 { title: '累积基准风险 H₀', dataIndex: 'cumulative_hazard', key: 'h', render: (v: number) => v?.toFixed(4) },
               ]}
             />
-          )}
+          }
+          {survPreview && Array.isArray(survPreview) && survPreview.length > 0 &&
+            <Table
+              style={{ marginTop: 12 }}
+              size="small"
+              pagination={false}
+              dataSource={survPreview.map((row) => ({ time: (row as any).time, survival: (row as any).survival, key: String(row) }))}
+              columns={[
+                { title: '时间', dataIndex: 'time', key: 'st' },
+                { title: '基准生存率 S₀', dataIndex: 'survival', key: 'ss' },
+              ]}
+            />
+          }
         </Card>
       )}
       {hazardRatios && hazardRatios.length > 0 && (

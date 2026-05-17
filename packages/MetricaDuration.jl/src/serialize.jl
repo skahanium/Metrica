@@ -91,6 +91,7 @@ function result_to_payload(result::CoxFitResult; include_augment::Bool = true)
             "aic" => get(result.diagnostics, :aic, nothing),
             "bic" => get(result.diagnostics, :bic, nothing),
             "diagnostics" => _diag_to_dict(result.diagnostics),
+            "cluster_se" => get(result.diagnostics, :cluster_se, nothing),
             "hazard_ratios" => hr_rows,
             "model_capabilities" => caps_dict,
             "augment_status" => aug_status,
