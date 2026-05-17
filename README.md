@@ -6,25 +6,24 @@
 
 Metrica 是一个基于 Julia 的联邦式计量经济学框架，目标是在教学体验、工程一致性、性能与可扩展性上，逐步超越 Python `statsmodels`，并最终发展为可视化、原生化的计量经济学应用生态。
 
-当前目录包含：
+**当前阶段：S1–S5 全部完成 ✅，下一阶段 S6（安装包与产品化收口）。**
 
-- `Metrica.jl-计量经济学框架-完善版.md`：项目总体蓝图与架构设计
-- `AGENTS.md`：跨 AI 助手统一协作规范
-- `S5-高级研究专题总施工规划.md`：`S5` 分期总规（高级专题 + 文档治理）
-- `docs/roadmap/`：新阶段体系施工指引（含 `s5-advanced-research-topics.md`）
-- `docs/superpowers/specs/2026-04-30-metrica-main-design.md`：当前主设计
-- `docs/superpowers/plans/2026-05-16-s5-execution-plan.md`：当前活跃实施计划
-- `docs/architecture/`：仍在生效的局部架构与协议文档
+当前仓库包含：
 
-建议采用 `monorepo + 多包` 组织方式，以 `MetricaBase.jl` 协议内核为边界，逐步实现数据管理、线性回归、面板模型、诊断检验、输出报告、桌面工作台与教学体系。
+- `packages/`：20 个 Julia Core 包（含全部 S4/S5 模型族）
+- `runtime/metrica-runtime/`：Rust 运行时桥接层（axum + Julia 持久化进程）
+- `apps/metrica-desktop/`：桌面工作台（**CLI-first** 消息流 + 结构化结果消费 + 20 个专用诊断面板）
+- `datasets/demo/`：全部模型族教学 demo 数据
+- `tutorials/`：全部 S5 模型族 CLI 教程
 
-当前仓库中已经包含：
+关键文档：
 
-- `packages/`：Julia Core 包（含 `S4` 模型族包）
-- `runtime/metrica-runtime/`：Rust 运行时桥接层
-- `apps/metrica-desktop/`：桌面工作台（**CLI-first** 消息流 + 结构化结果消费）
+- `Metrica.jl-计量经济学框架-完善版.md`：项目总体蓝图
+- `S5-模型族全量成熟化施工方案.md`：S5 施工基准
+- `docs/architecture/runtime-protocol.md`：Runtime 协议（全部 model_type 白名单）
+- `docs/roadmap/`：阶段施工指引（S1–S4 ✅，S5 ✅，S6–S7 待推进）
 
-当前目标是在已验证的 **`S1`–`S4` 主链路** 上推进 **`S5` 高级研究专题**（见总规），并保持稳定分层：
+核心原则：
 
 - `Core` 负责计量协议与结果语义
 - `Runtime` 负责执行桥接与协议搬运

@@ -319,21 +319,22 @@ Metrica 的阶段不是按教材目录机械切，也不是按“哪个模型听
 - 基础时间序列
 - 复杂抽样
 
-### `S5` 高级研究专题
+### `S5` 高级研究专题 ✅ 已完成
 
-目标：
+目标：承载高复杂但长期重要的专题能力。
 
-- 承载高复杂但长期重要的专题能力
+覆盖方向（全部已实现）：
 
-覆盖方向：
-
-- 一般 GMM
-- 动态面板
-- SUR / 联立方程
-- 分位数回归
-- 非线性 / 门限
-- 非参数 / 半参数
-- ARCH/GARCH、空间、久期、贝叶斯
+- **GMM**：一步/两步/iterated/CUE、Hansen J、C-stat、Diff-Hansen、Cragg-Donald F
+- **动态面板**：Difference GMM + System GMM（Blundell-Bond）、collapsed instruments
+- **SUR / 联立方程**：SUR(FGLS)、system 2SLS/3SLS、Wald/LR/LM、robust sandwich cov
+- **分位数回归**：多 τ、bootstrap SE、rank score、sparsity、IV quantile
+- **非线性 / 门限**：exp_growth/logistic/power/gompertz、数值 Jacobian/CI、多起点、多门限、bootstrap CI、sup-Wald
+- **ARCH / GARCH / GJR / EGARCH**：Gaussian/Student-t/skewed-t、forecast/VaR/ES/Kupiec
+- **空间计量**：SAR/SEM/SDM/SDEM/SAC/SLX/GWR/GTWR/Probit、Moran/LM、kNN/distance-band
+- **久期**：Cox PH（Efron/strata/cluster/weights/counting-process）、Schoenfeld/PH、AFT 四分布
+- **贝叶斯**：NIG 共轭 + MCMC(R-hat/ESS)、logistic/probit、层级线性模型
+- **统一协议**：全部包实现 model_capabilities + augment_status + WARNING_CODE
 
 ### `S6` 安装包与产品化收口
 
@@ -366,17 +367,12 @@ Metrica 的阶段不是按教材目录机械切，也不是按“哪个模型听
 
 ## 10. 当前阶段判断
 
-按当前仓库事实：
+按当前仓库事实（2026-05-17）：
 
-- `S1`：已完成
-- `S2`：已完成
-- `S3`：当前最合理的主线入口
+- `S1`–`S5`：全部完成 ✅
+- `S6`：安装包与产品化收口（下一阶段主线）
 
-因此，当前仓库不应再把精力放在为已完成里程碑保留大量历史文档，而应把文档和实现都集中到：
-
-- 当前稳定主链路的说明
-- `S3` 需要推进的产品化能力
-- `S4-S7` 的长期边界
+当前仓库实现已涵盖 20 个 Core Julia 包、6 个 S5 模型族全量成熟化、统一能力协议、CLI-first App。下一步应聚焦打包分发与产品化。
 
 ---
 

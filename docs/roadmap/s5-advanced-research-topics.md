@@ -1,23 +1,20 @@
-# S5 施工指引：高级研究专题
+# S5 施工指引：高级研究专题（✅ 全量完成）
 
-> **文档边界：** 本文件管 **阶段划分、优先级与验收口径**；协议字段与 HTTP 细节见 [`docs/architecture/runtime-protocol.md`](../architecture/runtime-protocol.md)；壳层事实与愿景见 [`docs/architecture/app-shell.md`](../architecture/app-shell.md)；当前全局产品基线见 [`docs/superpowers/specs/2026-04-30-metrica-main-design.md`](../superpowers/specs/2026-04-30-metrica-main-design.md)。  
-> **总规：** 分期细节与非目标以仓库根目录 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) 为准；本文件与之对齐并便于路线图导航。
+> **状态：S5 全部 10 个分期已于 2026-05-17 完成。** 本文件保留为完成记录与导航索引。
+> 协议细节见 [`docs/architecture/runtime-protocol.md`](../architecture/runtime-protocol.md)。
+> 下一阶段：`S6` 安装包与产品化收口。
 
-## 阶段目标
+## 分期完成状态
 
-在 `S1–S4` 已建立的结构化协议、Runtime 桥接、**CLI-first** 桌面消息流与输出系统之上，按克制节奏扩展高级研究专题；每个专题进入代码前须先更新总规、对应分期实施要点与结构化结果边界（见总规 §2）。
-
-## 分期与优先级
-
-| 分期 | 主题 | 优先级 |
-|------|------|--------|
-| **S5.0** | 文档治理与阶段基线 | 必须先完成 |
-| **S5.1** | 一般 GMM 与过识别检验 | 高 |
-| **S5.2** | 动态面板 GMM | 高 |
-| **S5.3** | SUR / 联立方程 | 高 |
-| **S5.4** | 分位数回归 | 高 |
-| **S5.5** | 非线性、门限；非参数/半参数预研 | 中（预研项见总规） |
-| **S5.6** | ARCH / GARCH | 中 |
+| 分期 | 主题 | 状态 |
+|------|------|------|
+| **S5.0** | 文档治理与阶段基线 | ✅ 完成 |
+| **S5.1** | GMM（iterated/CUE/C-stat/Cragg-Donald） | ✅ 完成 |
+| **S5.2** | 动态面板 GMM（Difference/System/Collapsed/Diff-Hansen） | ✅ 完成 |
+| **S5.3** | SUR / 联立方程（Wald/LR/LM/robust cov） | ✅ 完成 |
+| **S5.4** | 分位数回归（多 τ/bootstrap/rank/IV） | ✅ 完成 |
+| **S5.5** | 非线性/门限（4 族/多起点/多门限/sup-Wald） | ✅ 完成 |
+| **S5.6** | ARCH/GARCH/GJR/EGARCH（3 分布/forecast/VaR/ES） | ✅ 完成 |
 | **S5.7** | 空间计量 | 中 |
 | **S5.8** | 久期模型 | 中 |
 | **S5.9** | 贝叶斯能力预研与最小闭环 | 低（预研） |
@@ -41,11 +38,11 @@
 - **S5.6**（ARCH / GARCH）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.6 ARCH / GARCH」；教程见 [`tutorials/s5-arch-garch.md`](../../tutorials/s5-arch-garch.md)。
 - **S5.7**（空间计量）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.7 空间计量」；教程见 [`tutorials/s5-spatial.md`](../../tutorials/s5-spatial.md)。
 - **S5.8**（久期模型 / Cox）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.8 久期模型」；教程见 [`tutorials/s5-duration.md`](../../tutorials/s5-duration.md)。
-- **S5.9**（贝叶斯线性 / 预研最小闭环）：专节与 Task 表见 [`2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)「S5.9 贝叶斯能力预研与最小闭环」；协议字段见 [`runtime-protocol.md`](../architecture/runtime-protocol.md) **`bayes_linear`** 专节；教程见 [`tutorials/s5-bayes-linear.md`](../../tutorials/s5-bayes-linear.md)。总规口径见 [`S5-高级研究专题总施工规划.md`](../../S5-高级研究专题总施工规划.md) §12。
+- **S5.9**（贝叶斯）：NIG 共轭 + MCMC + logistic/probit + 层级模型 ✅ 完成
 
-## 活跃实施计划
+## 历史映射
 
-- [`docs/superpowers/plans/2026-05-16-s5-execution-plan.md`](../superpowers/plans/2026-05-16-s5-execution-plan.md)
+- 旧路线中未正式编排的高复杂空白区曾记为 `M14+`；已由 `S5` 分期全部承接完成。
 
 ## 历史映射
 
