@@ -1,0 +1,79 @@
+name: Full Quality
+
+on:
+  schedule:
+    - cron: "27 18 * * *"
+  workflow_dispatch:
+
+jobs:
+  julia-package-test:
+    name: Julia ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - MetricaBase.jl
+          - MetricaBayes.jl
+          - MetricaCausal.jl
+          - MetricaData.jl
+          - MetricaDiagnostics.jl
+          - MetricaDiscrete.jl
+          - MetricaDuration.jl
+          - MetricaGMM.jl
+          - MetricaLinear.jl
+          - MetricaNonlinear.jl
+          - MetricaOutput.jl
+          - MetricaPanel.jl
+          - MetricaQuantile.jl
+          - MetricaRuntime.jl
+          - MetricaSpatial.jl
+          - MetricaSurvey.jl
+          - MetricaSystem.jl
+          - MetricaTimeSeries.jl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - name: Test package
+        run: julia --project=packages/${{ matrix.package }} -e 'using Pkg; Pkg.test()'
+      - name: Write package summary
+        if: always()
+        run: |
+          mkdir -p quality-results
+          {
+            echo "package=${{ matrix.package }}"
+            echo "status=${{ job.status }}"
+            echo "mode=nightly-observed"
+            echo "run=${{ github.run_id }}"
+          } > quality-results/${{ matrix.package }}.txt
+      - name: Upload package summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-${{ matrix.package }}
+          path: quality-results/${{ matrix.package }}.txt
+
+  rust-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Rust check
+        run: cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
+      - name: Rust test
+        run: cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml
+
+  app-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install and test
+        run: |
+          cd apps/metrica-desktop
+          npm ci
+          npm test

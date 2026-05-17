@@ -311,7 +311,7 @@ function MetricaBase.fit(::Type{GMMLinearModel}, formula::AbstractString, data;
         else
             "two_step 请求在恰识别 (L=k) 下退化为一步权重：W = (Z'Z)^{-1}（稳健矩协方差 Ω̂ 不可逆，无法构造第二步最优权重）。"
         end
-    else
+    elseif wmode === :two_step
         # 过识别：两步 GMM
         β1 = _solve_gmm_beta(X, Z, y, W)
         β1 isa MetricaBase.ModelError && return β1
@@ -458,7 +458,7 @@ function MetricaBase.fit(::Type{GMMLinearModel}, formula::AbstractString, data;
             β[i] + t_crit * stderror[i],
         )
         for i in eachindex(β)
-    ], "GMM $(wmode === :one_step ? "one_step" : "two_step")")
+    ], "GMM $(String(wmode))")
 
     gmm_diag = Dict{Symbol, Any}(
         :j_statistic => j_stat,
@@ -467,7 +467,7 @@ function MetricaBase.fit(::Type{GMMLinearModel}, formula::AbstractString, data;
         :n_moments => L,
         :n_params => k,
         :overidentifying_restrictions => overid_df,
-        :gmm_weight => wmode === :one_step ? "one_step" : "two_step",
+        :gmm_weight => String(wmode),
         :weight_matrix_description => weight_description,
         :iterations => iterations,
         :exactly_identified => overid_df == 0,

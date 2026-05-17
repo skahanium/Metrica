@@ -10,7 +10,9 @@ using Statistics
 using MetricaBase
 using MetricaOutput
 
-export SpatialFitResult, fit_spatial, result_to_payload, error_to_payload
+export SpatialFitResult, GWRFitResult, GTWRFitResult, ProbitFitResult
+export fit_spatial, result_to_payload, error_to_payload
+export fit_gwr, fit_gtwr, fit_spatial_probit
 export lm_lag_test, lm_error_test, robust_lm_lag_test, robust_lm_error_test
 export build_knn_weights, build_distance_band_weights
 export euclidean_distance, haversine_distance

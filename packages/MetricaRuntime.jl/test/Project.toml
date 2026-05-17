@@ -1,0 +1,6 @@
+[deps]
+MetricaRuntime = "e5f6a7b8-c9d0-1234-ef56-789012345678"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+MetricaRuntime = {path = ".."}

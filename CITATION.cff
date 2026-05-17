@@ -7,7 +7,7 @@ authors:
 url: https://github.com/skahanium/Metrica
 repository-code: https://github.com/skahanium/Metrica
 license: GPL-3.0
-abstract: "一个开源计量经济学框架，提供 20 个 Julia Core 包、CLI-first 桌面工作台和统一的模型能力协议。"
+abstract: "一个开源计量经济学框架，当前提供 18 个 Julia 包、CLI-first 桌面工作台和统一的模型能力协议。"
 keywords:
   - econometrics
   - julia

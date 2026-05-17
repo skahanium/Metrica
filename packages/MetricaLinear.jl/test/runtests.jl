@@ -1,5 +1,6 @@
 using Test
-using LinearAlgebra: I, dot, Diagonal, cholesky, Symmetric, inv
+using JSON3
+using LinearAlgebra: I, dot, Diagonal, cholesky, Symmetric, inv, diag
 using Distributions: TDist, quantile
 using MetricaBase: fit, coef, vcov, stderror, nobs, dof, r2, fitted, residuals, predict,
     glance, tidy, augment, ModelError, ModelWarning, AugmentTable, AbstractLinearModel, AbstractLinearFitResult
@@ -12,6 +13,17 @@ const DEMO_CSV = joinpath(
     "data",
     "demo.csv",
 )
+
+const GOLDEN_ROOT = joinpath(dirname(dirname(dirname(@__DIR__))), "datasets", "golden")
+
+function golden_case(name::AbstractString)
+    path = joinpath(GOLDEN_ROOT, "$(name).json")
+    return JSON3.read(read(path, String))
+end
+
+function assert_golden_close(actual, expected, tolerance; label::AbstractString)
+    @test isapprox(Float64(actual), Float64(expected); atol=Float64(tolerance), rtol=0.0)
+end
 
 function coef_row(fit::OLSFitResult, name::Symbol)
     return only(row for row in tidy(fit).rows if row.name === name)
@@ -38,6 +50,36 @@ end
     missing_col = fit(OLSModel, "y ~ x9", DEMO_CSV)
     @test missing_col isa ModelError
     @test missing_col.code === :unknown_variable
+end
+
+@testset "Golden OLS reference" begin
+    spec = golden_case("linear_ols")
+    data_path = joinpath(dirname(GOLDEN_ROOT), String(spec.dataset))
+    result = fit(OLSModel, String(spec.formula), data_path)
+    @test result isa OLSFitResult
+
+    @test String(glance(result).model) == String(spec.expected.glance.model)
+    @test glance(result).nobs == Int(spec.expected.glance.nobs)
+    @test glance(result).dof == Int(spec.expected.glance.dof)
+
+    tolerances = Dict(String(row.name) => Float64(row.atol) for row in spec.tolerances)
+    for expected_row in spec.expected.tidy
+        row = coef_row(result, Symbol(expected_row.name))
+        assert_golden_close(row.estimate, expected_row.estimate, tolerances["coefficient"]; label="estimate $(expected_row.name)")
+        assert_golden_close(row.stderror, expected_row.stderror, tolerances["stderror"]; label="stderror $(expected_row.name)")
+        assert_golden_close(row.statistic, expected_row.statistic, tolerances["statistic"]; label="statistic $(expected_row.name)")
+    end
+
+    for expected_metric in spec.expected.metrics
+        metric_name = Symbol(expected_metric.name)
+        @test haskey(glance(result).metrics, metric_name)
+        assert_golden_close(
+            glance(result).metrics[metric_name],
+            expected_metric.value,
+            tolerances["metric"];
+            label="metric $(expected_metric.name)",
+        )
+    end
 end
 
 @testset "无截距 OLS 链路" begin
@@ -463,16 +505,16 @@ end
     strong_csv, strong_io = mktemp()
     close(strong_io)
     write(strong_csv, """y,x,x1,z
-10,3,1,5
-12,5,2,9
-14,7,3,13
-16,9,4,17
-18,11,5,21
-20,13,6,25
-22,15,7,29
-24,17,8,33
-26,19,9,37
-28,21,10,41
+34.5,10.5,1,5
+11.0,3.0,2,1
+49.5,15.5,3,7
+20.0,6.0,4,2
+64.5,20.5,5,9
+29.0,9.0,6,3
+79.5,25.5,7,11
+38.0,12.0,8,4
+94.5,30.5,9,13
+50.0,17.0,10,6
 """)
     strong_result = fit(IVModel, "y ~ x1 + x", strong_csv;
                         instruments=["z"], endog=["x"])

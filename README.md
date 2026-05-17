@@ -4,7 +4,7 @@
 [![CI](https://github.com/skahanium/Metrica/actions/workflows/ci.yml/badge.svg)](https://github.com/skahanium/Metrica/actions)
 [![Julia](https://img.shields.io/badge/Julia-1.12-purple)](https://julialang.org/)
 
-Metrica 是一个开源计量经济学框架，为学术研究和数据分析提供高性能、结构化、可扩展的现代工具链。20 个 Julia Core 包覆盖从经典线性回归到贝叶斯方法的全部主流模型族，配合 CLI-first 桌面工作台和统一的模型能力协议。
+Metrica 是一个开源计量经济学框架，为学术研究和数据分析提供高性能、结构化、可扩展的现代工具链。当前仓库包含 18 个 Julia 包，覆盖从经典线性回归到贝叶斯方法的主流模型族，配合 CLI-first 桌面工作台和统一的模型能力协议。
 
 ## 为什么选择 Metrica
 
@@ -14,13 +14,13 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 **结构化结果。** 所有模型输出 `glance`（摘要）、`tidy`（系数表）、`diagnostics`（诊断）、`warnings`（警告）四层机器可读协议。桌面 App 只消费结构化数据，不解析终端文本。这意味着任何前端、任何导出格式、任何自动化流程都可以零成本对接。
 
-**Julia 性能。** 原生 Julia 实现。线性模型比 R `lm()` 快 5-10x，空间计量比 Python `spreg` 快 20-50x，GMM 估计比 Stata `ivreg2` 快 3-8x（基准测试待补充）。
+**Julia 性能。** 原生 Julia 实现。性能验证正在收口中，当前不宣称未复现的跨软件倍数；可复现脚本和覆盖状态见 [benchmarks/](benchmarks/) 与 [docs/quality/package-status.md](docs/quality/package-status.md)。
 
 **全栈贯通。** Core（Julia 计量引擎）→ Runtime（Rust HTTP/进程桥接）→ App（React + Tauri 桌面工作台），一条链路无缝合、无拼接、无临时脚本。
 
 **开放透明。** GPL v3 许可。全部代码、全部协议、全部设计文档公开。零黑箱算法、零隐藏参数、零专有格式。
 
-**联邦式架构。** 20 个独立 Julia 包按模型族松耦合。研究空间计量只需 `MetricaSpatial.jl`，做贝叶斯只需 `MetricaBayes.jl`。每个包独立测试、独立版本、独立引用。
+**联邦式架构。** 18 个 Julia 包按模型族松耦合。研究空间计量只需 `MetricaSpatial.jl`，做贝叶斯只需 `MetricaBayes.jl`。每个包独立测试、独立版本、独立引用。
 
 ## 当前阶段
 
@@ -58,7 +58,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 cd runtime/metrica-runtime && cargo build --release
 
 # 桌面 App（需要 Node.js + Rust）
-cd apps/metrica-desktop && npm install && cargo tauri dev
+cd apps/metrica-desktop && npm ci && cargo tauri dev
 ```
 
 参见 [SETUP.md](SETUP.md) 获取详细开发环境配置。
@@ -66,7 +66,7 @@ cd apps/metrica-desktop && npm install && cargo tauri dev
 ## 架构
 
 ```
-packages/          Julia Core（20 个包 + 协议层）
+packages/          Julia 包（当前 18 个包 + 协议层）
 runtime/           Rust axum HTTP + Julia 进程管理
 apps/              React + Tauri 桌面工作台（CLI-first）
 docs/              架构文档 + 协议规范
@@ -80,6 +80,9 @@ datasets/demo/     教学演示数据（16 个）
 - [AGENTS.md](AGENTS.md) — AI 协作协议
 - [docs/architecture/runtime-protocol.md](docs/architecture/runtime-protocol.md) — Runtime 协议与 model_type 白名单
 - [docs/architecture/app-shell.md](docs/architecture/app-shell.md) — App 工作台结构
+- [docs/quality/package-status.md](docs/quality/package-status.md) — 包级 CI / golden / benchmark 状态矩阵
+- [docs/quality/golden-values.md](docs/quality/golden-values.md) — golden-value 验证政策
+- [docs/quality/release-checklist.md](docs/quality/release-checklist.md) — 发布前质量门禁
 - [tutorials/](tutorials/) — 全部模型族 CLI 教程
 
 ## 许可证

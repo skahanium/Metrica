@@ -4,7 +4,7 @@ function fit_spatial(
     model_type::AbstractString,
     formula::AbstractString,
     df::DataFrame,
-    spec::Dict{String, Any},
+    spec::AbstractDict{String, <:Any},
     working_dir::AbstractString,
 )::Union{SpatialFitResult, MetricaBase.ModelError}
     idcol = String(get(spec, "spatial_id_column", ""))

@@ -114,6 +114,7 @@ temp/
 **/.metrica/
 
 # --- 基准测试 / 性能分析 ---
+benchmarks/results/
 *.prof
 *.info
 perf.data*

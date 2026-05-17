@@ -1,4 +1,4 @@
-.PHONY: test test-julia test-rust test-app check lint clean
+.PHONY: test test-julia test-julia-core test-rust test-app check lint clean
 
 # 全栈测试
 test:
@@ -6,12 +6,19 @@ test:
 	@echo "=== Rust Runtime ===" && $(MAKE) test-rust
 	@echo "=== App ===" && $(MAKE) test-app
 
-# Julia 包测试（全部 20 个包）
+# Julia 包测试（当前仓库全部 18 个 packages/*.jl 包）
 test-julia:
-	@for pkg in packages/*.jl; do \
+	@status=0; \
+	for pkg in packages/*.jl; do \
 		echo "Testing $$(basename $$pkg)..."; \
-		julia --project="$$pkg" -e 'using Pkg; Pkg.test()' 2>&1 | tail -1; \
-	done
+		julia --project="$$pkg" -e 'using Pkg; Pkg.test()' || status=$$?; \
+	done; \
+	exit $$status
+
+# PR 阻塞 Julia 核心链路
+test-julia-core:
+	julia --project=packages/MetricaBase.jl -e 'using Pkg; Pkg.test()'
+	julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.test()'
 
 # Rust 编译检查 + 测试
 test-rust:

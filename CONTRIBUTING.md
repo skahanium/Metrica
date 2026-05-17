@@ -46,7 +46,10 @@
 
 - 新 Bug 修复必须附带回归测试
 - 测试覆盖不得降低
+- 数值结果变更应补充或更新 golden-value fixture，格式见 [docs/quality/golden-values.md](docs/quality/golden-values.md)
+- 发布前质量门禁见 [docs/quality/release-checklist.md](docs/quality/release-checklist.md)
 - 所有 Julia 包：`julia --project=<pkg> -e 'using Pkg; Pkg.test()'`
+- PR 阻塞 Julia 核心链路：`make test-julia-core`
 - Runtime：`cargo test --lib`
 - App：`cd apps/metrica-desktop && npm test`
 

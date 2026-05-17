@@ -4,6 +4,7 @@
 
 - [README.md](README.md) — 项目概述与快速入门
 - [docs/architecture/](docs/architecture/) — 架构与协议文档
+- [docs/quality/](docs/quality/) — CI、golden-value、benchmark 与发布门禁
 - [tutorials/](tutorials/) — 模型族 CLI 教程
 
 ## 社区支持

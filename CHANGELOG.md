@@ -16,6 +16,7 @@
 - **S5.8** 久期模型：Cox PH（Efron/strata/cluster/weights/counting-process）、Schoenfeld 残差、PH 检验、AFT（Weibull/Exponential/Log-normal/Log-logistic）
 - **S5.9** 贝叶斯：NIG 共轭、MCMC（R-hat/ESS/trace）、logistic/probit、层级线性模型
 - **统一协议**：全部 S5 包实现 model_capabilities + augment_status + WARNING_CODE 注册表
-- 开源基础设施：LICENSE（GPL v3）、CONTRIBUTING.md、CI/CD、Issue/PR 模板、CODE_OF_CONDUCT、SECURITY、SUPPORT、CITATION.cff
+- 开源基础设施：LICENSE（GPL v3）、CONTRIBUTING.md、分层 CI、Issue/PR 模板、CODE_OF_CONDUCT、SECURITY、SUPPORT、CITATION.cff
+- 信任底座：包级质量状态矩阵、golden-value 验证政策、OLS golden fixture、benchmark harness、发布前质量门禁
 - 13 篇模型族 CLI 教程、16 个教学 demo 数据集
 - CLI-first 桌面工作台（React + Tauri），20+ 专用诊断面板
