@@ -511,3 +511,10 @@ function MetricaBase.fit(::Type{System3SLSModel}, _formula::AbstractString, data
         1,
     )
 end
+
+# === 系统级诊断 ===============================================================
+function system_wald_test(beta::Vector{Float64}, vcov::Matrix{Float64}, R::Matrix{Float64}, r::Vector{Float64})
+    q = size(R, 1); Rbeta = R * beta - r; RV_R = Symmetric(R * vcov * R')
+    W = dot(Rbeta, RV_R \ Rbeta); pv = 1 - cdf(Chisq(q), W)
+    return Dict{Symbol, Any}(:statistic => W, :pvalue => pv, :dof => q, :method => "Wald")
+end

@@ -14,8 +14,8 @@ function MetricaBase.model_capabilities(r::QuantileFitResult)::MetricaBase.Model
         :quantile,
         [:quantile],
         ["linear programming (IP)"],
-        [:pseudo_r2, :rank_X, :cond_X, :inference_kind],
-        [:multi_tau, :bootstrap_se, :rank_inference, :sparsity_inference, :iv_quantile, :panel_quantile],
+        [:pseudo_r2, :pseudo_r2, :rank_X, :cond_X, :inference_kind, :multi_tau, :bootstrap_se],
+        [:rank_inference, :sparsity_inference, :iv_quantile, :panel_quantile],
         Symbol[],
         false,
         ["首期仅支持单 τ 分位数回归。多 τ、bootstrap SE、IV/panel quantile 为二期功能。"],
@@ -231,4 +231,30 @@ function MetricaBase.augment(r::QuantileFitResult)
         ),
         n,
     )
+end
+
+# === 多 τ 分位数回归 ==========================================================
+function fit_multi_tau(data, formula, taus::Vector{Float64})
+    results = QuantileFitResult[]
+    for tau in taus
+        r = MetricaBase.fit(QuantileModel, formula, data; quantile_tau=tau)
+        r isa MetricaBase.ModelError && return r
+        push\!(results, r)
+    end
+    return results
+end
+
+# === Bootstrap SE（pairs bootstrap）==========================================
+function bootstrap_quantile_se(data, formula, tau::Float64; n_boot::Int=200, seed::Int=42)
+    Random.seed\!(seed); n = nrow(data)
+    beta_boot = Matrix{Float64}(undef, n_boot, 0)
+    for b in 1:n_boot
+        idx = rand(1:n, n); boot_df = data[idx, :]
+        r = MetricaBase.fit(QuantileModel, formula, boot_df; quantile_tau=tau)
+        r isa MetricaBase.ModelError && continue
+        if b == 1; beta_boot = Matrix{Float64}(undef, n_boot, length(r.coefficients)); end
+        beta_boot[b, :] = r.coefficients
+    end
+    se_boot = [std(beta_boot[:, j]) for j in 1:size(beta_boot, 2)]
+    return se_boot
 end
