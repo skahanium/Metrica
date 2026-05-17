@@ -428,6 +428,11 @@ const grammars: CommandGrammar[] = [
     spatial_id: optionValue('spatial_id', false),
   }),
 
+  makeModelGrammar('bayesreg', '贝叶斯线性回归（NIG 共轭；解析推断）', {
+    seed: optionValue('seed', false),
+    prior_scale: optionValue('prior_scale', false),
+  }),
+
   {
     verb: 'stcox',
     description: 'Cox 比例风险模型（右删失；Breslow 并列；时间与事件列显式指定）',

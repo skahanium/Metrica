@@ -304,6 +304,10 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     return parseSpprobitToModelSpec(positionals, optMap);
   }
 
+  if (verb === 'bayesreg') {
+    return parseBayesregToModelSpec(positionals, optMap);
+  }
+
   const modelType = verbToModelType(verb);
 
   // 组装 formula：depvar ~ indepvar1 + indepvar2 + ...
@@ -703,6 +707,17 @@ function parseSpprobitToModelSpec(positionals: string[], optMap: Map<string, unk
     formula,
     spatial_weights_path: wp,
     spatial_id_column: id,
+  };
+}
+
+function parseBayesregToModelSpec(positionals: string[], optMap: Map<string, unknown>): ModelSpec | { error: string } {
+  if (positionals.length < 2) return { error: 'bayesreg 需要至少 1 个因变量和 1 个自变量。' };
+  const yVar = positionals[0]; const xVars = positionals.slice(1);
+  const formula = `${yVar} ~ ${xVars.join(' + ')}`;
+  return {
+    model_type: 'bayes_linear', formula,
+    bayes_seed: optMap.has('seed') ? Number(optMap.get('seed')) : undefined,
+    bayes_prior_scale: optMap.has('prior_scale') ? Number(optMap.get('prior_scale')) : undefined,
   };
 }
 

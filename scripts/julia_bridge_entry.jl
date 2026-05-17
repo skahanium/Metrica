@@ -18,6 +18,7 @@ using MetricaOutput
 using MetricaPanel
 using MetricaSpatial
 using MetricaDuration
+using MetricaBayes
 using MetricaSurvey
 using MetricaSystem
 using MetricaTimeSeries
@@ -345,6 +346,23 @@ else
                 end
             end
         end
+    elseif model_type == "bayes_linear"
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+        result = MetricaBayes.fit_bayes_linear(df, formula;
+            bayes_seed=hasproperty(request.model_spec, :bayes_seed) ? request.model_spec.bayes_seed : nothing,
+            bayes_prior_scale=Float64(get(() -> 1.0, :bayes_prior_scale, request.model_spec)),
+            bayes_sigma2_known=Bool(get(() -> false, :bayes_sigma2_known, request.model_spec)),
+            bayes_sigma2_value=Float64(get(() -> NaN, :bayes_sigma2_value, request.model_spec)),
+            bayes_ig_alpha=Float64(get(() -> 2.0, :bayes_ig_alpha, request.model_spec)),
+            bayes_ig_beta=Float64(get(() -> 1.0, :bayes_ig_beta, request.model_spec)))
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        if result isa MetricaBase.ModelError
+            MetricaBayes.error_to_payload(result)
+        else
+            MetricaBayes.result_to_payload(result; include_augment=include_augment)
+        end
+    else
         ModelT = MetricaBase.MODEL_REGISTRY[model_type]
         result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment

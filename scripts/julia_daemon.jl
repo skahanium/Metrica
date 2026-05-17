@@ -23,6 +23,7 @@ using MetricaDiagnostics
 using MetricaPanel
 using MetricaSpatial
 using MetricaDuration
+using MetricaBayes
 using MetricaData
 using MetricaSurvey
 using MetricaSystem
@@ -168,6 +169,20 @@ function handle_request(req::Dict{String, Any})
                     MetricaDuration.error_to_payload(result)
                 else
                     MetricaDuration.result_to_payload(result; include_augment=include_augment)
+                end
+            elseif model_type == "bayes_linear"
+                result = MetricaBayes.fit_bayes_linear(data, formula;
+                    bayes_seed=get(params, "bayes_seed", nothing),
+                    bayes_prior_scale=Float64(get(params, "bayes_prior_scale", 1.0)),
+                    bayes_sigma2_known=Bool(get(params, "bayes_sigma2_known", false)),
+                    bayes_sigma2_value=Float64(get(params, "bayes_sigma2_value", NaN)),
+                    bayes_ig_alpha=Float64(get(params, "bayes_ig_alpha", 2.0)),
+                    bayes_ig_beta=Float64(get(params, "bayes_ig_beta", 1.0)))
+                include_augment = haskey(params, :return_augment) ? params[:return_augment] : true
+                if result isa MetricaBase.ModelError
+                    MetricaBayes.error_to_payload(result)
+                else
+                    MetricaBayes.result_to_payload(result; include_augment=include_augment)
                 end
             elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]

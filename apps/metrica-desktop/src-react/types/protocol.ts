@@ -549,7 +549,7 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 // ---- 运行时请求/响应 ----
 
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'spatial_sdm' | 'spatial_sdem' | 'spatial_sac' | 'spatial_gwr' | 'spatial_gtwr' | 'spatial_probit' | 'duration_cox';
+  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'spatial_sdm' | 'spatial_sdem' | 'spatial_sac' | 'spatial_gwr' | 'spatial_gtwr' | 'spatial_probit' | 'duration_cox' | 'bayes_linear';
   formula: string;
   vcov?: { type: string };
   weights?: string;
@@ -678,6 +678,16 @@ export interface SpatialProbitDiagnostics {
   rho_posterior_sd?: number;
   rho_credible_lower?: number;
   rho_credible_upper?: number;
+}
+
+/** 贝叶斯线性回归（`result_payload.diagnostics`） */
+export interface BayesDiagnostics {
+  inference_mode?: string;
+  seed_used?: number | null;
+  sigma2_known?: boolean;
+  sigma2_posterior_mean?: number;
+  prior_scale?: number;
+  log_marginal_likelihood?: number | null;
 }
 
 export interface FitModelRequest {
