@@ -79,6 +79,10 @@ function fit_bayes_linear(
         :sigma2_known => bayes_sigma2_known,
         :sigma2_posterior_mean => sigma2_val,
         :prior_scale => bayes_prior_scale,
+        :alpha_n => bayes_sigma2_known ? 0.0 : (bayes_ig_alpha + n / 2),
+        :beta_n => bayes_sigma2_known ? 0.0 : (bayes_ig_beta + (dot(y - X * μ_n, y - X * μ_n) + dot(μ_n, prior_prec * μ_n)) / 2),
+        :Sigma_n => Σ_n,
+        :post_prec => post_prec,
     )
 
     warnings = MetricaBase.ModelWarning[]

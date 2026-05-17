@@ -7,7 +7,7 @@ MetricaBase.glance(r::BayesFitResult) = MetricaBase.ModelGlance(
 
 MetricaBase.tidy(r::BayesFitResult) = MetricaBase.TidyTable(
     [MetricaBase.CoefRow(r.coef_names[i], r.posterior_mean[i], nothing, nothing, nothing, r.credible_lower[i], r.credible_upper[i]) for i in eachindex(r.coef_names)],
-    "bayes_nig_conjugate")
+    "bayes")
 
 MetricaBase.nobs(r::BayesFitResult) = r.n_obs
 
@@ -16,11 +16,12 @@ function MetricaBase.model_capabilities(r::BayesFitResult)::MetricaBase.ModelCap
         :partial,
         :bayes,
         [:bayes_linear],
-        ["NIG conjugate (analytical)"],
-        [:posterior_mean, :posterior_sd, :credible_interval, :log_marginal_likelihood],
-        [:mcmc, :r_hat, :ess, :bayes_logistic, :hierarchical],
+        ["NIG conjugate (analytical)", "MCMC (Metropolis-Hastings + Gibbs)"],
+        [:posterior_mean, :posterior_sd, :credible_interval, :posterior_predictive,
+         :log_marginal_likelihood, :r_hat, :ess, :trace_summary],
+        Symbol[],
         Symbol[],
         false,
-        ["首期仅支持共轭贝叶斯线性回归。MCMC、logistic、层级模型为后续功能。"],
+        ["Bayesian logistic/probit 与层级模型已可用。MCMC 默认不启用（需显式调用 fit_bayes_linear_mcmc）。"],
     )
 end
