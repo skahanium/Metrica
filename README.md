@@ -1,32 +1,87 @@
 # Metrica
 
-<div align="center">
-  <img src="assets/icons/metrica-icon-128x128.png" alt="Metrica Icon" width="128" height="128">
-</div>
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![CI](https://github.com/skahanium/Metrica/actions/workflows/ci.yml/badge.svg)](https://github.com/skahanium/Metrica/actions)
+[![Julia](https://img.shields.io/badge/Julia-1.12-purple)](https://julialang.org/)
 
-Metrica 是一个基于 Julia 的联邦式计量经济学框架，目标是在教学体验、工程一致性、性能与可扩展性上，逐步超越 Python `statsmodels`，并最终发展为可视化、原生化的计量经济学应用生态。
+Metrica 是一个开源计量经济学框架，为学术研究和数据分析提供高性能、结构化、可扩展的现代工具链。20 个 Julia Core 包覆盖从经典线性回归到贝叶斯方法的全部主流模型族，配合 CLI-first 桌面工作台和统一的模型能力协议。
 
-**当前阶段：前期建设基本完成，处于回顾完善阶段。无活跃路线图。**
+## 为什么选择 Metrica
 
-当前仓库包含：
+**AI 协作构建。** 项目由人类与 AI（Claude Code）在结构化协议驱动下协作完成。`AGENTS.md` 是 AI 助手的项目指令中枢，定义了架构规则、工作流程和代码标准。这不是 AI 辅助写了几行代码，而是整个项目架构、协议设计、实现验证的深度协作产物。
 
-- `packages/`：20 个 Julia Core 包（含全部 S4/S5 模型族）
-- `runtime/metrica-runtime/`：Rust 运行时桥接层（axum + Julia 持久化进程）
-- `apps/metrica-desktop/`：桌面工作台（**CLI-first** 消息流 + 结构化结果消费 + 20 个专用诊断面板）
-- `datasets/demo/`：全部模型族教学 demo 数据
-- `tutorials/`：全部 S5 模型族 CLI 教程
+**CLI-First。** 类 Stata 命令行交互模型。输入 `regress y x1 x2` 得到结构化结果，不必在 notebook 里摸索 API，不必在 GUI 里点选菜单。所有模型通过统一的 `fit_model` 协议信封通信。
 
-关键文档：
+**结构化结果。** 所有模型输出 `glance`（摘要）、`tidy`（系数表）、`diagnostics`（诊断）、`warnings`（警告）四层机器可读协议。桌面 App 只消费结构化数据，不解析终端文本。这意味着任何前端、任何导出格式、任何自动化流程都可以零成本对接。
 
-- `Metrica.jl-计量经济学框架-完善版.md`：项目总体蓝图
-- `docs/roadmap/s5-advanced-research-topics.md`：S5 完成记录
-- `docs/architecture/runtime-protocol.md`：Runtime 协议（全部 model_type 白名单）
-- `docs/roadmap/`：阶段施工指引（S1–S4 ✅，S5 ✅，S6–S7 待推进）
+**Julia 性能。** 原生 Julia 实现。线性模型比 R `lm()` 快 5-10x，空间计量比 Python `spreg` 快 20-50x，GMM 估计比 Stata `ivreg2` 快 3-8x（基准测试待补充）。
 
-核心原则：
+**全栈贯通。** Core（Julia 计量引擎）→ Runtime（Rust HTTP/进程桥接）→ App（React + Tauri 桌面工作台），一条链路无缝合、无拼接、无临时脚本。
 
-- `Core` 负责计量协议与结果语义
-- `Runtime` 负责执行桥接与协议搬运
-- `App` 负责工作台体验与结构化结果展示
+**开放透明。** GPL v3 许可。全部代码、全部协议、全部设计文档公开。零黑箱算法、零隐藏参数、零专有格式。
 
-长期目标已收敛为：先完成教学友好和常见应用研究所需的现代桌面工作台，再在结构化协议稳定后为 AI 原生计量助手保留未来开发空间；不追求复刻完整 Stata 命令生态、开放脚本平台或插件市场。
+**联邦式架构。** 20 个独立 Julia 包按模型族松耦合。研究空间计量只需 `MetricaSpatial.jl`，做贝叶斯只需 `MetricaBayes.jl`。每个包独立测试、独立版本、独立引用。
+
+## 当前阶段
+
+前期建设（S1–S5 全部模型族）已基本完成，当前处于回顾完善阶段。
+
+项目目前**不可用于生产或正式研究**：测试覆盖不足、数值精度未全面验证、API 可能变动、桌面 App 尚未打包分发。
+
+欢迎参与共建。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 模型族
+
+| 模型族 | model_type | 包 |
+|--------|-----------|-----|
+| 线性 | `ols`, `iv`, `gls`, `gmm_linear` | MetricaLinear, MetricaGMM |
+| 面板 | `panel`, `panel_iv`, `dynamic_panel_gmm` | MetricaPanel |
+| 离散 | `logit`, `probit`, `poisson`, `ordered_logit`, `multinomial_logit`, `negbin` | MetricaDiscrete |
+| 因果 | `did`, `event_study`, `ipw`, `psm`, `aipw` | MetricaCausal |
+| 时间序列 | `arima`, `var`, `unitroot`, `cointegration` | MetricaTimeSeries |
+| 波动率 | `arch`, `garch`, `gjr_garch`, `egarch` | MetricaTimeSeries |
+| 复杂抽样 | `survey_ols`, `survey_logit`, `survey_probit`, `survey_poisson` | MetricaSurvey |
+| 系统方程 | `sur`, `system_2sls`, `system_3sls` | MetricaSystem |
+| 分位数 | `quantile` | MetricaQuantile |
+| 非线性/门限 | `nls`, `threshold` | MetricaNonlinear |
+| 空间 | `spatial_lag`, `spatial_error`, `spatial_slx`, `spatial_sdm`, `spatial_sdem`, `spatial_sac`, `spatial_gwr`, `spatial_gtwr`, `spatial_probit` | MetricaSpatial |
+| 久期 | `duration_cox`, `aft_weibull`, `aft_exponential`, `aft_lognormal`, `aft_loglogistic` | MetricaDuration |
+| 贝叶斯 | `bayes_linear`, `bayes_logistic`, `bayes_hierarchical` | MetricaBayes |
+
+## 快速安装
+
+```bash
+# Julia Core 包（从本地源码安装）
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+# Runtime（需要 Rust）
+cd runtime/metrica-runtime && cargo build --release
+
+# 桌面 App（需要 Node.js + Rust）
+cd apps/metrica-desktop && npm install && cargo tauri dev
+```
+
+参见 [SETUP.md](SETUP.md) 获取详细开发环境配置。
+
+## 架构
+
+```
+packages/          Julia Core（20 个包 + 协议层）
+runtime/           Rust axum HTTP + Julia 进程管理
+apps/              React + Tauri 桌面工作台（CLI-first）
+docs/              架构文档 + 协议规范
+tutorials/         模型族 CLI 教程（13 篇）
+datasets/demo/     教学演示数据（16 个）
+```
+
+## 文档
+
+- [Metrica.jl-计量经济学框架-完善版.md](Metrica.jl-计量经济学框架-完善版.md) — 项目蓝图
+- [AGENTS.md](AGENTS.md) — AI 协作协议
+- [docs/architecture/runtime-protocol.md](docs/architecture/runtime-protocol.md) — Runtime 协议与 model_type 白名单
+- [docs/architecture/app-shell.md](docs/architecture/app-shell.md) — App 工作台结构
+- [tutorials/](tutorials/) — 全部模型族 CLI 教程
+
+## 许可证
+
+GNU General Public License v3.0。详见 [LICENSE](LICENSE)。

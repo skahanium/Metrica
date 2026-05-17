@@ -1,0 +1,45 @@
+name: Bug Report
+description: 报告一个 bug
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: input
+    id: model_type
+    attributes:
+      label: 受影响的 model_type
+      placeholder: "e.g. spatial_lag, garch, duration_cox"
+  - type: input
+    id: julia_version
+    attributes:
+      label: Julia 版本
+      placeholder: "julia --version"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 加载数据集 ...
+        2. 运行命令 ...
+        3. 观察错误
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      placeholder: 粘贴错误消息或异常输出
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      placeholder: OS、数据集大小、相关日志等

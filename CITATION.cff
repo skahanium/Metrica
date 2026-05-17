@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: Metrica
+message: "如果你在研究中使用了 Metrica，请引用如下。"
+type: software
+authors:
+  - name: Metrica Contributors
+url: https://github.com/skahanium/Metrica
+repository-code: https://github.com/skahanium/Metrica
+license: GPL-3.0
+abstract: "一个开源计量经济学框架，提供 20 个 Julia Core 包、CLI-first 桌面工作台和统一的模型能力协议。"
+keywords:
+  - econometrics
+  - julia
+  - statistics
+  - regression
+  - spatial-econometrics
+  - time-series
+  - panel-data
+  - survival-analysis
+  - bayesian
+version: 0.1.0
+date-released: 2026-05-17

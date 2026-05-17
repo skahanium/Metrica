@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  julia-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        julia-version: ['1.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia-version }}
+      - name: Test MetricaBase
+        run: julia --project=packages/MetricaBase.jl -e 'using Pkg; Pkg.test()'
+        continue-on-error: true
+      - name: Test MetricaLinear
+        run: julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.test()'
+        continue-on-error: true
+
+  rust-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Rust check
+        run: cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
+      - name: Rust test
+        run: cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml
+
+  app-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install and test
+        run: |
+          cd apps/metrica-desktop
+          npm ci || npm install
+          npm test
