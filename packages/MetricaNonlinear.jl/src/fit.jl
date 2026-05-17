@@ -1,8 +1,11 @@
 # === NLS 与门限回归拟合 =========================================================
 
 using DataFrames
-using LinearAlgebra: dot, rank
+using Distributions: Normal, cdf
+using FiniteDiff
+using LinearAlgebra: dot, rank, diag, I, Symmetric
 using Optim
+using Random
 using Statistics
 using StatsModels: coefnames
 

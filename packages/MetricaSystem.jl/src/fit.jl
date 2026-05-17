@@ -1,8 +1,8 @@
 # === listwise 与 SUR / 系统 IV 拟合 =================================================
 
 using DataFrames
-using Distributions: TDist, FDist, cdf, quantile
-using LinearAlgebra: I, Symmetric, inv, rank, diag
+using Distributions: TDist, FDist, Chisq, cdf, quantile
+using LinearAlgebra: I, Symmetric, inv, rank, diag, dot
 using Statistics: mean
 using StatsModels: coefnames
 

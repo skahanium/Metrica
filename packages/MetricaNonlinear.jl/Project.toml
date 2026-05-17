@@ -6,6 +6,8 @@ authors = ["Metrica Contributors"]
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"

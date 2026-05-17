@@ -1,9 +1,10 @@
 # === 线性分位数回归拟合 =========================================================
 
 using DataFrames
-using Distributions: Normal, cdf, quantile
-using LinearAlgebra: cond, rank
+using Distributions: Normal, Chisq, cdf, quantile
+using LinearAlgebra: cond, rank, Symmetric, I
 using QuantileRegressions
+using Random
 import StatsAPI
 using Statistics
 using StatsModels: coefnames
