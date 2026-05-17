@@ -1,6 +1,6 @@
-# Metrica 主设计：S1–S4 稳定主链路与 S5 扩展基线
+# Metrica 主设计：S1–S5 产品与协议事实基线（已归档）
 
-> **状态：当前主设计锚点。** 本文件记录 **`S1`–`S4` 已收口** 的产品与协议事实基线，并划定 **`S5` 高级研究专题** 的扩展边界。早期 foundation、dual-track、vertical slice 与远期 visualization 草案已回收，不再作为独立实施依据。
+> **状态：S1–S5 已全部完成，本文件为历史事实基线，不再作为活跃设计锚点。** 当前项目处于回顾完善阶段，无活跃路线图。
 >
 > **当前事实基线：** 真实 OLS/WLS/IV/GLS 与扩展协方差、扩展诊断已贯通；面板能力覆盖 FE/RE/FD/Between、HDFE、CRE、Panel IV、Driscoll-Kraay 等；**`S4` 离散、因果、时间序列、复杂抽样** 等模型族已纳入同一 `fit_model` 结构化结果协议；Runtime 为 axum HTTP + 持久化 Julia 守护进程（stdin/stdout JSON lines），并暴露数据查询、变换、项目与导出等动作；**桌面 App 主交互为 CLI-first 命令消息流**，结构化消费 `glance` / `tidy` / `diagnostics` / `warnings`，不解析终端摘要文本。教学向教程见 `tutorials/s4-*.md` 等。
 >

@@ -21,7 +21,7 @@
 - `docs/roadmap/`：阶段级路线
 - `docs/architecture/runtime-protocol.md`：Runtime 协议
 - `docs/architecture/app-shell.md`：App 工作台结构
-- `docs/superpowers/specs/2026-04-30-metrica-main-design.md`：当前主设计锚点
+- `docs/superpowers/specs/2026-04-30-metrica-main-design.md`：S1–S5 历史事实基线
 
 ---
 

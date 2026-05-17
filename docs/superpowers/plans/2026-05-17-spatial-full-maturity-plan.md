@@ -1,8 +1,6 @@
-# 空间计量模型族全量成熟化 — 实施计划
+# 空间计量模型族全量成熟化 — 实施计划（已归档）
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** 将 `MetricaSpatial.jl` 从 SAR/SEM/SLX 基础实现扩展为包含 SDM、SDEM、SAC、GWR、GTWR、空间Probit + LM检验 + kNN/distance-band权重构造的完整空间横截面模型族，并贯通 Runtime/App/Docs。
+> **状态：已于 2026-05-17 完成。** 本文件保留为历史记录。
 
 **Architecture:** 五阶段递进 — A (LM检验+权重构造) → B (SDM/SDEM/SAC) → C (GWR/GTWR→独立坐标体系) → D (空间Probit Gibbs) → E (跨层贯通)。W-based 模型族复用现有 `SpatialFitResult`；Coord-based 模型族新增 `GWRFitResult`/`GTWRFitResult`；Probit 新增 `ProbitFitResult`。
 

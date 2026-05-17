@@ -1,12 +1,12 @@
-# S5 执行计划（活跃）
+# S5 执行计划（已归档）
 
-> **状态：当前唯一活跃 `superpowers` 实施计划。** 分期目标、非目标与验收细节以仓库根目录 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) 为权威来源；本文件仅维护**执行顺序、文档锚点与跨层检查清单**，不重复总规全文。
+> **状态：S5 已于 2026-05-17 全量完成。** 本文件保留为历史记录，不再作为活跃实施计划。当前项目处于回顾完善阶段，无活跃路线图。
 
 ## 文档锚点
 
 | 用途 | 路径 |
 |------|------|
-| 总规 | [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) |
+| 总规 | [`docs/roadmap/s5-advanced-research-topics.md`](../../../docs/roadmap/s5-advanced-research-topics.md) |
 | 路线图分期 | [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md) |
 | 主设计 | [`docs/superpowers/specs/2026-04-30-metrica-main-design.md`](../specs/2026-04-30-metrica-main-design.md) |
 | Runtime 协议 | [`docs/architecture/runtime-protocol.md`](../../architecture/runtime-protocol.md) |
@@ -38,7 +38,7 @@
 
 ## S5.2 动态面板 GMM（实施规划）
 
-> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §5；本节只写**边界、协议草案、文件级 Task、验收与风险**，实现细节从现有 `PanelData` / `fit_panel_iv` / `MetricaGMM` 代码中读取模式。
+> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../../docs/roadmap/s5-advanced-research-topics.md) §5；本节只写**边界、协议草案、文件级 Task、验收与风险**，实现细节从现有 `PanelData` / `fit_panel_iv` / `MetricaGMM` 代码中读取模式。
 
 ### 0. 收口状态（2026-05-16）
 
@@ -100,7 +100,7 @@
 
 ## S5.3 SUR 与联立方程（实施规划）
 
-> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §6；本节只写**边界、协议草案、文件级 Task、验收与风险**。
+> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../../docs/roadmap/s5-advanced-research-topics.md) §6；本节只写**边界、协议草案、文件级 Task、验收与风险**。
 
 ### 0. 收口状态（2026-05-16）
 
@@ -164,7 +164,7 @@
 
 ## S5.4 分位数回归（实施规划）
 
-> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §7；本节只写**边界、协议定稿、文件级 Task、验收与风险**。
+> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../../docs/roadmap/s5-advanced-research-topics.md) §7；本节只写**边界、协议定稿、文件级 Task、验收与风险**。
 
 ### 0. 收口状态
 
@@ -223,7 +223,7 @@
 
 ## S5.5 非线性与门限（及非参数/半参数预留）（实施规划）
 
-> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §8；本节写**边界、协议定稿、文件级 Task、验收与风险**；**不**开放任意可执行代码字符串。
+> **权威条目：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../../docs/roadmap/s5-advanced-research-topics.md) §8；本节写**边界、协议定稿、文件级 Task、验收与风险**；**不**开放任意可执行代码字符串。
 
 ### 0. 收口状态
 
@@ -290,7 +290,7 @@
 ### 1. 收口状态
 
 - **范围：** 在 `MetricaTimeSeries.jl` 与既有时间序列桥接分支上，新增 `model_type`：`arch`（ARCH(q)，常数均值）与 `garch`（GARCH(p,q)，常数均值）；Runtime 字段校验与垂直切片；App CLI + 结构化 `VolatilitySummaryPanel`；协议与教程。
-- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §9；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
+- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../docs/roadmap/s5-advanced-research-topics.md) §9；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
 
 ### 2. 范围与非目标
 
@@ -366,7 +366,7 @@
 ### 1. 收口状态
 
 - **范围：** 新建 `MetricaSpatial.jl`；`model_type`：`spatial_lag`（SAR，空间滞后）、`spatial_error`（SEM，空间误差）；外部稀疏权重边表 + 主数据 **ID 列 join**；Runtime 字段与规模上界；App `spreg` CLI + `SpatialDiagnosticsPanel`；协议与教程。
-- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §10；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
+- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../docs/roadmap/s5-advanced-research-topics.md) §10；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
 
 ### 2. 范围与非目标
 
@@ -455,7 +455,7 @@
 ### 1. 收口状态
 
 - **范围：** 新建 `MetricaDuration.jl`；`model_type`：**`duration_cox`**（Cox 比例风险、右删失）；`model_spec` 显式 **时间列 / 事件列** + 协变量公式（占位左值）；Runtime 白名单与必填字段；App **`stcox`** CLI + **`DurationDiagnosticsPanel`**；协议与教程。
-- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §11；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
+- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../docs/roadmap/s5-advanced-research-topics.md) §11；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。
 
 ### 2. 范围与非目标
 
@@ -538,7 +538,7 @@
 ### 1. 收口状态
 
 - **范围：** 候选新建 `packages/MetricaBayes.jl`；`model_type`：**`bayes_linear`**（单方程高斯线性似然 + 冻结先验族）；Runtime 白名单与 `bayes_*` 字段；App **`bayesreg`** CLI + **`BayesDiagnosticsPanel`**（或等价命名）；协议与教程；**首期默认推断路径 A（解析/共轭），不默认 MCMC**。
-- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../docs/roadmap/s5-advanced-research-topics.md(已删除)) §12；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)；协议专节 [`docs/architecture/runtime-protocol.md`](../../architecture/runtime-protocol.md) **`bayes_linear`**；教程 [`tutorials/s5-bayes-linear.md`](../../tutorials/s5-bayes-linear.md)。总规 §12 全文不重复，以本节 + 协议专节为实施单一事实来源。
+- **权威对齐：** 总规 [`docs/roadmap/s5-advanced-research-topics.md`](../../docs/roadmap/s5-advanced-research-topics.md) §12；路线图 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)；协议专节 [`docs/architecture/runtime-protocol.md`](../../architecture/runtime-protocol.md) **`bayes_linear`**；教程 [`tutorials/s5-bayes-linear.md`](../../tutorials/s5-bayes-linear.md)。总规 §12 全文不重复，以本节 + 协议专节为实施单一事实来源。
 
 ### 2. 范围与非目标
 
