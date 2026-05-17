@@ -550,3 +550,55 @@ end
     @test r isa DynamicPanelGMMFitResult
     @test r.n_instruments == 2  # 1 列 collapsed + 1 外生
 end
+
+@testset "S5.2 Golden-value: DGP y=0.7*y_{t-1}+1.5*x+η+ε" begin
+    golden_path = joinpath(dirname(@__DIR__), "..", "..", "datasets", "demo", "dynamic_panel_gmm_golden.csv")
+    df = CSV.read(golden_path, DataFrame)
+    pd = PanelData(df, :firm, :year)
+
+    # Difference GMM (two-step) on known DGP
+    r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags=(2, 4), gmm_weight="two_step")
+    @test r isa DynamicPanelGMMFitResult
+
+    # 样本校验：30 个体 × 10 时期 → 差分样本 = 30 × (10-4) = 180
+    @test r.n_obs_diff == 180
+    @test get(r.diagnostics, :n_groups, 0) == 30
+
+    # 系数 golden：γ ≈ 0.7，β ≈ 1.5（容许 ±0.3 误差）
+    γ_idx = findfirst(n -> n == :L1Dy, r.coefficient_names)
+    β_idx = findfirst(n -> n == :D_x, r.coefficient_names)
+    @test γ_idx !== nothing
+    @test β_idx !== nothing
+    γ_hat = r.coefficient_values[γ_idx]
+    β_hat = r.coefficient_values[β_idx]
+    @test 0.4 < γ_hat < 1.0    # 真实值 0.7
+    @test 1.2 < β_hat < 1.8    # 真实值 1.5
+
+    # AR(1) 应显著（差分设定下常规），AR(2) 应不显著
+    ar1_p = get(get(r.diagnostics, :ar1_test, Dict()), :pvalue, 1.0)
+    ar2_p = get(get(r.diagnostics, :ar2_test, Dict()), :pvalue, 1.0)
+    @test ar1_p < 0.05   # 一阶序列相关（预期）
+    @test ar2_p > 0.01   # 二阶无序列相关（模型设定正确）
+
+    # Hansen J 不应拒绝（过识别约束有效）
+    hj = get(r.diagnostics, :hansen_j, Dict())
+    @test get(hj, :j_statistic, Inf) > 0
+    j_pv = get(hj, :j_pvalue, 0.0)
+    @test isnothing(j_pv) || j_pv > 0.01  # 过识别成立
+
+    # === System GMM golden ===
+    r_sys = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags=(2, 4), dpgmm_style="system")
+    @test r_sys isa DynamicPanelGMMFitResult
+    @test get(r_sys.diagnostics, :dpgmm_style, "") == "system"
+
+    # System GMM 系数应同样接近真实值
+    γ_sys = r_sys.coefficient_values[findfirst(n -> n == :L1Dy, r_sys.coefficient_names)]
+    β_sys = r_sys.coefficient_values[findfirst(n -> n == :D_x, r_sys.coefficient_names)]
+    @test 0.4 < γ_sys < 1.0
+    @test 1.2 < β_sys < 1.8
+
+    # System GMM 应有 Diff-Hansen
+    @test haskey(r_sys.diagnostics, :diff_hansen)
+    dh = r_sys.diagnostics[:diff_hansen]
+    @test get(dh, :c_statistic, NaN) >= 0
+end
