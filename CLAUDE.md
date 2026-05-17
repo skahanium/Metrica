@@ -14,28 +14,10 @@
 
 ## 当前阶段
 
-里程碑 1–5 已全部完成；**`S5` 高级研究专题已全量成熟化**，所有模型族达到 `implemented` 状态。
+前期建设（里程碑 1–5 + S5 全部模型族）已基本完成。当前处于回顾完善阶段：修复缺陷、打磨数值精度、补充测试覆盖、清理文档债务。无活跃路线图。
 
-- 里程碑 1：Base Alpha ✅
-- 里程碑 2：教学向 OLS ✅
-- 里程碑 3：面板基础 ✅
-- 里程碑 4：离散 / 因果 / 时间序列 / 复杂抽样等 `S4` 模型族 ✅
-- 里程碑 5：地基升级与数据能力 ✅
-- **S5.1**：线性 IV-GMM + iterated GMM + CUE + C-stat + Cragg-Donald ✅
-- **S5.2**：动态面板 GMM（Difference + System + Collapsed + Diff-Hansen）✅
-- **S5.3**：SUR / System 2SLS / 3SLS + Wald/LR/LM + robust cov ✅
-- **S5.4**：分位数回归（多 τ + bootstrap + rank/sparsity + IV quantile）✅
-- **S5.5**：NLS（exp_growth/logistic/power/gompertz + 多起点）+ 多门限 + sup-Wald ✅
-- **S5.6**：ARCH/GARCH/GJR/EGARCH + Student-t/skewed-t + forecast/VaR/ES ✅
-- **S5.7**：SAR/SEM/SDM/SDEM/SAC/SLX/GWR/GTWR/Probit + LM + 权重构造 ✅
-- **S5.8**：Cox PH（Efron/strata/cluster/weights/counting-process）+ Schoenfeld + AFT 四分布 ✅
-- **S5.9**：Bayesian 线性（NIG 共轭 + MCMC）+ logistic/probit + 层级模型 ✅
-- **统一协议**：全部 S5 包实现 model_capabilities + augment_status + WARNING_CODE ✅
-
-总体蓝图：`Metrica.jl-计量经济学框架-完善版.md`  
-路线图：`docs/roadmap/s5-advanced-research-topics.md`  
-设计文档：`docs/superpowers/specs/`  
-实施计划：`docs/superpowers/plans/`
+总体蓝图：`Metrica.jl-计量经济学框架-完善版.md`
+架构文档：`docs/architecture/`
 
 Core 层 Julia 包（20 个）：MetricaBase / MetricaData / MetricaDiagnostics / MetricaLinear / MetricaPanel / MetricaOutput / MetricaDiscrete / MetricaCausal / MetricaTimeSeries / MetricaSurvey / MetricaGMM / MetricaQuantile / MetricaNonlinear / MetricaSystem / MetricaSpatial / MetricaDuration / MetricaBayes / MetricaRuntime（以 `packages/` 为准）  
 App 层：桌面宿主 **tao + wry** + React 19 + TypeScript 5 + Ant Design；**CLI-first 命令消息流**  
