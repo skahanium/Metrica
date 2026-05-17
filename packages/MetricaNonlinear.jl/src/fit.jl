@@ -444,54 +444,65 @@ function MetricaBase.augment(r::ThresholdFitResult)
     )
 end
 
-# === NLS 通用公式 + 数值 Jacobian =============================================
-function nls_fit_user(formula_str::String, data, start::Vector{Float64})
+# === NLS 模型族：exp_growth, logistic, power, gompertz ==========================
+
+const NLS_PREDICTORS = Dict{String, Tuple{Int, Function}}(
+    "exp_growth" => (3, (b, x) -> b[1] + b[2] * exp(b[3] * x)),
+    "logistic"   => (3, (b, x) -> b[1] / (1.0 + b[2] * exp(-b[3] * x))),
+    "power"      => (2, (b, x) -> b[1] * x^b[2]),
+    "gompertz"   => (3, (b, x) -> b[1] * exp(-b[2] * exp(-b[3] * x))),
+)
+const NLS_PARAM_NAMES = Dict{String, Vector{String}}(
+    "exp_growth" => ["b1", "b2", "b3"],
+    "logistic"   => ["Asym", "b2", "b3"],
+    "power"      => ["a", "b"],
+    "gompertz"   => ["Asym", "b2", "b3"],
+)
+
+function nls_fit_user(formula_str::String, data, start::Vector{Float64}; nls_family::String="exp_growth")
+    haskey(NLS_PREDICTORS, nls_family) || return MetricaBase.ModelError(:nls_unknown_family,
+        "不支持的 NLS 族: $nls_family", "支持: $(join(keys(NLS_PREDICTORS), ", "))", "")
+    np, pred_fn = NLS_PREDICTORS[nls_family]
+    length(start) == np || return MetricaBase.ModelError(:nls_start_length,
+        "$nls_family 需要 $np 个初值，收到 $(length(start))", "", "")
     parsed = MetricaBase.parse_metrica_formula(formula_str)
     parsed isa MetricaBase.ModelError && return parsed
-    yname, xnames = parsed
-    y = Float64.(data[\!, Symbol(yname)])
-    X = hcat(ones(length(y)), [Float64.(data[\!, Symbol(c)]) for c in xnames]...)
-    function obj(b)
-        rss = 0.0
-        for i in eachindex(y)
-            mu = b[1] + b[2] * exp(b[3] * X[i, 2])
-            rss += (y[i] - mu)^2
-        end
+    yname, xnames = parsed; y = Float64.(data[!, Symbol(yname)])
+    x = Float64.(data[!, Symbol(xnames[1])])
+    function obj(b); rss = 0.0
+        for i in eachindex(y); mu = pred_fn(b, x[i]); rss += (y[i] - mu)^2; end
         return rss
     end
     r = Optim.optimize(obj, start, BFGS(), Optim.Options(iterations=2000, f_reltol=1e-8, g_reltol=1e-8))
     b = Optim.minimizer(r); converged = Optim.converged(r); it = Optim.iterations(r)
-    H = zeros(length(b), length(b))
-    FiniteDiff.finite_difference_hessian\!(H, obj, b)
-    V = 2 * obj(b) / (length(y) - length(b)) .* inv(Symmetric(H + 1e-10 * I))
+    H = zeros(np, np); FiniteDiff.finite_difference_hessian!(H, obj, b)
+    V = 2 * obj(b) / max(length(y) - np, 1) * inv(Symmetric(H + 1e-10 * I))
     se = sqrt.(max.(diag(V), 0.0))
-    fitted = [b[1] + b[2] * exp(b[3] * X[i, 2]) for i in eachindex(y)]
-    residuals = y - fitted
+    fitted = [pred_fn(b, x[i]) for i in eachindex(y)]; residuals = y - fitted
     diag_dict = Dict{Symbol, Any}(:converged => converged, :iterations => it, :optimizer => "BFGS",
         :objective_final => obj(b), :start_used => start, :parameter_covariance => V,
-        :gradient_norm => nothing, :nls_family => "user")
-    coefs = MetricaBase.CoefRow[]
+        :gradient_norm => nothing, :nls_family => nls_family)
+    coefs = MetricaBase.CoefRow[]; pnames = NLS_PARAM_NAMES[nls_family]
     for i in eachindex(b)
         z = se[i] > 0 ? b[i] / se[i] : nothing
         pv = se[i] > 0 ? 2 * (1 - cdf(Normal(), abs(z))) : nothing
-        push\!(coefs, MetricaBase.CoefRow(Symbol("b$i"), b[i], se[i], z, pv, b[i]-1.96*se[i], b[i]+1.96*se[i]))
+        push!(coefs, MetricaBase.CoefRow(Symbol(pnames[i]), b[i], se[i], z, pv, b[i]-1.96*se[i], b[i]+1.96*se[i]))
     end
-    gl = MetricaBase.ModelGlance(:nls, length(y), length(y) - length(b),
+    gl = MetricaBase.ModelGlance(:nls, length(y), length(y) - np,
         Dict{Symbol, MetricaBase.MetricValue}(:rss => obj(b)), MetricaBase.ModelWarning[])
-    return NLSFitResult(formula_str, gl, MetricaBase.TidyTable(coefs, "BFGS"), "user",
-        b, obj(b), converged, it, "BFGS", nothing, diag_dict, X[:, 2], y, fitted, residuals)
+    return NLSFitResult(formula_str, gl, MetricaBase.TidyTable(coefs, "BFGS"), nls_family,
+        b, obj(b), converged, it, "BFGS", nothing, diag_dict, x, y, fitted, residuals)
 end
 
-# === NLS 多起点全局优化 =======================================================
-function nls_multi_start(formula_str::String, data, n_starts::Int=10, seed::Int=42)
-    Random.seed\!(seed); best_result = nothing; best_rss = Inf
+function nls_multi_start(formula_str::String, data, nls_family::String="exp_growth"; n_starts::Int=10, seed::Int=42)
+    haskey(NLS_PREDICTORS, nls_family) || return MetricaBase.ModelError(:nls_unknown_family, "", "", "")
+    np = NLS_PREDICTORS[nls_family][1]; Random.seed!(seed)
+    best_result = nothing; best_rss = Inf
     for s in 1:n_starts
-        start = randn(3) .* 0.5 .+ 1.0; start[3] = rand() * 0.2
-        r = nls_fit_user(formula_str, data, start)
+        start = np == 2 ? randn(2) .* 0.5 .+ [1.0, 0.5] : randn(3) .* 0.5 .+ 1.0
+        r = nls_fit_user(formula_str, data, start; nls_family=nls_family)
         r isa MetricaBase.ModelError && continue
-        if r.residual_sum_squares < best_rss
-            best_rss = r.residual_sum_squares; best_result = r
-        end
+        if r.residual_sum_squares < best_rss; best_rss = r.residual_sum_squares; best_result = r; end
     end
     best_result === nothing && return MetricaBase.ModelError(:nls_all_failed, "多起点均失败", "", "")
     best_result.diagnostics[:multi_start_attempts] = n_starts

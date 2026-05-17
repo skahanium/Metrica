@@ -254,11 +254,17 @@ function _fit_sur_equations(filtered::DataFrame, equations::Vector{String}; max_
         corr[i, j] = si > 0 && sj > 0 ? Sigma[i, j] / (si * sj) : 0.0
     end
 
+    # 收集方程级拟合值供预测
+    eq_fitteds = [Xs[g] * beta[starts[g]:(starts[g] + ks[g] - 1)] for g in 1:G]
+    eq_resids = [ys[g] .- eq_fitteds[g] for g in 1:G]
+
     diagnostics = Dict{Symbol, Any}(
         :system_method => "sur_fgls",
         :iterations => iter_done,
         :sigma_residual => Sigma,
         :equation_correlation => corr,
+        :equation_fitted => eq_fitteds,
+        :equation_residuals => eq_resids,
     )
     return (
         equation_glances = eq_glances,
@@ -492,11 +498,15 @@ function MetricaBase.fit(::Type{System3SLSModel}, _formula::AbstractString, data
         sj = sqrt(Sigma[j, j])
         corr[i, j] = si > 0 && sj > 0 ? Sigma[i, j] / (si * sj) : 0.0
     end
+    eq_fitteds = [Xs[g] * beta[starts[g]:(starts[g] + ks[g] - 1)] for g in 1:G]
+    eq_resids = [ys[g] .- eq_fitteds[g] for g in 1:G]
     diagnostics = Dict{Symbol, Any}(
         :system_method => "3sls",
         :iterations => 1,
         :sigma_residual => Sigma,
         :equation_correlation => corr,
+        :equation_fitted => eq_fitteds,
+        :equation_residuals => eq_resids,
     )
     tidy = MetricaBase.TidyTable(tidy_rows, "3sls")
     return SystemEquationsFitResult(
@@ -564,9 +574,11 @@ end
 
 # === 系统预测 =================================================================
 function system_predict(result::SystemEquationsFitResult)
+    fitted = get(result.diagnostics, :equation_fitted, nothing)
+    fitted === nothing && return Dict{String, Vector{Float64}}()
     preds = Dict{String, Vector{Float64}}()
-    for (i, g) in enumerate(result.equation_glances)
-        preds[result.equation_labels[i]] = zeros(g.nobs)
+    for (i, label) in enumerate(result.equation_labels)
+        preds[label] = fitted[i]
     end
     return preds
 end
