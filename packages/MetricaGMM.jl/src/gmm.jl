@@ -395,6 +395,14 @@ function MetricaBase.fit(::Type{GMMLinearModel}, formula::AbstractString, data;
 
     coefficient_names_sym = Symbol.(vcat(["(Intercept)"], string.(exog_only), string.(endog_syms)))
 
+    # Cragg-Donald F-statistic (最小特征值)
+    cragg_donald_f = if L > k + 1
+        try
+            eigvals(Symmetric(Z' * Z))[1]
+        catch; NaN
+        end
+    else NaN end
+
     rss = sum(abs2, u)
     tss = sum(abs2, y .- mean(y))
     r2_val = iszero(tss) ? 1.0 : 1 - rss / tss
