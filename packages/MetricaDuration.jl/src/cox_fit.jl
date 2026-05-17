@@ -36,6 +36,8 @@ function log_partial_likelihood(
     t_ord::Vector{Float64},
     e_ord::Vector{Int};
     ties::Symbol=:efron,
+    weights::Union{Nothing, Vector{Float64}}=nothing,
+    start_times::Union{Nothing, Vector{Float64}}=nothing,
 )::Float64
     n = length(t_ord)
     p = size(X, 2)
@@ -48,17 +50,35 @@ function log_partial_likelihood(
         d = j - j0
         first_risk = _first_risk_index(t_ord, tau)
         first_risk === nothing && return -Inf
-        r0 = first_risk:n; Xr = X[r0, :]; eta = Xr * beta; mx = maximum(eta)
-        er = exp.(eta .- mx); s0 = sum(er)
+        r0 = first_risk:n
+        # Counting-process: 仅保留 start < tau <= stop 的观测
+        if start_times !== nothing
+            risk_mask = [start_times[ri] < tau for ri in r0:n]
+            risk_idx = r0 .- 1 .+ findall(risk_mask)
+            isempty(risk_idx) && return -Inf
+        else
+            risk_idx = r0:n
+        end
+        Xr = X[risk_idx, :]; eta = Xr * beta; mx = maximum(eta)
+        er = exp.(eta .- mx)
+        wr = weights !== nothing ? weights[risk_idx] : nothing
+        if wr !== nothing
+            er .*= wr
+        end
+        s0 = sum(er)
         s0 <= 0 && return -Inf
         k = collect(j0:(j - 1))
-        xf_sum = vec(sum(X[k, :], dims=1))
+        wk = weights !== nothing ? weights[k] : ones(d)
+        xf_sum = vec(sum(X[k, :] .* wk, dims=1))
         if ties == :efron && d > 1
             for m in 0:(d - 1)
-                w = m / d
+                fail_w = m / d
                 er_fail = exp.(Xr[k, :] * beta .- mx)
+                if wr !== nothing
+                    er_fail .*= wr[k]
+                end
                 sf = sum(er_fail)
-                s0m = s0 - w * sf
+                s0m = s0 - fail_w * sf
                 s0m > 0 || (ll = -Inf; break)
                 ll -= log(s0m) + mx
             end
@@ -122,9 +142,14 @@ function fit_duration_cox(
     ties::Symbol=:efron,
     cluster_col::Union{Nothing, AbstractString}=nothing,
     strata_col::Union{Nothing, AbstractString}=nothing,
+    weights_col::Union{Nothing, AbstractString}=nothing,
+    start_col::Union{Nothing, AbstractString}=nothing,
 )::Union{CoxFitResult, MetricaBase.ModelError}
     tc = String(strip(time_col))
     ec = String(strip(event_col))
+    # counting-process: start_col 指定进入风险集的时间
+    has_start = start_col !== nothing
+    sc = has_start ? String(strip(start_col)) : ""
     isempty(tc) &&
         return MetricaBase.ModelError(:duration_missing_time, "缺少时间列", "", "请设置 duration_time_column。")
     isempty(ec) &&
@@ -136,7 +161,12 @@ function fit_duration_cox(
     isempty(xnames) &&
         return MetricaBase.ModelError(:duration_no_covariates, "Cox 模型至少需要一个协变量", "", "请使用 ph ~ x1 或更多协变量。")
 
-    needcols = unique(vcat([tc, ec], String.(xnames)))
+    extra_cols = String[]
+    has_start && push!(extra_cols, sc)
+    weights_col !== nothing && push!(extra_cols, String(weights_col))
+    cluster_col !== nothing && push!(extra_cols, String(cluster_col))
+    strata_col !== nothing && push!(extra_cols, String(strata_col))
+    needcols = unique(vcat([tc, ec], String.(xnames), extra_cols))
     missingcols = setdiff(needcols, names(df))
     !isempty(missingcols) &&
         return MetricaBase.ModelError(
@@ -189,13 +219,35 @@ function fit_duration_cox(
         X[:, j] .= Float64.(subcc[!, Symbol(xn)])
     end
 
+    # Case weights
+    w_vec = if weights_col !== nothing
+        wv = Float64.(subcc[!, Symbol(String(weights_col))])
+        all(x -> x >= 0, wv) || return MetricaBase.ModelError(:duration_negative_weights, "权重不能为负", "", "")
+        maximum(wv) > 0 || return MetricaBase.ModelError(:duration_zero_weights, "权重全为零", "", "")
+        wv
+    else
+        nothing
+    end
+
+    # Counting-process start times
+    start_vec = if has_start
+        sv = Float64.(subcc[!, Symbol(sc)])
+        # 验证 start < stop
+        all(sv .< timev) || return MetricaBase.ModelError(:duration_start_not_less_than_stop, "start 必须 < stop(time_col)", "", "")
+        sv
+    else
+        nothing
+    end
+
     # 并列：同时间下事件优先于删失（左连续风险集常规处理）
     ord = sortperm(1:n, by = i -> (timev[i], -event[i]))
     t_ord = timev[ord]
     e_ord = event[ord]
     X_o = X[ord, :]
+    w_ord = w_vec !== nothing ? w_vec[ord] : nothing
+    start_ord = start_vec !== nothing ? start_vec[ord] : nothing
 
-    neg_ll(β) = -log_partial_likelihood(β, X_o, t_ord, e_ord; ties=ties)
+    neg_ll(β) = -log_partial_likelihood(β, X_o, t_ord, e_ord; ties=ties, weights=w_ord, start_times=start_ord)
     β0 = zeros(p)
     opt = Optim.optimize(neg_ll, β0, Optim.NelderMead(), Optim.Options(iterations=15_000, f_reltol=1e-7))
     βhat = Optim.minimizer(opt)

@@ -70,6 +70,26 @@ end
     @test length(r.time_ratios) == 2
 end
 
+@testset "Cox case weights" begin
+    df = CSV.read(demo_path, DataFrame)
+    df[!, :w] .= 1.0
+    r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; weights_col="w")
+    @test r isa CoxFitResult
+    @test isfinite(r.loglik)
+end
+
+@testset "Cox counting-process" begin
+    timev = [3.0, 6.0, 8.0, 5.0, 7.0, 10.0]
+    startv = [0.0, 2.0, 1.0, 0.0, 3.0, 0.0]
+    eventv = [1, 1, 0, 1, 1, 0]
+    x1v = [0.5, 1.2, -0.3, 0.8, 0.1, -0.5]
+    df = DataFrame(time=timev, fail=eventv, x1=x1v, start=startv)
+    r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; start_col="start")
+    @test r isa CoxFitResult
+    @test isfinite(r.loglik)
+    @test r.n_events >= 2
+end
+
 @testset "AFT Exponential / Lognormal / Loglogistic" begin
     df = CSV.read(demo_path, DataFrame)
     for d in ["exponential", "lognormal", "loglogistic"]

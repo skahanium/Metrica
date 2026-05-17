@@ -50,17 +50,17 @@ end
 
 function MetricaBase.model_capabilities(r::CoxFitResult)::MetricaBase.ModelCapabilities
     return MetricaBase.ModelCapabilities(
-        :partial,
+        :implemented,
         :duration,
         [:duration_cox],
         ["Efron partial likelihood + Optim (Nelder-Mead) + FiniteDiff Hessian"],
         [:n_events, :n_censored, :censoring_fraction, :loglik, :aic, :bic,
          :baseline_hazard, :baseline_survival, :hazard_ratios,
          :schoenfeld_residuals, :ph_global_test, :ph_variable_tests,
-         :strata, :cluster_se, :case_weights],
-        [:time_varying_covariates],
+         :strata, :cluster_se, :case_weights, :time_varying_covariates],
+        Symbol[],
         [:hazard_ratios],
         false,
-        ["时依协变量 counting-process 格式为后续功能。"],
+        String[],
     )
 end
