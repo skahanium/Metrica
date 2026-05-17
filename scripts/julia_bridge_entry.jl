@@ -240,6 +240,21 @@ else
         else
             MetricaDuration.result_to_payload(result; include_augment=include_augment)
         end
+    elseif model_type in ("aft_weibull", "aft_exponential", "aft_lognormal", "aft_loglogistic")
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+        tc = String(request.model_spec.duration_time_column)
+        ec = String(request.model_spec.duration_event_column)
+        dist = model_type == "aft_weibull" ? "weibull" :
+               model_type == "aft_exponential" ? "exponential" :
+               model_type == "aft_lognormal" ? "lognormal" : "loglogistic"
+        result = MetricaDuration.fit_aft(df, formula, tc, ec; dist=dist)
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        if result isa MetricaBase.ModelError
+            MetricaLinear.error_to_payload(result)
+        else
+            MetricaDuration.result_to_payload(result; include_augment=include_augment)
+        end
     else
         # 通过 MODEL_REGISTRY 统一派发
         kwargs = Dict{Symbol, Any}()

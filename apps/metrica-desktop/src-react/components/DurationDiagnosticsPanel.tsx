@@ -33,13 +33,16 @@ export function DurationDiagnosticsPanel({
             <Descriptions.Item label="部分似然（对数）">
               {diagnostics.loglikelihood != null ? diagnostics.loglikelihood.toFixed(4) : '—'}
             </Descriptions.Item>
-            <Descriptions.Item label="PH 检验（预留）" span={2}>
-              {diagnostics.ph_diagnostics === null ? (
-                <Text type="secondary">首期为 null；二期可填 Schoenfeld 等。</Text>
-              ) : (
-                <Text code>{JSON.stringify(diagnostics.ph_diagnostics)}</Text>
-              )}
+            <Descriptions.Item label="PH 全局检验 χ²" span={2}>
+              {(diagnostics as any).ph_diagnostics?.global_test !== undefined
+                ? `${(diagnostics as any).ph_diagnostics.global_test.statistic?.toFixed(4) ?? '—'} (df=${(diagnostics as any).ph_diagnostics.global_test.dof}, p=${(diagnostics as any).ph_diagnostics.global_test.pvalue?.toFixed(4)})`
+                : '—'}
             </Descriptions.Item>
+            {(diagnostics as any).ph_diagnostics?.global_test?.pvalue !== undefined && (diagnostics as any).ph_diagnostics.global_test.pvalue < 0.05 && (
+              <Descriptions.Item label="⚠ PH 假设提示" span={2}>
+                <Text type="warning">全局 PH 检验在 5% 水平拒绝原假设（p={String((diagnostics as any).ph_diagnostics.global_test.pvalue?.toFixed(4))}），可能不满足比例风险假定。</Text>
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="基准风险预览点数" span={2}>
               {bh?.n_event_times ?? '—'}
             </Descriptions.Item>

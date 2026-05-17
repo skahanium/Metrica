@@ -156,6 +156,19 @@ function handle_request(req::Dict{String, Any})
                 else
                     MetricaDuration.result_to_payload(result; include_augment=include_augment)
                 end
+            elseif model_type in ("aft_weibull", "aft_exponential", "aft_lognormal", "aft_loglogistic")
+                tc = String(get(params, "duration_time_column", "time"))
+                ec = String(get(params, "duration_event_column", "fail"))
+                dist = model_type == "aft_weibull" ? "weibull" :
+                       model_type == "aft_exponential" ? "exponential" :
+                       model_type == "aft_lognormal" ? "lognormal" : "loglogistic"
+                result = MetricaDuration.fit_aft(data, formula, tc, ec; dist=dist)
+                include_augment = haskey(params, :return_augment) ? params[:return_augment] : true
+                if result isa MetricaBase.ModelError
+                    MetricaDuration.error_to_payload(result)
+                else
+                    MetricaDuration.result_to_payload(result; include_augment=include_augment)
+                end
             elseif haskey(MetricaBase.MODEL_REGISTRY, model_type)
                 ModelT = MetricaBase.MODEL_REGISTRY[model_type]
 

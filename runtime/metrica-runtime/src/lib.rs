@@ -95,6 +95,10 @@ fn model_required_fields() -> HashMap<&'static str, Vec<&'static str>> {
         ("spatial_gtwr", vec!["spatial_coord_columns", "gtwr_time_column"]),
         ("spatial_probit", vec!["spatial_weights_path", "spatial_id_column"]),
         ("duration_cox", vec!["duration_time_column", "duration_event_column"]),
+        ("aft_weibull", vec!["duration_time_column", "duration_event_column"]),
+        ("aft_exponential", vec!["duration_time_column", "duration_event_column"]),
+        ("aft_lognormal", vec!["duration_time_column", "duration_event_column"]),
+        ("aft_loglogistic", vec!["duration_time_column", "duration_event_column"]),
     ])
 }
 

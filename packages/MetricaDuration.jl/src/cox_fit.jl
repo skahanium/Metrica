@@ -34,37 +34,38 @@ function log_partial_likelihood(
     beta::Vector{Float64},
     X::Matrix{Float64},
     t_ord::Vector{Float64},
-    e_ord::Vector{Int},
+    e_ord::Vector{Int};
+    ties::Symbol=:efron,
 )::Float64
     n = length(t_ord)
-    p = length(beta)
-    p == size(X, 2) || return -Inf
-    ll = 0.0
-    j = 1
+    p = size(X, 2)
+    p == 0 || p == length(beta) || return -Inf
+    ll = 0.0; j = 1
     while j <= n
-        if e_ord[j] == 0
-            j += 1
-            continue
-        end
-        tau = t_ord[j]
-        j0 = j
-        while j <= n && t_ord[j] ≈ tau && e_ord[j] == 1
-            j += 1
-        end
-        fail_range = j0:(j - 1)
-        d = length(fail_range)
+        e_ord[j] == 0 && (j += 1; continue)
+        tau = t_ord[j]; j0 = j
+        while j <= n && t_ord[j] ≈ tau && e_ord[j] == 1; j += 1 end
+        d = j - j0
         first_risk = _first_risk_index(t_ord, tau)
         first_risk === nothing && return -Inf
-        r0 = first_risk:n
-        Xr = X[r0, :]
-        eta = Xr * beta
-        mx = maximum(eta)
-        er = exp.(eta .- mx)
-        s0 = sum(er)
+        r0 = first_risk:n; Xr = X[r0, :]; eta = Xr * beta; mx = maximum(eta)
+        er = exp.(eta .- mx); s0 = sum(er)
         s0 <= 0 && return -Inf
-        k = collect(fail_range)
-        xf_sum = vec(sum(X[k, :], dims = 1))
-        ll += dot(xf_sum, beta) - d * (log(s0) + mx)
+        k = collect(j0:(j - 1))
+        xf_sum = vec(sum(X[k, :], dims=1))
+        if ties == :efron && d > 1
+            for m in 0:(d - 1)
+                w = m / d
+                er_fail = exp.(Xr[k, :] * beta .- mx)
+                sf = sum(er_fail)
+                s0m = s0 - w * sf
+                s0m > 0 || (ll = -Inf; break)
+                ll -= log(s0m) + mx
+            end
+            ll += dot(xf_sum, beta)
+        else
+            ll += dot(xf_sum, beta) - d * (log(s0) + mx)
+        end
     end
     return ll
 end
@@ -117,7 +118,10 @@ function fit_duration_cox(
     df::DataFrame,
     formula::AbstractString,
     time_col::AbstractString,
-    event_col::AbstractString,
+    event_col::AbstractString;
+    ties::Symbol=:efron,
+    cluster_col::Union{Nothing, AbstractString}=nothing,
+    strata_col::Union{Nothing, AbstractString}=nothing,
 )::Union{CoxFitResult, MetricaBase.ModelError}
     tc = String(strip(time_col))
     ec = String(strip(event_col))
@@ -191,47 +195,53 @@ function fit_duration_cox(
     e_ord = event[ord]
     X_o = X[ord, :]
 
-    neg_ll(β) = -log_partial_likelihood(β, X_o, t_ord, e_ord)
+    neg_ll(β) = -log_partial_likelihood(β, X_o, t_ord, e_ord; ties=ties)
     β0 = zeros(p)
-    opt = Optim.optimize(neg_ll, β0, Optim.NelderMead(), Optim.Options(iterations = 15_000, f_reltol = 1e-7))
+    opt = Optim.optimize(neg_ll, β0, Optim.NelderMead(), Optim.Options(iterations=15_000, f_reltol=1e-7))
     βhat = Optim.minimizer(opt)
-    ll = log_partial_likelihood(βhat, X_o, t_ord, e_ord)
+    ll = log_partial_likelihood(βhat, X_o, t_ord, e_ord; ties=ties)
     converged = Optim.converged(opt)
     iters = Optim.iterations(opt)
 
     H = zeros(Float64, p, p)
     FiniteDiff.finite_difference_hessian!(H, neg_ll, βhat)
-    Hs = Symmetric(H)
-    evmin = minimum(eigvals(Matrix(Hs)))
+    Hs = Symmetric(H); evmin = minimum(eigvals(Matrix(Hs)))
     evmin < 1e-10 && (Hs = Hs + (1e-8 - evmin) * I)
-    covb = try
-        inv(Matrix(Hs))
-    catch
-        return MetricaBase.ModelError(
-            :cox_singular_information,
-            "信息矩阵接近奇异",
-            "无法求逆海森",
-            "请检查协变量完全共线性或事件过少。",
-        )
-    end
+    covb = try inv(Matrix(Hs))
+    catch; return MetricaBase.ModelError(:cox_singular_information, "信息矩阵接近奇异", "无法求逆海森", "请检查协变量完全共线性或事件过少。") end
     se = sqrt.(clamp.(diag(covb), 0.0, Inf))
 
     preview = breslow_baseline_preview(βhat, X_o, t_ord, e_ord, 30)
+    surv = baseline_survival(preview)
+
+    # Schoenfeld 残差 + PH 检验
+    ph_diag = nothing
+    if p > 0
+        sr, sr_times = schoenfeld_residuals(βhat, X_o, t_ord, e_ord)
+        if size(sr, 1) > p + 1
+            global_test = ph_global_test(sr, sr_times)
+            var_tests = ph_variable_tests(sr, sr_times)
+            ph_diag = Dict{Symbol, Any}(:global_test => global_test, :variable_tests => var_tests)
+        end
+    end
+
+    k_params = p
+    aic = -2 * ll + 2 * k_params
+    bic = -2 * ll + k_params * log(n)
+
     diagd = Dict{Symbol, Any}(
-        :n_obs => n,
-        :n_events => ne,
-        :n_censored => n - ne,
-        :censoring_fraction => (n - ne) / n,
-        :risk_set_ties_method => "breslow",
-        :converged => converged,
-        :iterations => iters,
-        :loglikelihood => ll,
+        :n_obs => n, :n_events => ne, :n_censored => n - ne,
+        :censoring_fraction => (n - ne) / max(n, 1),
+        :risk_set_ties_method => String(ties),
+        :converged => converged, :iterations => iters,
+        :loglikelihood => ll, :aic => aic, :bic => bic,
         :baseline_hazard_summary => Dict{Symbol, Any}(
             :n_event_times => length(preview),
             :preview => [Dict("time" => pr.first, "cumulative_hazard" => pr.second) for pr in preview],
-            :ties_method => "breslow",
+            :ties_method => String(ties),
         ),
-        :ph_diagnostics => nothing,
+        :baseline_survival_preview => [Dict("time" => pr.first, "survival" => pr.second) for pr in surv],
+        :ph_diagnostics => ph_diag,
     )
 
     return CoxFitResult(

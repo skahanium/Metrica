@@ -51,3 +51,31 @@ end
     @test length(rp["hazard_ratios"]) == 1
     @test haskey(rp["diagnostics"], "n_events")
 end
+
+@testset "Cox Efron ties + PH diagnostics" begin
+    df = CSV.read(demo_path, DataFrame)
+    r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; ties=:efron)
+    @test r isa CoxFitResult
+    @test r.diagnostics[:risk_set_ties_method] == "efron"
+    @test isfinite(r.diagnostics[:aic])
+    @test haskey(r.diagnostics, :ph_diagnostics)
+end
+
+@testset "AFT Weibull" begin
+    df = CSV.read(demo_path, DataFrame)
+    r = fit_aft(df, "ph ~ x1", "time", "fail"; dist="weibull")
+    @test r isa AFTFitResult
+    @test r.distribution == "weibull"
+    @test isfinite(r.loglik); @test r.sigma > 0
+    @test length(r.time_ratios) == 2
+end
+
+@testset "AFT Exponential / Lognormal / Loglogistic" begin
+    df = CSV.read(demo_path, DataFrame)
+    for d in ["exponential", "lognormal", "loglogistic"]
+        r = fit_aft(df, "ph ~ x1", "time", "fail"; dist=d)
+        @test r isa AFTFitResult
+        @test r.distribution == d
+        @test isfinite(r.loglik)
+    end
+end
