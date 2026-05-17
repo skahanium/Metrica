@@ -19,7 +19,7 @@ Metrica 是一个基于 Julia 的联邦式计量经济学框架，目标是在�
 关键文档：
 
 - `Metrica.jl-计量经济学框架-完善版.md`：项目总体蓝图
-- `S5-模型族全量成熟化施工方案.md`：S5 施工基准
+- `docs/roadmap/s5-advanced-research-topics.md`：S5 完成记录
 - `docs/architecture/runtime-protocol.md`：Runtime 协议（全部 model_type 白名单）
 - `docs/roadmap/`：阶段施工指引（S1–S4 ✅，S5 ✅，S6–S7 待推进）
 

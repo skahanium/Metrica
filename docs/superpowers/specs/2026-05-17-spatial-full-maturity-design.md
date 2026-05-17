@@ -1,6 +1,6 @@
 # 空间计量模型族全量成熟化 — 设计文档
 
-> 对照 `S5-模型族全量成熟化施工方案.md` §2，将 `MetricaSpatial.jl` 从 SAR/SEM/SLX 基础实现扩展为完整空间横截面模型族。
+> 对照 `docs/roadmap/s5-advanced-research-topics.md` §2，将 `MetricaSpatial.jl` 从 SAR/SEM/SLX 基础实现扩展为完整空间横截面模型族。
 
 ## 1. Context
 

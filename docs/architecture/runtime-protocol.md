@@ -74,7 +74,7 @@
 - 新高级专题（如 `gmm_linear`）仍须走 **`fit_model` 信封**（或未来经设计新增的白名单 `action`，不得使用自由文本替代结构化 `model_spec`）。
 - 每个新类型必须返回结构化 **`glance`、`tidy`、`diagnostics`、`warnings`** 与可用时的 **`model_capabilities`**（及现有载荷约定中的扩展字段），App 只消费结构化字段。
 - 在 Julia 侧注册 `MODEL_REGISTRY`（**若适用**；空间模型等可走专用分支）并在桥接入口增加派发；同步更新本文件上表与 CLI 语法文档。
-- 详见 [`S5-模型族全量成熟化施工方案.md`](../../S5-模型族全量成熟化施工方案.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
+- 详见 [`docs/roadmap/s5-advanced-research-topics.md`](../roadmap/s5-advanced-research-topics.md)。
 
 ### `quantile`（线性分位数回归，单 τ）
 

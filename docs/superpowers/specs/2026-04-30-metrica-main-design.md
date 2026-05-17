@@ -6,7 +6,7 @@
 >
 > **`S3`（复现与报告）与产品化：** 项目保存/加载、运行记录、`export_report` 等在 Runtime 与桥接层已具备实现与测例；App 侧持续接入 CLI 动词与 UI。**不得**将「仅文档宣称」或样例 JSON 当作完成标准；未完成项在路线图与实施计划中如实标注为部分落地或待验范围。
 >
-> **`S5` 边界：** 在稳定协议上扩展 GMM、动态面板、系统方程、分位数等高级专题；新模型不得写入 `MetricaBase.jl` 的估计量实现，仅扩共享协议与类型约定；详见 [`S5-高级研究专题总施工规划.md`](../../../S5-高级研究专题总施工规划.md) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。不得重开平行 mock 主链路。
+> **`S5` 边界：** 在稳定协议上扩展 GMM、动态面板、系统方程、分位数等高级专题；新模型不得写入 `MetricaBase.jl` 的估计量实现，仅扩共享协议与类型约定；详见 [`docs/roadmap/s5-advanced-research-topics.md(已删除)`](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) 与 [`docs/roadmap/s5-advanced-research-topics.md`](../../roadmap/s5-advanced-research-topics.md)。不得重开平行 mock 主链路。
 
 ## 概述
 
@@ -428,7 +428,7 @@ App 只消费 Runtime 返回的结构化 JSON。
 
 ## 结论
 
-当前 Metrica 最重要的任务不是继续堆叠模块名或页面名，而是在 **`S1`–`S4` 已验证主链路** 上继续加固协议与数值语义，并按 [`S5` 总规](../../../S5-高级研究专题总施工规划.md) 分期扩展高级专题。
+当前 Metrica 最重要的任务不是继续堆叠模块名或页面名，而是在 **`S1`–`S4` 已验证主链路** 上继续加固协议与数值语义，并按 [`S5` 总规](../../../docs/roadmap/s5-advanced-research-topics.md(已删除)) 分期扩展高级专题。
 
 后续所有能力扩展，都应建立在这条链路之上推进，而不是绕开它继续增加未验证的子系统。
 

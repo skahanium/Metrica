@@ -33,7 +33,7 @@
 - **统一协议**：全部 S5 包实现 model_capabilities + augment_status + WARNING_CODE ✅
 
 总体蓝图：`Metrica.jl-计量经济学框架-完善版.md`  
-施工基准：`S5-模型族全量成熟化施工方案.md`  
+路线图：`docs/roadmap/s5-advanced-research-topics.md`  
 设计文档：`docs/superpowers/specs/`  
 实施计划：`docs/superpowers/plans/`
 

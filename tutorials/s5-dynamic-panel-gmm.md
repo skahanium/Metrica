@@ -50,5 +50,5 @@ System GMM 在差分方程基础上增加水平方程，使用滞后差分作为
 
 ## 与总规、协议文档的关系
 
-- 总规：`S5-高级研究专题总施工规划.md` §5。
+- 总规：`docs/roadmap/s5-advanced-research-topics.md(已删除)` §5。
 - 协议字段与键名定稿：`docs/architecture/runtime-protocol.md` 中 `dynamic_panel_gmm` 专节。
