@@ -1260,3 +1260,73 @@ async fn fit_model_http_survey_ols_returns_survey_fields() {
 
     server.abort();
 }
+
+#[test]
+fn fit_model_runs_spatial_gwr_with_local_coefficients() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/spatial_demo_coords.csv".to_string();
+    request.model_spec.model_type = "spatial_gwr".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+    request.model_spec.spatial_coord_columns = Some(vec!["lon".to_string(), "lat".to_string()]);
+    request.model_spec.gwr_kernel = Some("gaussian".to_string());
+    request.model_spec.gwr_bandwidth = Some(2.0);
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let preview = payload
+        .get("local_coefficients_preview")
+        .and_then(|v| v.as_array())
+        .expect("local_coefficients_preview");
+    assert!(!preview.is_empty());
+    let bandwidth = payload.get("bandwidth").and_then(|v| v.as_f64()).expect("bandwidth");
+    assert!(bandwidth > 0.0);
+    let model_caps = payload.get("model_capabilities").expect("capabilities");
+    assert_eq!(
+        model_caps.get("model_family").and_then(|v| v.as_str()),
+        Some("spatial")
+    );
+}
+
+#[test]
+fn fit_model_runs_spatial_gtwr_with_time_scale() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/spatial_demo_coords.csv".to_string();
+    request.model_spec.model_type = "spatial_gtwr".to_string();
+    request.model_spec.formula = "y ~ x1".to_string();
+    request.model_spec.spatial_coord_columns = Some(vec!["lon".to_string(), "lat".to_string()]);
+    request.model_spec.gtwr_time_column = Some("x2".to_string());
+    request.model_spec.gtwr_time_scale = Some(serde_json::Value::String("auto".to_string()));
+    request.model_spec.gwr_kernel = Some("bisquare".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let time_scale = payload
+        .get("time_scale")
+        .and_then(|v| v.as_f64())
+        .expect("time_scale");
+    assert!(time_scale > 0.0);
+}
+
+#[test]
+fn fit_model_runs_spatial_probit_with_posterior() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = repo_root().to_string_lossy().to_string();
+    request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
+    request.model_spec.model_type = "spatial_probit".to_string();
+    request.model_spec.formula = "y ~ x1".to_string();
+    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
+    request.model_spec.spatial_id_column = Some("region".to_string());
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let rho_mean = payload
+        .get("rho_posterior_mean")
+        .and_then(|v| v.as_f64())
+        .expect("rho_posterior_mean");
+    assert!(rho_mean.is_finite());
+}

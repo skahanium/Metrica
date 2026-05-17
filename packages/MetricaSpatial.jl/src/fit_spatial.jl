@@ -254,6 +254,14 @@ function fit_spatial(
         merge!(diag, mor)
         diag[:rho] = rho
         diag[:lambda] = lambda
+        eff = sar_effects(rho, pairs, W, x_colnames)
+        if !(eff isa MetricaBase.ModelError)
+            direct_eff, indirect_eff, total_eff, method_eff = eff
+            diag[:direct_effects] = direct_eff
+            diag[:indirect_effects] = indirect_eff
+            diag[:total_effects] = total_eff
+            diag[:effects_method] = method_eff
+        end
         dof = max(1, n - length(pairs))
         return SpatialFitResult(:spatial_sac, pairs, se,
             "GS2SLS（SAC）", resid, fitted, n, dof,

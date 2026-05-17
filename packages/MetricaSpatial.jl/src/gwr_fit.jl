@@ -105,6 +105,8 @@ function fit_gwr(y::Vector{Float64}, X::Matrix{Float64}, coords::Matrix{Float64}
 
     # 局部 WLS
     local_beta = Matrix{Float64}(undef, n, p)
+    local_se = Matrix{Float64}(undef, n, p)
+    local_tval = Matrix{Float64}(undef, n, p)
     hat_diag = Vector{Float64}(undef, n)
     fitted = Vector{Float64}(undef, n)
     local_r2 = Vector{Float64}(undef, n)
@@ -118,28 +120,42 @@ function fit_gwr(y::Vector{Float64}, X::Matrix{Float64}, coords::Matrix{Float64}
         Xw = Wsqrt .* X
         yw = Wsqrt .* y
         try
-            beta_i = Xw \ yw
+            XtX = Xw' * Xw
+            XtX_inv = inv(Symmetric(XtX))
+            beta_i = XtX_inv * (Xw' * yw)
             local_beta[i, :] = beta_i
             fitted[i] = dot(X[i, :], beta_i)
-            H_i = dot(X[i, :], (Xw' * Xw) \ X[i, :]) * w[i]
+            H_i = dot(X[i, :], XtX_inv * X[i, :]) * w[i]
             hat_diag[i] = max(H_i, 0.0)
             tss_i = sum(w[j] * (y[j] - mean(y))^2 for j in 1:n)
             rss_i = sum(w[j] * (y[j] - dot(X[j, :], beta_i))^2 for j in 1:n)
             local_r2[i] = tss_i > 0 ? 1.0 - rss_i / tss_i : 0.0
+            for k in 1:p
+                local_se[i, k] = sqrt(max(XtX_inv[k, k], 0.0))
+                local_tval[i, k] = local_se[i, k] > 1e-18 ? beta_i[k] / local_se[i, k] : 0.0
+            end
         catch
-            local_beta[i, :] .= 0.0
-            fitted[i] = 0.0
-            hat_diag[i] = 0.0
-            local_r2[i] = 0.0
+            local_beta[i, :] .= NaN
+            local_se[i, :] .= NaN
+            local_tval[i, :] .= NaN
+            fitted[i] = NaN
+            hat_diag[i] = NaN
+            local_r2[i] = NaN
         end
     end
 
+    valid_rows = findall(isfinite.(fitted))
+    n_valid = length(valid_rows)
+    if n_valid == 0
+        return MetricaBase.ModelError(:gwr_all_singular, "GWR 所有局部设计矩阵均奇异", "", "")
+    end
+
     residuals = y - fitted
-    sigma2 = dot(residuals, residuals) / (n - 2 * sum(hat_diag) + sum(hat_diag.^2))
+    sigma2 = dot(residuals[valid_rows], residuals[valid_rows]) / max(n_valid - 2 * sum(hat_diag[valid_rows]) + sum(hat_diag[valid_rows].^2), 1)
     sigma2 = max(sigma2, 1e-18)
-    eff_params = sum(hat_diag)
-    denom = max(n - eff_params - 2, 1)
-    aicc = n * log(sigma2) + n * log(2π) + n * (n + eff_params) / denom
+    eff_params = sum(hat_diag[valid_rows])
+    denom = max(n_valid - eff_params - 2, 1)
+    aicc = n_valid * log(sigma2) + n_valid * log(2π) + n_valid * (n_valid + eff_params) / denom
 
     warnings = MetricaBase.ModelWarning[]
     if !adaptive && (h < 0.05 * mean(D))
@@ -159,7 +175,7 @@ function fit_gwr(y::Vector{Float64}, X::Matrix{Float64}, coords::Matrix{Float64}
         :aicc => aicc,
     )
 
-    return GWRFitResult("gwr", n, p, coef_names, local_beta, nothing, nothing,
+    return GWRFitResult("gwr", n, p, coef_names, local_beta, local_se, local_tval,
                          local_r2, fitted, residuals, h, bw_method, bw_score,
                          kernel, adaptive, String(distance_metric),
                          eff_params, sigma2, aicc, hat_diag, diag, warnings)

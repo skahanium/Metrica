@@ -122,6 +122,8 @@ end
     @test result isa SpatialFitResult
     @test result.model_kind == :spatial_sac
     @test haskey(result.diagnostics, :lambda)
+    @test haskey(result.diagnostics, :direct_effects)
+    @test result.diagnostics[:direct_effects] !== nothing
 end
 
 @testset "MetricaSpatial GWR 小样本成功" begin
@@ -144,4 +146,37 @@ end
     edges_db, meta_db = build_distance_band_weights(coords, 2.0; distance_metric=:euclidean)
     @test nrow(edges_db) >= 2  # at minimum the closest pair
     @test meta_db[:method] == "distance_band"
+end
+
+@testset "MetricaSpatial GWR golden-value (固定数据)" begin
+    coords = [0.0 0.0; 1.0 0.0; 0.0 1.0; 1.0 1.0; 0.5 0.5]
+    y = [1.0, 2.0, 1.5, 2.5, 2.0]
+    X = [1.0 0.5; 1.0 1.5; 1.0 0.5; 1.0 1.5; 1.0 1.0]
+    result = fit_gwr(y, X, coords; bandwidth=2.0, kernel="gaussian")
+
+    @test result isa GWRFitResult
+    @test size(result.local_coefficients) == (5, 2)
+    @test size(result.local_stderrors) == (5, 2)
+    @test size(result.local_tvalues) == (5, 2)
+    @test result.bandwidth ≈ 2.0
+    @test result.kernel == "gaussian"
+    @test !result.adaptive
+
+    # 关键数值（手工 WLS）：点 5 (中心) 应有接近 OLS 的系数
+    beta_ols = X \ y  # ≈ [0.9, 1.1]
+    beta_center = result.local_coefficients[5, :]
+    @test beta_center[1] ≈ beta_ols[1] atol=0.5  # 截距
+    @test beta_center[2] ≈ beta_ols[2] atol=0.5  # 斜率
+
+    # 所有 SE 应为有限正数
+    se_center = result.local_stderrors[5, :]
+    @test all(isfinite, se_center)
+    @test all(>=(0), se_center)
+
+    # 局部 R² 在 [0, 1]
+    @test all(r -> 0 <= r <= 1, result.local_r2)
+
+    # 有效参数和 AICc 为有限
+    @test result.effective_parameters > 0
+    @test isfinite(result.aicc)
 end

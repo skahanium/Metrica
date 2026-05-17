@@ -93,6 +93,10 @@ function result_to_payload(result::GWRFitResult; include_augment::Bool=true)
                 "aicc" => result.aicc,
             ),
             "local_coefficients_preview" => local_preview,
+            "local_stderrors_preview" => result.local_stderrors !== nothing ?
+                [result.local_stderrors[i, j] for i in 1:preview_n, j in 1:result.ncoef] : nothing,
+            "local_tvalues_preview" => result.local_tvalues !== nothing ?
+                [result.local_tvalues[i, j] for i in 1:preview_n, j in 1:result.ncoef] : nothing,
             "local_r2" => result.local_r2[1:preview_n],
             "bandwidth" => result.bandwidth,
             "bandwidth_selection" => result.bandwidth_selection,
@@ -106,10 +110,10 @@ function result_to_payload(result::GWRFitResult; include_augment::Bool=true)
                 MetricaBase.ModelCapabilities(
                     :partial, :spatial, [:spatial_gwr],
                     ["local WLS (CV bandwidth)"],
-                    [:bandwidth, :kernel, :aicc, :local_r2],
-                    [:local_standard_errors, :local_tvalues, :golden_value_alignment],
+                    [:bandwidth, :kernel, :aicc, :local_r2, :local_standard_errors, :local_tvalues],
+                    [:golden_value_alignment],
                     Symbol[], true,
-                    ["局部标准误/t 值为二期功能。", "n ≤ 2000。"]))
+                    ["n ≤ 2000。"]))
         ),
     )
 
@@ -140,10 +144,10 @@ function result_to_payload(result::GTWRFitResult; include_augment::Bool=true)
         MetricaBase.ModelCapabilities(
             :partial, :spatial, [:spatial_gwr, :spatial_gtwr],
             ["local WLS (时空核)"],
-            [:bandwidth, :kernel, :aicc, :local_r2, :time_scale],
-            [:local_standard_errors, :golden_value_alignment],
+            [:bandwidth, :kernel, :aicc, :local_r2, :time_scale, :local_standard_errors, :local_tvalues],
+            [:golden_value_alignment],
             Symbol[], true,
-            ["局部标准误/t 值为二期功能。"]))
+            ["GTWR 时空加权回归，支持欧氏/haversine 距离。"]))
     return payload
 end
 

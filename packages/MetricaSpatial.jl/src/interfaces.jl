@@ -59,7 +59,7 @@ end
 function MetricaBase.model_capabilities(r::SpatialFitResult)::MetricaBase.ModelCapabilities
     available = [:moran_i, :moran_ei, :moran_var, :moran_z, :moran_pvalue,
                  :lm_lag, :lm_error, :robust_lm_lag, :robust_lm_error]
-    effects = if r.model_kind in (:spatial_lag, :spatial_slx)
+    effects = if r.model_kind in (:spatial_lag, :spatial_slx, :spatial_sdm, :spatial_sac)
         [:direct_effects, :indirect_effects, :total_effects]
     else
         Symbol[]
