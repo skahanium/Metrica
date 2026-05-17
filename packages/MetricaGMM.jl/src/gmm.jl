@@ -35,7 +35,7 @@ function MetricaBase.model_capabilities(r::GMMLinearFitResult)::MetricaBase.Mode
         :partial,
         :gmm,
         [:gmm_linear],
-        ["one_step", "two_step"],
+        ["one_step", "two_step", "iterated", "cue"],
         [:j_statistic, :j_df, :j_pvalue, :overidentifying_restrictions, :exactly_identified, :n_moments, :n_params],
         [:c_stat, :difference_in_hansen, :weak_instrument_diagnostics],
         Symbol[],
@@ -137,12 +137,16 @@ function _parse_gmm_weight(s::AbstractString)
         return :one_step
     elseif key == "two_step"
         return :two_step
+    elseif key == "iterated"
+        return :iterated
+    elseif key == "cue"
+        return :cue
     end
     return MetricaBase.ModelError(
         :invalid_gmm_weight,
         "不支持的 GMM 权重步长",
-        "gmm_weight 只能为 one_step 或 two_step，收到：$(s)。",
-        "请使用 weight(two_step) 或 weight(one_step)。",
+        "gmm_weight 只能为 one_step / two_step / iterated / cue，收到：$(s)。",
+        "请使用 weight(two_step) 或 weight(iterated) 或 weight(cue)。",
     )
 end
 
@@ -331,6 +335,45 @@ function MetricaBase.fit(::Type{GMMLinearModel}, formula::AbstractString, data;
         β = _solve_gmm_beta(X, Z, y, W_final)
         β isa MetricaBase.ModelError && return β
         u = y - X * β
+    elseif wmode === :iterated
+        # Iterated GMM: 循环至系数收敛
+        β_prev = ones(k) * Inf
+        β_curr = _solve_gmm_beta(X, Z, y, W)
+        β_curr isa MetricaBase.ModelError && return β_curr
+        iter = 1; max_iter = 100
+        while maximum(abs.(β_curr .- β_prev)) > 1e-6 && iter < max_iter
+            β_prev = β_curr
+            u_i = y - X * β_prev
+            Ω_i = _moment_covariance(Z, u_i, nobs)
+            jitter_i = 1e-10 * (tr(Ω_i) / max(size(Ω_i, 1), 1) + 1e-12)
+            W_i = _inv_sym_pd(Symmetric(Ω_i + jitter_i * I), :singular_weight_matrix, "iterated 迭代权重奇异", "", "")
+            W_i isa MetricaBase.ModelError && return W_i
+            β_curr = _solve_gmm_beta(X, Z, y, W_i)
+            β_curr isa MetricaBase.ModelError && return β_curr
+            iter += 1
+        end
+        W_final = W_i; β = β_curr; u = y - X * β; iterations = iter
+        weight_description = "iterated: 迭代至收敛（$(iter) 次），W = Ω̂(β)^(-1)。"
+    elseif wmode === :cue
+        # CUE: 连续更新估计器 — min_β n * g(β)' * Ω(β)^(-1) * g(β)
+        β_init = _solve_gmm_beta(X, Z, y, W)
+        β_init isa MetricaBase.ModelError && return β_init
+        function cue_objective(b)
+            u_c = y - X * b; Ω_c = _moment_covariance(Z, u_c, nobs)
+            jitter_c = 1e-10 * (tr(Ω_c) / max(size(Ω_c, 1), 1) + 1e-12)
+            W_c = _inv_sym_pd(Symmetric(Ω_c + jitter_c * I), :cue_weight, "", "", "")
+            W_c isa MetricaBase.ModelError && return Inf
+            g_c = (Z' * u_c) ./ nobs
+            return nobs * dot(g_c, W_c * g_c)
+        end
+        cue_result = Optim.optimize(cue_objective, β_init, BFGS(), Optim.Options(iterations=200, f_reltol=1e-8))
+        β = Optim.minimizer(cue_result)
+        u = y - X * β; iterations = Optim.iterations(cue_result)
+        Ω_cue = _moment_covariance(Z, u, nobs)
+        jitter_cue = 1e-10 * (tr(Ω_cue) / max(size(Ω_cue, 1), 1) + 1e-12)
+        W_final = _inv_sym_pd(Symmetric(Ω_cue + jitter_cue * I), :cue_final_weight, "", "", "")
+        W_final isa MetricaBase.ModelError && return W_final
+        weight_description = "CUE: 连续更新估计器，W = Ω̂(β)^(-1) 与 β 同时优化。"
     end
 
     # 协方差：sandwich，Ω 用最终残差

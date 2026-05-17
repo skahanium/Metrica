@@ -203,11 +203,11 @@ pub fn validate_model_request(spec: &ModelSpec) -> Option<ValidationError> {
             if spec.model_type == "gmm_linear" || spec.model_type == "dynamic_panel_gmm" {
                 if let Some(ref w) = spec.gmm_weight {
                     let t = w.trim().to_ascii_lowercase();
-                    if !t.is_empty() && t != "one_step" && t != "two_step" {
+                    if !t.is_empty() && t != "one_step" && t != "two_step" && t != "iterated" && t != "cue" {
                         return Some(ValidationError {
                             code: "RUNTIME_INVALID_FIELD",
                             message: format!(
-                                "模型类型 `{}` 的 gmm_weight 只能为 one_step 或 two_step，收到 `{w}`。",
+                                "模型类型 `{}` 的 gmm_weight 只能为 one_step / two_step / iterated / cue，收到 `{w}`。",
                                 spec.model_type
                             ),
                             hint: Some("请省略该字段以使用默认 two_step。".to_string()),
