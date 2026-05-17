@@ -8,38 +8,55 @@
 
 ## 初始化
 
-### 1. Julia 包
+### 1. 检查本地环境
 
 ```bash
-cd packages/MetricaBase.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
-cd packages/MetricaData.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
-cd packages/MetricaDiagnostics.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
-cd packages/MetricaLinear.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
-cd packages/MetricaPanel.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
-cd packages/MetricaOutput.jl && julia --project=. -e 'using Pkg; Pkg.instantiate()'
+bash scripts/dev/doctor.sh
 ```
 
-### 2. Runtime
+### 2. Julia 包
+
+当前仓库包含 18 个 `packages/*.jl` 包。首次开发不需要一次实例化全部包；按你修改的包运行：
 
 ```bash
-cd runtime/metrica-runtime && cargo build
+julia --project=packages/MetricaBase.jl -e 'using Pkg; Pkg.instantiate()'
+julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.instantiate()'
 ```
 
-### 3. 桌面应用
+聚合环境：
 
 ```bash
-cd apps/metrica-desktop && npm install && npm run dev
+julia --project=packages/MetricaRuntime.jl -e 'using Pkg; Pkg.instantiate()'
+```
+
+### 3. Runtime
+
+```bash
+cargo build --manifest-path runtime/metrica-runtime/Cargo.toml
+```
+
+### 4. 桌面应用
+
+```bash
+cd apps/metrica-desktop && npm ci && npm run dev
 ```
 
 ## 运行测试
 
 ```bash
 # Julia
-cd packages/MetricaData.jl && julia --project=. -e 'using Pkg; Pkg.test()'
+make test-julia-core
+bash scripts/dev/test-package.sh MetricaLinear.jl
 
 # Rust
-cd runtime/metrica-runtime && cargo test
+cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml
 
 # 前端
 cd apps/metrica-desktop && npm test
+```
+
+轻量核心验证：
+
+```bash
+bash scripts/dev/test-core.sh
 ```

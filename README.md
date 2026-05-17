@@ -28,7 +28,7 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 项目目前**不可用于生产或正式研究**：测试覆盖不足、数值精度未全面验证、API 可能变动、桌面 App 尚未打包分发。
 
-欢迎参与共建。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎参与共建。当前最适合的贡献方向是测试、golden-value 对齐、Bug 修复、文档和开源基础设施。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 模型族
 

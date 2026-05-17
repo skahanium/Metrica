@@ -1,8 +1,26 @@
 name: Bug Report
 description: 报告一个 bug
 title: "[Bug]: "
-labels: ["bug"]
+labels: ["bug", "status: needs-triage"]
 body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 受影响区域
+      options:
+        - julia-core
+        - runtime
+        - app
+        - docs
+        - quality
+        - unknown
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: 受影响包或路径
+      placeholder: "e.g. packages/MetricaLinear.jl, runtime/metrica-runtime, apps/metrica-desktop"
   - type: input
     id: model_type
     attributes:
@@ -38,6 +56,13 @@ body:
       placeholder: 粘贴错误消息或异常输出
     validations:
       required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 已运行的验证命令
+      placeholder: |
+        bash scripts/dev/doctor.sh
+        julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.test()'
   - type: textarea
     id: context
     attributes:

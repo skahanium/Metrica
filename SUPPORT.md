@@ -3,7 +3,9 @@
 ## 文档
 
 - [README.md](README.md) — 项目概述与快速入门
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 贡献入口、测试要求和当前阶段范围
 - [docs/architecture/](docs/architecture/) — 架构与协议文档
+- [docs/contributing/](docs/contributing/) — review 与 Issue 分流规则
 - [docs/quality/](docs/quality/) — CI、golden-value、benchmark 与发布门禁
 - [tutorials/](tutorials/) — 模型族 CLI 教程
 

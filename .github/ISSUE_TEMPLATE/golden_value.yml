@@ -1,0 +1,40 @@
+name: Golden Value
+description: 提交或请求外部参考值对齐用例
+title: "[Golden]: "
+labels: ["quality", "tests", "status: needs-triage"]
+body:
+  - type: input
+    id: model_type
+    attributes:
+      label: model_type
+      placeholder: "e.g. ols, logit, spatial_lag"
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: 目标包
+      placeholder: "e.g. packages/MetricaLinear.jl"
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: 参考软件与版本
+      placeholder: "e.g. R 4.4.0 lm(), Stata 18 regress, Python statsmodels 0.14"
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: 数据与命令
+      placeholder: "说明数据来源、最小数据样例、参考软件命令。"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 参考结果
+      placeholder: "系数、标准误、统计量、样本量、容差建议。"
+    validations:
+      required: true

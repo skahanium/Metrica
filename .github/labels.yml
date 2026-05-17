@@ -1,0 +1,37 @@
+# Minimal solo-maintainer label set. Apply manually or with a label sync tool.
+- name: bug
+  color: d73a4a
+  description: Something is broken.
+- name: docs
+  color: 0075ca
+  description: Documentation-only changes or reports.
+- name: tests
+  color: a2eeef
+  description: Test coverage, golden values, or verification work.
+- name: good first issue
+  color: 7057ff
+  description: Small, well-scoped task suitable for a first contribution.
+- name: help wanted
+  color: 008672
+  description: Maintainer welcomes outside help.
+- name: julia-core
+  color: bfd4f2
+  description: Julia packages under packages/.
+- name: runtime
+  color: c5def5
+  description: Rust runtime or Julia bridge behavior.
+- name: app
+  color: d4c5f9
+  description: Desktop application or React UI.
+- name: quality
+  color: fbca04
+  description: CI, release checks, golden values, benchmarks, or trust signals.
+- name: enhancement
+  color: a2eeef
+  description: Small improvement request that fits the current phase.
+- name: "status: needs-triage"
+  color: fef2c0
+  description: Maintainer has not reviewed scope or priority yet.
+- name: "out of scope"
+  color: e4e669
+  description: Not accepted in the current project phase.

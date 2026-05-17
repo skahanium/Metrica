@@ -18,5 +18,6 @@
 - **统一协议**：全部 S5 包实现 model_capabilities + augment_status + WARNING_CODE 注册表
 - 开源基础设施：LICENSE（GPL v3）、CONTRIBUTING.md、分层 CI、Issue/PR 模板、CODE_OF_CONDUCT、SECURITY、SUPPORT、CITATION.cff
 - 信任底座：包级质量状态矩阵、golden-value 验证政策、OLS golden fixture、benchmark harness、发布前质量门禁
+- 外部贡献入口：增强 CONTRIBUTING/SETUP、Issue/PR 模板、轻量标签规范、开发环境脚本、review/triage 规则
 - 13 篇模型族 CLI 教程、16 个教学 demo 数据集
 - CLI-first 桌面工作台（React + Tauri），20+ 专用诊断面板
