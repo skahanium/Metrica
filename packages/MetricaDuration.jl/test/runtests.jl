@@ -53,7 +53,7 @@ end
 end
 
 @testset "Cox Efron ties + PH diagnostics" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DEMO, DataFrame)
     r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; ties=:efron)
     @test r isa CoxFitResult
     @test r.diagnostics[:risk_set_ties_method] == "efron"
@@ -62,7 +62,7 @@ end
 end
 
 @testset "AFT Weibull" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DEMO, DataFrame)
     r = fit_aft(df, "ph ~ x1", "time", "fail"; dist="weibull")
     @test r isa AFTFitResult
     @test r.distribution == "weibull"
@@ -71,7 +71,7 @@ end
 end
 
 @testset "Cox case weights" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DEMO, DataFrame)
     df[!, :w] .= 1.0
     r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; weights_col="w")
     @test r isa CoxFitResult
@@ -91,7 +91,7 @@ end
 end
 
 @testset "AFT Exponential / Lognormal / Loglogistic" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DEMO, DataFrame)
     for d in ["exponential", "lognormal", "loglogistic"]
         r = fit_aft(df, "ph ~ x1", "time", "fail"; dist=d)
         @test r isa AFTFitResult
@@ -101,7 +101,7 @@ end
 end
 
 @testset "Cox Strata" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DEMO, DataFrame)
     df[!, :grp] = vcat(fill("A", 5), fill("B", 5))
     r = fit_duration_cox(df, "ph ~ x1", "time", "fail"; strata_col="grp")
     @test r isa CoxFitResult

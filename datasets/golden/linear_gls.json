@@ -1,0 +1,51 @@
+{
+  "id": "linear_gls",
+  "dataset": "golden/linear_gls.csv",
+  "model_type": "gls",
+  "formula": "y ~ x1 + x2",
+  "omega_fn": "identity",
+  "reference": {
+    "source": "Metrica 0.1.0 deterministic fixture generated from MetricaLinear GLSModel with identity Omega; external R/Stata alignment pending.",
+    "generated_on": "2026-05-18",
+    "notes": "With identity Omega, GLS(Omega=I) estimates match the deterministic OLS-equivalent path on this fixture."
+  },
+  "tolerances": [
+    {"name": "coefficient", "atol": 1.0e-10},
+    {"name": "stderror", "atol": 1.0e-10},
+    {"name": "statistic", "atol": 1.0e-10},
+    {"name": "metric", "atol": 1.0e-10}
+  ],
+  "expected": {
+    "glance": {
+      "model": "gls",
+      "nobs": 8,
+      "dof": 5
+    },
+    "metrics": [
+      {"name": "r2", "value": 0.9227166276346604},
+      {"name": "sigma", "value": 2.672261889590422},
+      {"name": "wald_stat", "value": 29.84848484848487},
+      {"name": "wald_pvalue", "value": 0.0016604093188219426}
+    ],
+    "tidy": [
+      {
+        "name": "(Intercept)",
+        "estimate": 1.9262295081967218,
+        "stderror": 2.8049534830232403,
+        "statistic": 0.6867242255014473
+      },
+      {
+        "name": "x1",
+        "estimate": 4.237704918032785,
+        "stderror": 0.6128495086807562,
+        "statistic": 6.914756164453871
+      },
+      {
+        "name": "x2",
+        "estimate": 1.1639344262295104,
+        "stderror": 0.5036283294474043,
+        "statistic": 2.311098002581811
+      }
+    ]
+  }
+}

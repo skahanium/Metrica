@@ -22,3 +22,4 @@ function result_to_payload(result::BayesFitResult; include_augment::Bool=true)
 end
 
 result_to_payload(err::MetricaBase.ModelError; include_augment::Bool=true) = MetricaBase.error_to_payload(err)
+error_to_payload(err::MetricaBase.ModelError) = MetricaBase.error_to_payload(err)

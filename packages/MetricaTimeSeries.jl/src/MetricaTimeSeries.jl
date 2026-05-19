@@ -268,6 +268,12 @@ function __init__()
         if isdefined(@__MODULE__, :GARCHModel)
             MetricaBase.MODEL_REGISTRY["garch"] = GARCHModel
         end
+        if isdefined(@__MODULE__, :GJRModel)
+            MetricaBase.MODEL_REGISTRY["gjr_garch"] = GJRModel
+        end
+        if isdefined(@__MODULE__, :EGARCHModel)
+            MetricaBase.MODEL_REGISTRY["egarch"] = EGARCHModel
+        end
     end
 end
 

@@ -83,7 +83,7 @@ function fit_bayes_probit(df::DataFrame, formula::AbstractString;
             end
             # β | z
             prec = X' * X + I(p)/tau2
-            post_cov = Symmetric(prec) \ I
+            post_cov = Symmetric(prec) \ Matrix{Float64}(I, p, p)
             post_mu = post_cov * (X' * z)
             beta_curr = rand(MvNormal(post_mu, Symmetric(post_cov)))
             if iter > bayes_warmup

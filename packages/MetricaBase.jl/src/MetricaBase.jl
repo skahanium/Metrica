@@ -505,18 +505,32 @@ const WARNING_CODE = Dict(
     # 通用数据/样本
     :rows_dropped_missing => "因缺失值删除行",
     :rows_dropped_listwise => "listwise 删行",
+    :rows_dropped => "因缺失值删除观测行",
     :n_obs_low => "样本量偏小，估计精度可能不足",
+    :small_sample => "样本量偏小，推断应谨慎",
     # 数值/矩阵
     :near_singular => "矩阵近奇异，结果可能不稳定",
     :singular_hessian => "Hessian 不可逆，标准误不可用",
     :singular_design => "设计矩阵奇异",
+    :weak_instrument => "工具变量与内生变量相关性弱",
     # 优化/收敛
     :convergence_not_reached => "优化未收敛",
     :local_optimum_risk => "存在局部最优风险，建议尝试不同初值",
     :optimizer_failure => "优化器返回失败状态",
+    :irls_not_converged => "IRLS 迭代未收敛",
+    :nls_not_converged => "非线性最小二乘未收敛",
+    :garch_not_converged => "GARCH 估计未收敛",
+    :arch_not_converged => "ARCH 估计未收敛",
+    :gjr_not_converged => "GJR-GARCH 估计未收敛",
+    :egarch_not_converged => "EGARCH 估计未收敛",
+    :mle_not_converged => "MLE 优化未收敛",
+    :css_not_converged => "CSS 估计未收敛",
+    :mlogit_not_converged => "多项 Logit 估计未收敛",
     # 诊断不可用
     :diag_unavailable => "诊断指标不可用",
     :diag_not_applicable => "该诊断不适用于当前模型",
+    :nls_se_not_implemented => "NLS 标准误尚未实现",
+    :quantile_se_unavailable => "分位数回归标准误不可用",
     # 效应与预测
     :effects_unavailable => "效应分解不可用",
     :prediction_unavailable => "当前模型不支持预测",
@@ -527,11 +541,18 @@ const WARNING_CODE = Dict(
     :crs_unknown => "坐标参考系未声明，距离度量可能不准确",
     # 面板/动态
     :instrument_proliferation => "工具变量过多，可能存在过度拟合",
+    :many_instruments => "工具变量数量较多",
     :short_panel => "面板时间维度偏短",
     :few_groups => "截面个体数偏少",
+    :ar2_serial_correlation => "AR(2) 序列相关检验提示自相关",
+    # 因果推断
+    :parallel_trends_unchecked => "平行趋势假设尚未检验",
+    :parallel_trends_check => "事件研究平行趋势预检验提示",
     # 波动率
     :volatility_nonstationary => "波动率过程非平稳（persistence ≥ 1）",
     :variance_nonpositive => "方差参数估计值非正",
+    :garch_fit_failed => "GARCH 模型拟合失败",
+    :arch_fit_failed => "ARCH 模型拟合失败",
     # 久期
     :ph_assumption_untested => "PH 假设尚未检验",
     :all_censored => "所有观测均为删失，无法估计",
@@ -539,6 +560,18 @@ const WARNING_CODE = Dict(
     :mcmc_not_applicable => "当前使用解析推断，MCMC 诊断不适用",
     # 分位数
     :tau_near_boundary => "分位点 τ 接近边界，估计方差可能较大",
+    :extreme_quantile => "极端分位点估计，方差可能较大",
+    # 离散选择
+    :possible_separation => "可能存在完全分离，参数估计不可靠",
+    :overdispersion => "数据存在过度分散，应考虑负二项模型",
+    :near_poisson => "负二项过分散参数接近 Poisson 边界",
+    # 时间序列
+    :unitroot_conflict => "单位根检验结论冲突",
+    :pp_adf_conflict => "PP 与 ADF 检验结论不一致",
+    :var_instability => "VAR 模型参数可能存在结构性不稳定",
+    # 模型构建
+    :mle_se_unavailable => "MLE 标准误不可用，使用伪方差估计",
+    :css_se_unavailable => "CSS 标准误不可用",
 )
 
 # === 模型注册表 ==============================================================

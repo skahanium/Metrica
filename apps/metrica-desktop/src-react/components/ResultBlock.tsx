@@ -22,7 +22,7 @@ import { SpatialDiagnosticsPanel } from './SpatialDiagnosticsPanel';
 import { DurationDiagnosticsPanel } from './DurationDiagnosticsPanel';
 import { ModelCapabilitiesPanel } from './ModelCapabilitiesPanel';
 import { GWRDiagnosticsPanel } from './GWRDiagnosticsPanel';
-import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics, DurationDiagnostics, GWRDiagnostics as GWRDiag } from '../types/protocol';
+import type { GmmDiagnostics, ModelResult, QuantileDiagnostics, NlsDiagnostics, ThresholdDiagnostics, VolatilityDiagnostics, SpatialDiagnostics, DurationDiagnostics, GWRDiagnostics as GWRDiag, SpatialProbitDiagnostics } from '../types/protocol';
 
 const { Text } = Typography;
 
@@ -109,18 +109,21 @@ export const ResultBlock: React.FC<ResultBlockProps> = ({ command, result, runId
       {showGWR && result.diagnostics && (
         <GWRDiagnosticsPanel diagnostics={result.diagnostics as unknown as GWRDiag} />
       )}
-      {showProbit && result.diagnostics && (
-        <div style={{ marginTop: 12, padding: 8, background: 'var(--m-surface)', borderRadius: 6, border: '1px solid var(--m-border)' }}>
-          <Descriptions size="small" column={2} title="空间 Probit 后验摘要">
-            <Descriptions.Item label="ρ 后验均值">{result.diagnostics.rho_posterior_mean?.toFixed(4) ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="ρ 后验标准差">{result.diagnostics.rho_posterior_sd?.toFixed(4) ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="ρ 95% HPD">[{result.diagnostics.rho_credible_lower?.toFixed(4)}, {result.diagnostics.rho_credible_upper?.toFixed(4)}]</Descriptions.Item>
-            <Descriptions.Item label="M-H 接受率">{result.diagnostics.rho_accept_rate?.toFixed(4) ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="迭代">{result.diagnostics.n_iter ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Warmup">{result.diagnostics.n_warmup ?? '—'}</Descriptions.Item>
-          </Descriptions>
-        </div>
-      )}
+      {showProbit && result.diagnostics && (() => {
+        const spDiag = result.diagnostics as SpatialProbitDiagnostics;
+        return (
+          <div style={{ marginTop: 12, padding: 8, background: 'var(--m-surface)', borderRadius: 6, border: '1px solid var(--m-border)' }}>
+            <Descriptions size="small" column={2} title="空间 Probit 后验摘要">
+              <Descriptions.Item label="ρ 后验均值">{spDiag.rho_posterior_mean?.toFixed(4) ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="ρ 后验标准差">{spDiag.rho_posterior_sd?.toFixed(4) ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="ρ 95% HPD">[{spDiag.rho_credible_lower?.toFixed(4)}, {spDiag.rho_credible_upper?.toFixed(4)}]</Descriptions.Item>
+              <Descriptions.Item label="M-H 接受率">{spDiag.rho_accept_rate?.toFixed(4) ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="迭代">{spDiag.n_iter ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="Warmup">{spDiag.n_warmup ?? '—'}</Descriptions.Item>
+            </Descriptions>
+          </div>
+        );
+      })()}
       {isDiscrete && <DiscreteGlanceCards result={result} />}
       {modelType === 'did' && <DIDResultCards result={result} />}
       {(modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') && <TreatmentEffectSummary result={result} />}

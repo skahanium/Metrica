@@ -119,7 +119,7 @@ function handle_request(req::Dict{String, Any})
             model_type = get(params, "model_type", "ols")
             include_augment = get(params, "return_augment", false)
 
-            if model_type in ("arima", "var", "unitroot", "cointegration", "arch", "garch")
+            if model_type in ("arima", "var", "unitroot", "cointegration", "arch", "garch", "gjr_garch", "egarch")
                 # 时间序列不在 MODEL_REGISTRY 中，必须先于注册表分支处理。
                 data = CSV.read(dataset_path, DataFrame)
                 model = MetricaTimeSeries.build_time_series_model(model_type, params)
@@ -158,28 +158,60 @@ function handle_request(req::Dict{String, Any})
                     MetricaDuration.result_to_payload(result; include_augment=include_augment)
                 end
             elseif model_type in ("aft_weibull", "aft_exponential", "aft_lognormal", "aft_loglogistic")
+                data = CSV.read(dataset_path, DataFrame)
                 tc = String(get(params, "duration_time_column", "time"))
                 ec = String(get(params, "duration_event_column", "fail"))
                 dist = model_type == "aft_weibull" ? "weibull" :
                        model_type == "aft_exponential" ? "exponential" :
                        model_type == "aft_lognormal" ? "lognormal" : "loglogistic"
                 result = MetricaDuration.fit_aft(data, formula, tc, ec; dist=dist)
-                include_augment = haskey(params, :return_augment) ? params[:return_augment] : true
-                if result isa MetricaBase.ModelError
+                include_augment = get(params, "return_augment", false)
+                payload = if result isa MetricaBase.ModelError
                     MetricaDuration.error_to_payload(result)
                 else
                     MetricaDuration.result_to_payload(result; include_augment=include_augment)
                 end
-            elseif model_type == "bayes_linear"
-                result = MetricaBayes.fit_bayes_linear(data, formula;
-                    bayes_seed=get(params, "bayes_seed", nothing),
-                    bayes_prior_scale=Float64(get(params, "bayes_prior_scale", 1.0)),
-                    bayes_sigma2_known=Bool(get(params, "bayes_sigma2_known", false)),
-                    bayes_sigma2_value=Float64(get(params, "bayes_sigma2_value", NaN)),
-                    bayes_ig_alpha=Float64(get(params, "bayes_ig_alpha", 2.0)),
-                    bayes_ig_beta=Float64(get(params, "bayes_ig_beta", 1.0)))
-                include_augment = haskey(params, :return_augment) ? params[:return_augment] : true
-                if result isa MetricaBase.ModelError
+            elseif model_type in ("bayes_linear", "bayes_logistic", "bayes_probit", "bayes_hierarchical")
+                data = CSV.read(dataset_path, DataFrame)
+                bayes_seed = get(params, "bayes_seed", nothing)
+                result = if model_type == "bayes_linear"
+                    MetricaBayes.fit_bayes_linear(data, formula;
+                        bayes_seed=bayes_seed,
+                        bayes_prior_scale=Float64(get(params, "bayes_prior_scale", 1.0)),
+                        bayes_sigma2_known=Bool(get(params, "bayes_sigma2_known", false)),
+                        bayes_sigma2_value=Float64(get(params, "bayes_sigma2_value", NaN)),
+                        bayes_ig_alpha=Float64(get(params, "bayes_ig_alpha", 2.0)),
+                        bayes_ig_beta=Float64(get(params, "bayes_ig_beta", 1.0)))
+                elseif model_type == "bayes_logistic"
+                    MetricaBayes.fit_bayes_logistic(data, formula;
+                        bayes_seed=bayes_seed,
+                        bayes_prior_scale=Float64(get(params, "bayes_prior_scale", 5.0)),
+                        bayes_iter=Int(get(params, "bayes_iter", 3000)),
+                        bayes_warmup=Int(get(params, "bayes_warmup", 750)),
+                        bayes_chains=Int(get(params, "bayes_chains", 1)))
+                elseif model_type == "bayes_probit"
+                    MetricaBayes.fit_bayes_probit(data, formula;
+                        bayes_seed=bayes_seed,
+                        bayes_prior_scale=Float64(get(params, "bayes_prior_scale", 5.0)),
+                        bayes_iter=Int(get(params, "bayes_iter", 3000)),
+                        bayes_warmup=Int(get(params, "bayes_warmup", 750)),
+                        bayes_chains=Int(get(params, "bayes_chains", 1)))
+                else
+                    group_col = String(get(params, "bayes_group_column", ""))
+                    isempty(group_col) ? MetricaBase.ModelError(
+                        :bayes_missing_group_column,
+                        "层级贝叶斯模型需要 bayes_group_column",
+                        "",
+                        "请在 model_spec 中提供 bayes_group_column。",
+                    ) : MetricaBayes.fit_bayes_hierarchical(data, formula, Symbol(group_col);
+                        bayes_seed=bayes_seed,
+                        bayes_prior_scale=Float64(get(params, "bayes_prior_scale", 10.0)),
+                        bayes_iter=Int(get(params, "bayes_iter", 3000)),
+                        bayes_warmup=Int(get(params, "bayes_warmup", 750)),
+                        bayes_chains=Int(get(params, "bayes_chains", 1)))
+                end
+                include_augment = get(params, "return_augment", false)
+                payload = if result isa MetricaBase.ModelError
                     MetricaBayes.error_to_payload(result)
                 else
                     MetricaBayes.result_to_payload(result; include_augment=include_augment)

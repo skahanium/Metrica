@@ -19,7 +19,7 @@
 
 ## 项目定位
 
-Metrica 是一个开源计量经济学框架。20 个 Julia Core 包 + CLI-first 桌面工作台 + GPL v3 许可。AI 协作构建（AGENTS.md 为 AI 助手的项目指令中枢）。
+Metrica 是一个开源计量经济学框架。18 个 Julia Core 包 + CLI-first 桌面工作台 + GPL v3 许可。AI 协作构建（AGENTS.md 为 AI 助手的项目指令中枢）。
 
 总体蓝图：`Metrica.jl-计量经济学框架-完善版.md`
 架构文档：`docs/architecture/`

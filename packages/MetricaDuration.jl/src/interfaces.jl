@@ -64,3 +64,6 @@ function MetricaBase.model_capabilities(r::CoxFitResult)::MetricaBase.ModelCapab
         String[],
     )
 end
+
+MetricaBase.augment(::CoxFitResult) = AugmentTable()
+MetricaBase.augment(::AFTFitResult) = AugmentTable()

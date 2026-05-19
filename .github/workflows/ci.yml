@@ -17,6 +17,22 @@ jobs:
         package:
           - MetricaBase.jl
           - MetricaLinear.jl
+          - MetricaGMM.jl
+          - MetricaPanel.jl
+          - MetricaDiscrete.jl
+          - MetricaCausal.jl
+          - MetricaSystem.jl
+          - MetricaTimeSeries.jl
+          - MetricaSurvey.jl
+          - MetricaSpatial.jl
+          - MetricaDuration.jl
+          - MetricaBayes.jl
+          - MetricaNonlinear.jl
+          - MetricaQuantile.jl
+          - MetricaData.jl
+          - MetricaDiagnostics.jl
+          - MetricaOutput.jl
+          - MetricaRuntime.jl
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
@@ -47,3 +63,13 @@ jobs:
           cd apps/metrica-desktop
           npm ci
           npm test
+
+  model-type-alignment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - name: Check model_type alignment
+        run: julia scripts/check_model_type_alignment.jl

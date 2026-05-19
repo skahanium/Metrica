@@ -1,3 +1,15 @@
+# === Runtime / MODEL_REGISTRY marker specs =================================
+
+struct SpatialLagModel <: MetricaBase.AbstractEconModel end
+struct SpatialErrorModel <: MetricaBase.AbstractEconModel end
+struct SpatialSLXModel <: MetricaBase.AbstractEconModel end
+struct SpatialSDMModel <: MetricaBase.AbstractEconModel end
+struct SpatialSDEMModel <: MetricaBase.AbstractEconModel end
+struct SpatialSACModel <: MetricaBase.AbstractEconModel end
+struct SpatialGWRModel <: MetricaBase.AbstractEconModel end
+struct SpatialGTWRModel <: MetricaBase.AbstractEconModel end
+struct SpatialProbitModel <: MetricaBase.AbstractEconModel end
+
 # === 空间计量拟合结果类型 =====================================================
 
 struct SpatialFitResult

@@ -31,7 +31,7 @@ function _aft_ll_weibull(beta_sigma::Vector, X::Matrix, log_t::Vector, event::Ve
     ll = 0.0
     for i in eachindex(z)
         vi = z[i]; ei = event[i]
-        ll += ei * (vi - log(sigma) + log(pdf(ExtremeValue(), vi))) + (1 - ei) * log(ccdf(ExtremeValue(), vi))
+        ll += ei * (vi - log(sigma) + log(pdf(Gumbel(), vi))) + (1 - ei) * log(ccdf(Gumbel(), vi))
     end
     return ll
 end
@@ -42,7 +42,7 @@ function _aft_ll_exponential(beta::Vector, X::Matrix, log_t::Vector, event::Vect
     ll = 0.0
     for i in eachindex(z)
         ei = event[i]; vi = z[i]
-        ll += ei * (vi + log(pdf(ExtremeValue(), vi))) + (1 - ei) * log(ccdf(ExtremeValue(), vi))
+        ll += ei * (vi + log(pdf(Gumbel(), vi))) + (1 - ei) * log(ccdf(Gumbel(), vi))
     end
     return ll
 end
@@ -104,7 +104,7 @@ function fit_aft(df::DataFrame, formula::AbstractString, time_col::AbstractStrin
     else; return MetricaBase.ModelError(:aft_unknown_dist, "未知分布: $dist", "", "") end
 
     obj(x) = -ll_fn(x, X, log_t, event)
-    opt = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=5000, f_reltol=1e-6, g_reltol=1e-6))
+    opt = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=5000, f_reltol=1e-6, g_abstol=1e-6))
     xm = Optim.minimizer(opt); converged = Optim.converged(opt); iters = Optim.iterations(opt)
     beta_hat = xm[1:p]; sigma_hat = has_sigma ? exp(xm[p+1]) : 1.0
     ll = -Optim.minimum(opt)
@@ -124,14 +124,14 @@ function fit_aft(df::DataFrame, formula::AbstractString, time_col::AbstractStrin
     z_crit = 1.96
     tr_lo = exp.(beta_hat .- z_crit .* se_beta); tr_hi = exp.(beta_hat .+ z_crit .* se_beta)
 
-    diag = Dict{Symbol, Any}(:n_obs => n, :n_events => ne, :n_censored => n - ne,
+    diagnostics = Dict{Symbol, Any}(:n_obs => n, :n_events => ne, :n_censored => n - ne,
         :censoring_fraction => (n - ne) / max(n, 1), :distribution => dist,
         :sigma => sigma_hat, :converged => converged, :iterations => iters,
         :loglikelihood => ll, :aic => aic, :bic => bic)
 
     return AFTFitResult(:aft, dist, vcat([:intercept], Symbol.(xnames)),
         beta_hat, se_beta, sigma_hat, ll, aic, bic,
-        n, ne, n - ne, time_ratios, tr_lo, tr_hi, converged, iters, diag,
+        n, ne, n - ne, time_ratios, tr_lo, tr_hi, converged, iters, diagnostics,
         MetricaBase.ModelWarning[])
 end
 
@@ -157,5 +157,3 @@ function result_to_payload(r::AFTFitResult; include_augment::Bool=true)
             "diagnostics" => MetricaBase.dict_symbol_to_string(r.diagnostics)))
     return payload
 end
-
-result_to_payload(err::MetricaBase.ModelError; include_augment::Bool=true) = MetricaBase.error_to_payload(err)

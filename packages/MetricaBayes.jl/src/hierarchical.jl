@@ -34,7 +34,7 @@ function fit_bayes_hierarchical(df::DataFrame, formula::AbstractString, group_co
             # β | α, σ²
             y_adj = y .- alpha[gidx]
             post_prec = X' * X / sigma2 + I(p)/tau2
-            post_cov = Symmetric(post_prec) \ I
+            post_cov = Symmetric(post_prec) \ Matrix{Float64}(I, p, p)
             post_mu = post_cov * (X' * y_adj / sigma2)
             beta = rand(MvNormal(post_mu, Symmetric(post_cov)))
             # σ²

@@ -29,7 +29,7 @@ function ph_global_test(schoenfeld_r::Matrix{Float64}, event_times::Vector{Float
     g = log.(max.(event_times, 1e-12))
     g_mean = mean(g); g_c = g .- g_mean
     U = schoenfeld_r' * g_c
-    V = sum(g_c .^ 2) .* (schoonfeld_r' * schoenfeld_r) ./ n_ev
+    V = sum(g_c .^ 2) .* (schoenfeld_r' * schoenfeld_r) ./ n_ev
     V_inv = try inv(Symmetric(V)) catch; pinv(V) end
     stat = dot(U, V_inv * U)
     pv = 1 - cdf(Chisq(p), stat)

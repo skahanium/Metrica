@@ -1,0 +1,57 @@
+{
+  "id": "linear_iv",
+  "dataset": "golden/linear_iv.csv",
+  "model_type": "iv",
+  "formula": "y ~ x1 + x2",
+  "instruments": ["z1", "z2"],
+  "endog_columns": ["x2"],
+  "reference": {
+    "source": "Metrica 0.1.0 deterministic fixture generated from MetricaLinear IVModel; external R/Stata alignment pending.",
+    "generated_on": "2026-05-18",
+    "notes": "Fixture generated from MetricaBase.fit(IVModel, \"y ~ x1 + x2\", linear_iv.csv; instruments=[\"z1\", \"z2\"], endog=[\"x2\"])."
+  },
+  "tolerances": [
+    {"name": "coefficient", "atol": 1.0e-10},
+    {"name": "stderror", "atol": 1.0e-10},
+    {"name": "statistic", "atol": 1.0e-10},
+    {"name": "metric", "atol": 1.0e-10}
+  ],
+  "expected": {
+    "glance": {
+      "model": "iv",
+      "nobs": 8,
+      "dof": 5
+    },
+    "metrics": [
+      {"name": "r2", "value": 0.9227166276346603},
+      {"name": "sigma", "value": 2.6722618895904233},
+      {"name": "f_stat", "value": 29.848484848484837},
+      {"name": "f_pvalue", "value": 0.0016604093188219426}
+    ],
+    "tidy": [
+      {
+        "name": "(Intercept)",
+        "estimate": 1.9262295081967238,
+        "stderror": 2.8049534830232425,
+        "statistic": 0.6867242255014475
+      },
+      {
+        "name": "x1",
+        "estimate": 4.2377049180327875,
+        "stderror": 0.6128495086807565,
+        "statistic": 6.9147561644538715
+      },
+      {
+        "name": "x2",
+        "estimate": 1.163934426229507,
+        "stderror": 0.5036283294474048,
+        "statistic": 2.311098002581802
+      }
+    ],
+    "first_stage": {
+      "x2": {
+        "f_stat": 3.358987291826475e30
+      }
+    }
+  }
+}

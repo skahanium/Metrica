@@ -1,3 +1,11 @@
+# === Runtime / MODEL_REGISTRY marker specs =================================
+
+struct CoxModel <: MetricaBase.AbstractEconModel end
+struct AFTWeibullModel <: MetricaBase.AbstractEconModel end
+struct AFTExponentialModel <: MetricaBase.AbstractEconModel end
+struct AFTLognormalModel <: MetricaBase.AbstractEconModel end
+struct AFTLoglogisticModel <: MetricaBase.AbstractEconModel end
+
 # === Cox PH 拟合结果 ========================================================
 
 """Cox 比例风险模型（Breslow 并列）拟合结果。"""

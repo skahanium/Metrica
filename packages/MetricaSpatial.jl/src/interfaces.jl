@@ -94,3 +94,9 @@ function MetricaBase.model_capabilities(r::SpatialFitResult)::MetricaBase.ModelC
         ["空间 Probit 与 GWR/GTWR 尚未暴露为可调用模型。"],
     )
 end
+
+# === augment 桩：空间模型增广诊断暂由 serialize.jl 内联构造 ===================
+MetricaBase.augment(::SpatialFitResult) = AugmentTable()
+MetricaBase.augment(::GWRFitResult) = AugmentTable()
+MetricaBase.augment(::GTWRFitResult) = AugmentTable()
+MetricaBase.augment(::ProbitFitResult) = AugmentTable()

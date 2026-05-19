@@ -26,7 +26,24 @@ Metrica 在进入稳定研究可用状态前采用轻量 SemVer 规则。目标�
 ## 仓库内版本来源
 
 - `CHANGELOG.md` 是用户可读的发布事实来源。
-- `CITATION.cff` 记录当前引用版本和发布日期。
-- Julia 包、Runtime、App 的内部版本应在正式发布时与 release notes 保持一致。
+- `CITATION.cff` 记录当前引用版本和发布日期（与 GitHub「Cite this repository」一致）。
+- Julia 包、Runtime、App 的内部 `version` 字段应在正式发布时与上述发布线一致。
 
 除非进入独立发布阶段，Metrica 先按单仓库 release 处理，不为每个包单独维护公开 release 流程。
+
+## 仓库内须同步的版本字段
+
+一次**整体抬版本**（例如 `0.1.0` → `0.1.1`）时，至少核对并修改下列位置的 `version`（或等价字段），避免仓库内出现不一致：
+
+| 位置 | 说明 |
+|------|------|
+| `CITATION.cff` | `version`；同时更新 `date-released` |
+| `packages/*/Project.toml` | 各 Julia 包的 `version = "…"` |
+| `scripts/daemon/Project.toml` | 守护进程辅助环境的 `version` |
+| `runtime/metrica-runtime/Cargo.toml` | `[package].version` |
+| `apps/metrica-desktop/src-tauri/Cargo.toml` | `[package].version`（桌面对外版本以此为准） |
+| `README.md` | 顶部 shields **Version** 徽章 URL 中的 `version-X.Y.Z` 段；「版本与引用」小节的发布线文字 |
+
+`apps/metrica-desktop/package.json` **不**维护 npm `version`；若将来需要单独的前端包版本，再在文档中另立约定。
+
+README 中的「当前仓库整体发布线」、顶部版本徽章应与 `CHANGELOG.md` 最新已发布条目、`CITATION.cff` 保持一致。

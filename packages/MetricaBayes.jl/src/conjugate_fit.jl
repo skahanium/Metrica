@@ -33,7 +33,7 @@ function fit_bayes_linear(
 
     # 后验精度: Σ_n⁻¹ = X'X + τ⁻²I
     post_prec = X' * X + prior_prec
-    Σ_n = Symmetric(post_prec) \ I
+    Σ_n = Symmetric(post_prec) \ Matrix{Float64}(I, p, p)
     μ_n = Σ_n * (X' * y)
 
     if bayes_sigma2_known
@@ -73,7 +73,7 @@ function fit_bayes_linear(
 
     coef_names = vcat([:intercept], Symbol.(xnames))
 
-    diag = Dict{Symbol, Any}(
+    diagnostics = Dict{Symbol, Any}(
         :inference_mode => inference_mode,
         :seed_used => bayes_seed,
         :sigma2_known => bayes_sigma2_known,
@@ -88,7 +88,7 @@ function fit_bayes_linear(
     warnings = MetricaBase.ModelWarning[]
     if n < 20
         push!(warnings, MetricaBase.ModelWarning(:small_sample, "样本量偏小",
-            "n=$n，后验分布可能受先验主导。", "建议增加观测或检查先验设置。", MetricaBase.info))
+            "n=$(n)，后验分布可能受先验主导。", "建议增加观测或检查先验设置。", MetricaBase.info))
     end
 
     return BayesFitResult(
@@ -96,6 +96,6 @@ function fit_bayes_linear(
         inference_mode, "normal_independent",
         bayes_sigma2_known, sigma2_val,
         bayes_sigma2_known ? log_ml : nothing,
-        n, p, bayes_seed, diag, warnings,
+        n, p, bayes_seed, diagnostics, warnings,
     )
 end

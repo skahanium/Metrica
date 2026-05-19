@@ -194,6 +194,8 @@ function MetricaBase.model_capabilities(r::GJRFitResult)::MetricaBase.ModelCapab
         ["GJR-GARCH 支持杠杆效应。VaR/ES/预测为后续功能。"])
 end
 
+MetricaBase.augment(::GJRFitResult) = AugmentTable()
+
 function result_to_payload(r::GJRFitResult; include_augment::Bool=true)
     preview_n = 50
     σ = sqrt.(max.(r.conditional_variance, 1e-18))

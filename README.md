@@ -1,6 +1,7 @@
 # Metrica
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Version](https://img.shields.io/badge/version-0.1.0-6A5ACD)](CITATION.cff)
 [![CI](https://github.com/skahanium/Metrica/actions/workflows/ci.yml/badge.svg)](https://github.com/skahanium/Metrica/actions)
 [![Julia](https://img.shields.io/badge/Julia-1.12-purple)](https://julialang.org/)
 
@@ -16,7 +17,7 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 **Julia 性能。** 原生 Julia 实现。性能验证正在收口中，当前不宣称未复现的跨软件倍数；可复现脚本和覆盖状态见 [benchmarks/](benchmarks/) 与 [docs/quality/package-status.md](docs/quality/package-status.md)。
 
-**全栈贯通。** Core（Julia 计量引擎）→ Runtime（Rust HTTP/进程桥接）→ App（React + Tauri 桌面工作台），一条链路无缝合、无拼接、无临时脚本。
+**全栈贯通。** Core（Julia 计量引擎）→ Runtime（Rust HTTP/进程桥接）→ App（React + tao/wry 桌面工作台），一条链路无缝合、无拼接、无临时脚本。
 
 **开放透明。** GPL v3 许可。全部代码、全部协议、全部设计文档公开。零黑箱算法、零隐藏参数、零专有格式。
 
@@ -29,6 +30,15 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 项目目前**不可用于生产或正式研究**：测试覆盖不足、数值精度未全面验证、API 可能变动、桌面 App 尚未打包分发。
 
 欢迎参与共建。当前最适合的贡献方向是测试、golden-value 对齐、Bug 修复、文档和开源基础设施。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 版本与引用
+
+- **当前仓库整体发布线：** `0.1.0`（与 [CHANGELOG.md](CHANGELOG.md) 最新条目、[CITATION.cff](CITATION.cff) 中的 `version` 一致）。
+- **论文与软件引用：** 以根目录 [CITATION.cff](CITATION.cff) 为准（含 `date-released`）；GitHub 仓库页的「Cite this repository」也由此生成。
+- **各组件版本字段：** Julia Core 为各 `packages/*/Project.toml` 的 `version`（另有 `scripts/daemon/Project.toml`）；Runtime 为 `runtime/metrica-runtime/Cargo.toml`；桌面壳为 `apps/metrica-desktop/src-tauri/Cargo.toml`。正式发布时应与上述发布线一致，清单见 [docs/governance/versioning.md](docs/governance/versioning.md#仓库内须同步的版本字段)。
+- **前端 npm 包：** `apps/metrica-desktop/package.json` 未维护 `version` 字段；若需对外报桌面版本，以 **桌面壳工程** `Cargo.toml` 为准。
+
+发版步骤与质量门禁见 [docs/governance/release-process.md](docs/governance/release-process.md) 与 [docs/quality/release-checklist.md](docs/quality/release-checklist.md)。
 
 ## 模型族
 
@@ -46,7 +56,7 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 | 非线性/门限 | `nls`, `threshold` | MetricaNonlinear |
 | 空间 | `spatial_lag`, `spatial_error`, `spatial_slx`, `spatial_sdm`, `spatial_sdem`, `spatial_sac`, `spatial_gwr`, `spatial_gtwr`, `spatial_probit` | MetricaSpatial |
 | 久期 | `duration_cox`, `aft_weibull`, `aft_exponential`, `aft_lognormal`, `aft_loglogistic` | MetricaDuration |
-| 贝叶斯 | `bayes_linear`, `bayes_logistic`, `bayes_hierarchical` | MetricaBayes |
+| 贝叶斯 | `bayes_linear`, `bayes_logistic`, `bayes_probit`, `bayes_hierarchical` | MetricaBayes |
 
 ## 快速安装
 
@@ -58,7 +68,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 cd runtime/metrica-runtime && cargo build --release
 
 # 桌面 App（需要 Node.js + Rust）
-cd apps/metrica-desktop && npm ci && cargo tauri dev
+cd apps/metrica-desktop && npm ci && cargo run --manifest-path src-tauri/Cargo.toml
 ```
 
 参见 [SETUP.md](SETUP.md) 获取详细开发环境配置。
@@ -68,7 +78,7 @@ cd apps/metrica-desktop && npm ci && cargo tauri dev
 ```
 packages/          Julia 包（当前 18 个包 + 协议层）
 runtime/           Rust axum HTTP + Julia 进程管理
-apps/              React + Tauri 桌面工作台（CLI-first）
+apps/              React + tao/wry 桌面工作台（CLI-first）
 docs/              架构文档 + 协议规范
 tutorials/         模型族 CLI 教程（13 篇）
 datasets/demo/     教学演示数据（16 个）

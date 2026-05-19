@@ -152,6 +152,13 @@ include("psm.jl")
 include("doubly_robust.jl")
 include("serialize.jl")
 
+# === augment 桩：因果推断模型暂不支持增广诊断 ==================================
+MetricaBase.augment(::DIDFitResult) = AugmentTable()
+MetricaBase.augment(::EventStudyFitResult) = AugmentTable()
+MetricaBase.augment(::IPWFitResult) = AugmentTable()
+MetricaBase.augment(::PSMFitResult) = AugmentTable()
+MetricaBase.augment(::AIPWFitResult) = AugmentTable()
+
 # === MODEL_REGISTRY 注册 =====================================================
 
 function __init__()

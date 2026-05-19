@@ -1,4 +1,7 @@
 struct BayesLinearModel <: MetricaBase.AbstractEconModel end
+struct BayesLogisticModel <: MetricaBase.AbstractEconModel end
+struct BayesProbitModel <: MetricaBase.AbstractEconModel end
+struct BayesHierarchicalModel <: MetricaBase.AbstractEconModel end
 
 struct BayesFitResult <: MetricaBase.AbstractFittedModel
     formula::String

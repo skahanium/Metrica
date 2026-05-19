@@ -131,6 +131,7 @@ lcov.info
 .claude/launch.json
 .codex/
 .opencode/
+skills-lock.json
 
 # --- 杂项 ---
 *.orig

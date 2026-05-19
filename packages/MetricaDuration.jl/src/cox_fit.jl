@@ -50,14 +50,14 @@ function log_partial_likelihood(
         d = j - j0
         first_risk = _first_risk_index(t_ord, tau)
         first_risk === nothing && return -Inf
-        r0 = first_risk:n
+        risk_range = first_risk:n
         # Counting-process: 仅保留 start < tau <= stop 的观测
         if start_times !== nothing
-            risk_mask = [start_times[ri] < tau for ri in r0:n]
-            risk_idx = r0 .- 1 .+ findall(risk_mask)
+            risk_mask = [start_times[ri] < tau for ri in risk_range]
+            risk_idx = first_risk .- 1 .+ findall(risk_mask)
             isempty(risk_idx) && return -Inf
         else
-            risk_idx = r0:n
+            risk_idx = risk_range
         end
         Xr = X[risk_idx, :]; eta = Xr * beta; mx = maximum(eta)
         er = exp.(eta .- mx)
@@ -73,7 +73,7 @@ function log_partial_likelihood(
         if ties == :efron && d > 1
             for m in 0:(d - 1)
                 fail_w = m / d
-                er_fail = exp.(Xr[k, :] * beta .- mx)
+                er_fail = exp.(X[k, :] * beta .- mx)
                 if wr !== nothing
                     er_fail .*= wr[k]
                 end

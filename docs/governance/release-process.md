@@ -8,7 +8,8 @@ Metrica 当前采用手动 release 流程。暂不引入自动发布流水线，
 2. 完成 [发布前质量门禁](../quality/release-checklist.md)。
 3. 更新 `CHANGELOG.md`，明确新增、修复、破坏性变更和已知限制。
 4. 更新 `CITATION.cff` 的 `version` 与 `date-released`。
-5. 确认 README、SUPPORT、SECURITY 和质量文档没有过度宣称。
+5. 按 [版本策略 · 仓库内须同步的版本字段](versioning.md#仓库内须同步的版本字段) 更新各 `packages/*/Project.toml`、`scripts/daemon/Project.toml`、`runtime/metrica-runtime/Cargo.toml`、`apps/metrica-desktop/src-tauri/Cargo.toml`，并与根目录 [README.md](../../README.md)「版本与引用」中的发布线表述及 **顶部版本徽章** 一致。
+6. 确认 README、SUPPORT、SECURITY 和质量文档没有过度宣称。
 
 ## 发布命令
 

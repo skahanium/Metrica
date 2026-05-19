@@ -3,7 +3,7 @@ import { Collapse, Tag, Typography, Descriptions, Space } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, ExperimentOutlined } from '@ant-design/icons';
 import type { ModelCapabilities } from '../types/protocol';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 interface ModelCapabilitiesPanelProps {
   capabilities: ModelCapabilities;

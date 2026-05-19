@@ -25,3 +25,5 @@ function MetricaBase.model_capabilities(r::BayesFitResult)::MetricaBase.ModelCap
         ["Bayesian logistic/probit 与层级模型已可用。MCMC 默认不启用（需显式调用 fit_bayes_linear_mcmc）。"],
     )
 end
+
+MetricaBase.augment(::BayesFitResult) = AugmentTable()

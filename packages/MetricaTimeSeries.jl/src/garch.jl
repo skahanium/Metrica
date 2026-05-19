@@ -212,6 +212,8 @@ function MetricaBase.model_capabilities(r::GARCHFitResult)::MetricaBase.ModelCap
     )
 end
 
+MetricaBase.augment(::GARCHFitResult) = AugmentTable()
+
 function result_to_payload(r::GARCHFitResult; include_augment::Bool = true)
     preview_n = 50
     σ = sqrt.(max.(r.conditional_variance, 1e-18))

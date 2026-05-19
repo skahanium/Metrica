@@ -24,6 +24,10 @@ Metrica 处于回顾完善阶段。优先接受：
 - 大范围架构重构
 - UI 中新增计量逻辑，或 Runtime 中重复 Julia Core 业务逻辑
 
+### 版本与发版
+
+普通功能或修复 PR **不必**改版本号。仓库整体版本、引用与须同步的文件清单见 [README.md](README.md) 中「版本与引用」及 [docs/governance/versioning.md](docs/governance/versioning.md)。准备发版时按 [docs/governance/release-process.md](docs/governance/release-process.md) 执行。
+
 ### 第一次贡献
 
 1. 阅读 [README.md](README.md)、[AGENTS.md](AGENTS.md) 和 [docs/quality/package-status.md](docs/quality/package-status.md)

@@ -192,6 +192,8 @@ function MetricaBase.model_capabilities(r::EGARCHFitResult)::MetricaBase.ModelCa
         ["EGARCH 支持非对称指数波动。VaR/ES/预测为后续功能。"])
 end
 
+MetricaBase.augment(::EGARCHFitResult) = AugmentTable()
+
 function result_to_payload(r::EGARCHFitResult; include_augment::Bool=true)
     preview_n = 50
     σ = sqrt.(max.(r.conditional_variance, 1e-18))

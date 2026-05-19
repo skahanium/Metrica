@@ -61,3 +61,4 @@ end
 
 MetricaBase.glance(r::SystemEquationsFitResult) = _aggregate_glance(r)
 MetricaBase.tidy(r::SystemEquationsFitResult) = r.tidy_table
+MetricaBase.augment(::SystemEquationsFitResult) = AugmentTable()
