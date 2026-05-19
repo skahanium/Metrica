@@ -31,7 +31,7 @@ function result_to_payload(result::QuantileFitResult; include_augment::Bool = tr
         result;
         available=include_augment,
         columns_available=include_augment ? ["fitted", "residual", "std_residual", "leverage", "cooks_d"] : String[],
-        columns_unavailable=[],
+        columns_unavailable=String[],
         preview_included=include_augment,
         preview_rows=include_augment ? min(100, length(result.fitted_values)) : 0,
     )

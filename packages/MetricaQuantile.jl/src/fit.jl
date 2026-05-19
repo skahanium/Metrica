@@ -240,14 +240,14 @@ function fit_multi_tau(data, formula, taus::Vector{Float64})
     for tau in taus
         r = MetricaBase.fit(QuantileModel, formula, data; quantile_tau=tau)
         r isa MetricaBase.ModelError && return r
-        push\!(results, r)
+        push!(results, r)
     end
     return results
 end
 
 # === Bootstrap SE（pairs bootstrap）==========================================
 function bootstrap_quantile_se(data, formula, tau::Float64; n_boot::Int=200, seed::Int=42)
-    Random.seed\!(seed); n = nrow(data)
+    Random.seed!(seed); n = nrow(data)
     beta_boot = Matrix{Float64}(undef, n_boot, 0)
     for b in 1:n_boot
         idx = rand(1:n, n); boot_df = data[idx, :]
@@ -283,13 +283,13 @@ end
 
 # === IV Quantile (2SLS 型) ====================================================
 function fit_iv_quantile(data, formula::String, instruments::Vector{String}, endog::Vector{String}, tau::Float64)
-    Z = Matrix{Float64}(hcat([data[\!, Symbol(c)] for c in instruments]...))
-    X_endo = Matrix{Float64}(hcat([data[\!, Symbol(c)] for c in endog]...))
+    Z = Matrix{Float64}(hcat([data[!, Symbol(c)] for c in instruments]...))
+    X_endo = Matrix{Float64}(hcat([data[!, Symbol(c)] for c in endog]...))
     ZtZ_inv = inv(Symmetric(Z' * Z + 1e-10 * I))
     X_hat = Z * ZtZ_inv * (Z' * X_endo)
     X_exog_cols = setdiff(Symbol.(names(data)), vcat(Symbol(endog), Symbol(formula[1])))
-    X_exog = isempty(X_exog_cols) ? ones(nrow(data)) : Matrix{Float64}(hcat([data[\!, c] for c in X_exog_cols]...))
+    X_exog = isempty(X_exog_cols) ? ones(nrow(data)) : Matrix{Float64}(hcat([data[!, c] for c in X_exog_cols]...))
     X_all = hcat(X_exog, X_hat)
-    data_aug = hcat(DataFrame(y = data[\!, Symbol(split(formula, "~")[1])]), DataFrame(X_all, :auto))
+    data_aug = hcat(DataFrame(y = data[!, Symbol(split(formula, "~")[1])]), DataFrame(X_all, :auto))
     return MetricaBase.fit(QuantileModel, "y ~ x1", data_aug; quantile_tau=tau)
 end

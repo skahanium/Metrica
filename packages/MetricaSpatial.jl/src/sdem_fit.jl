@@ -36,7 +36,7 @@ function fit_sdem_ml(y::Vector{Float64}, X::Matrix{Float64}, W::Matrix{Float64},
 
     f(x) = -prof_ll(x[1])
     result = Optim.optimize(f, [-0.5, 0.5], Optim.NelderMead(),
-                            Optim.Options(iterations=500, g_tol=1e-6))
+                            Optim.Options(iterations=500, g_abstol=1e-6))
     lambda_hat = Optim.minimizer(result)[1]
     converged = Optim.converged(result)
     iters = Optim.iterations(result)

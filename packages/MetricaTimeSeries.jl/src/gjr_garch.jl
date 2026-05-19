@@ -38,6 +38,19 @@ struct GJRFitResult <: AbstractTSFitResult
     warnings::Vector{MetricaBase.ModelWarning}
 end
 
+function GJRModel(;
+    variable::Symbol,
+    time_column::Symbol,
+    garch_p::Int = 1,
+    garch_q::Int = 1,
+    mean_type::Symbol = :constant,
+    max_iter::Int = 8000,
+    tol::Float64 = 1e-5,
+    dist::Symbol = :gaussian,
+)
+    return GJRModel(variable, time_column, garch_p, garch_q, mean_type, max_iter, tol, dist)
+end
+
 function _gjr_unconditional_variance(ω::Float64, α::Vector{Float64}, γ::Vector{Float64}, β::Vector{Float64})
     s = sum(α) + 0.5 * sum(γ) + sum(β)
     s >= 1.0 - 1e-10 && return NaN
@@ -90,7 +103,7 @@ function _pack_gjr_params(logω::Float64, uab::Vector{Float64}, p::Int, q::Int)
     return ω, α, γ, β
 end
 
-function fit_gjr_garch_qmle(e::Vector{Float64}, p::Int, q::Int; max_iter::Int=8000, tol::Float64=1e-5)
+function fit_gjr_garch_qmle(e::Vector{Float64}, p::Int, q::Int; max_iter::Int=8000, tol::Float64=1e-5, dist::Symbol=:gaussian)
     v0 = var(e)
     if !(v0 > 0)
         return (NaN, NaN, Float64[], Float64[], Float64[], false, 0, "var_zero", Float64[], fill(NaN, 1+2p+q))
@@ -100,17 +113,17 @@ function fit_gjr_garch_qmle(e::Vector{Float64}, p::Int, q::Int; max_iter::Int=80
         ω, α, γ, β = _pack_gjr_params(x[1], x[2:end], p, q)
         -gjr_garch_loglik(e, ω, α, γ, β)
     end
-    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_reltol=tol))
+    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_abstol=tol))
     xm = Optim.minimizer(r)
     ωm, αm, γm, βm = _pack_gjr_params(xm[1], xm[2:end], p, q)
     ll = gjr_garch_loglik(e, ωm, αm, γm, βm)
     converged = Optim.converged(r) && isfinite(ll)
     iters = r.iterations
     okh, h = gjr_garch_conditional_variances(e, ωm, αm, γm, βm)
-    !okh && (return (NaN, ωm, αm, γm, βm, false, iters, "invalid_variance", fill(NaN, length(e)), fill(NaN, 1+2p+q)))
+    !okh && (return (NaN, ωm, αm, γm, βm, false, iters, "invalid_variance", fill(NaN, length(e)), fill(NaN, 1+2p+q), "invalid_variance"))
     n = length(e)
-    se_all = _opg_standard_errors(xm, obj, n)
-    return (ll, ωm, αm, γm, βm, converged, iters, "BFGS", h, se_all)
+    se_all, hess_stat = _opg_standard_errors(xm, obj, n)
+    return (ll, ωm, αm, γm, βm, converged, iters, "BFGS", h, se_all, hess_stat)
 end
 
 function MetricaBase.fit(model::GJRModel, data::DataFrame)
@@ -165,7 +178,19 @@ function MetricaBase.fit(model::GJRModel, data::DataFrame)
         MetricaBase.CoefRow(:omega, est, nothing, nothing, nothing, nothing, nothing)
     push!(crows, push_se(1, ω))
     for i in 1:length(α)
-        push!(crows, push_se(1+i, α[i]); crows[end] = MetricaBase.CoefRow(Symbol("alpha_$i"), α[i], se_valid ? se_all[1+i] : nothing, se_valid ? α[i]/se_all[1+i] : nothing, nothing, nothing, nothing))
+        se_i = se_valid ? se_all[1+i] : nothing
+        push!(
+            crows,
+            MetricaBase.CoefRow(
+                Symbol("alpha_$i"),
+                α[i],
+                se_i,
+                se_valid ? α[i] / se_i : nothing,
+                se_valid ? 2 * (1 - cdf(Normal(), abs(α[i] / se_i))) : nothing,
+                se_valid ? α[i] - 1.96 * se_i : nothing,
+                se_valid ? α[i] + 1.96 * se_i : nothing,
+            ),
+        )
     end
     for i in 1:length(γ)
         idx = 1 + p + i

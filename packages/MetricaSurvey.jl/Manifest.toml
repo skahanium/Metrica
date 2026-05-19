@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "51a361008507eb7b90f75b4e095bc0623a5ed447"
+project_hash = "56d75283fb182c4c811472f19013ccb6ccfc11ef"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -429,9 +429,15 @@ uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
 version = "1.11.0"
 
 [[deps.MetricaBase]]
-deps = ["Dates"]
+deps = ["Dates", "Distributions"]
 path = "../MetricaBase.jl"
 uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
+version = "0.1.0"
+
+[[deps.MetricaData]]
+deps = ["CSV", "DataFrames", "Statistics"]
+path = "../MetricaData.jl"
+uuid = "2248ac24-609b-424e-8643-ff19a1f22962"
 version = "0.1.0"
 
 [[deps.MetricaDiscrete]]
@@ -441,7 +447,7 @@ uuid = "d1e2f3a4-b5c6-7890-def0-123456789abc"
 version = "0.1.0"
 
 [[deps.MetricaLinear]]
-deps = ["CSV", "DataFrames", "Distributions", "FixedEffectModels", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaOutput", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaData", "MetricaOutput", "Statistics", "StatsModels"]
 path = "../MetricaLinear.jl"
 uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 version = "0.1.0"

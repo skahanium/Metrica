@@ -473,7 +473,7 @@ function nls_fit_user(formula_str::String, data, start::Vector{Float64}; nls_fam
         for i in eachindex(y); mu = pred_fn(b, x[i]); rss += (y[i] - mu)^2; end
         return rss
     end
-    r = Optim.optimize(obj, start, BFGS(), Optim.Options(iterations=2000, f_reltol=1e-8, g_reltol=1e-8))
+    r = Optim.optimize(obj, start, BFGS(), Optim.Options(iterations=2000, f_reltol=1e-8, g_abstol=1e-8))
     b = Optim.minimizer(r); converged = Optim.converged(r); it = Optim.iterations(r)
     H = zeros(np, np); FiniteDiff.finite_difference_hessian!(H, obj, b)
     V = 2 * obj(b) / max(length(y) - np, 1) * inv(Symmetric(H + 1e-10 * I))
@@ -513,15 +513,15 @@ end
 function fit_threshold_multi(data, formula::String, qvar::Symbol, n_thresholds::Int)
     isempty(n_thresholds) && n_thresholds == 0 && return MetricaBase.ModelError(:threshold_zero, "至少需要 1 个门限", "", "")
     n_thresholds > 3 && return MetricaBase.ModelError(:threshold_too_many, "最多支持 3 个门限", "", "")
-    q = Float64.(data[\!, qvar]); n = length(q)
+    q = Float64.(data[!, qvar]); n = length(q)
     threshold_grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=200))
     best_rss = Inf; best_gammas = Float64[]
     for g1 in threshold_grid
         r1 = (q .<= g1); n1 = sum(r1)
         n1 < 10 && continue
         if n_thresholds == 1
-            rss = MetricaNonlinear._ols_split_rss(Float64.(data[\!, Symbol(split(formula, "~")[1])]),
-                hcat(ones(n), [Float64.(data[\!, Symbol(c)]) for c in split(split(formula, "~")[2], "+")]...), r1)
+            rss = MetricaNonlinear._ols_split_rss(Float64.(data[!, Symbol(split(formula, "~")[1])]),
+                hcat(ones(n), [Float64.(data[!, Symbol(c)]) for c in split(split(formula, "~")[2], "+")]...), r1)
             if rss + Inf > 0 && (isempty(best_gammas) || rss < best_rss); best_rss = rss; best_gammas = [g1]; end
         end
     end
@@ -531,31 +531,31 @@ end
 
 # === Threshold Bootstrap CI ===================================================
 function threshold_bootstrap_ci(data, formula::String, qvar::Symbol, n_boot::Int=100, seed::Int=42)
-    Random.seed\!(seed); n = nrow(data); gammas = Float64[]
-    q = Float64.(data[\!, qvar]); grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=50))
+    Random.seed!(seed); n = nrow(data); gammas = Float64[]
+    q = Float64.(data[!, qvar]); grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=50))
     for b in 1:n_boot
         idx = rand(1:n, n); boot_df = data[idx, :]
         best_rss = Inf; best_g = NaN
         for g in grid
-            r1 = Float64.(boot_df[\!, qvar]) .<= g
+            r1 = Float64.(boot_df[!, qvar]) .<= g
             sum(r1) < 10 && continue
-            yb = Float64.(boot_df[\!, Symbol(split(formula, "~")[1])])
-            Xb = hcat(ones(n), [Float64.(boot_df[\!, Symbol(c)]) for c in split(strip(split(formula, "~")[2]), "+")]...)
-            b1 = Xb[r1, :] \ yb[r1]; b2 = Xb[.\!r1, :] \ yb[.\!r1]
-            rss = sum(abs2, yb[r1] - Xb[r1, :] * b1) + sum(abs2, yb[.\!r1] - Xb[.\!r1, :] * b2)
+            yb = Float64.(boot_df[!, Symbol(split(formula, "~")[1])])
+            Xb = hcat(ones(n), [Float64.(boot_df[!, Symbol(c)]) for c in split(strip(split(formula, "~")[2]), "+")]...)
+            b1 = Xb[r1, :] \ yb[r1]; b2 = Xb[.!r1, :] \ yb[.!r1]
+            rss = sum(abs2, yb[r1] - Xb[r1, :] * b1) + sum(abs2, yb[.!r1] - Xb[.!r1, :] * b2)
             if rss < best_rss; best_rss = rss; best_g = g; end
         end
-        isfinite(best_g) && push\!(gammas, best_g)
+        isfinite(best_g) && push!(gammas, best_g)
     end
     return Dict{Symbol, Any}(:lower => quantile(gammas, 0.025), :upper => quantile(gammas, 0.975), :mean => mean(gammas))
 end
 
 # === Threshold sup-Wald 检验 (Hansen 1996) ===================================
 function threshold_sup_wald(data, formula::String, qvar::Symbol)
-    q = Float64.(data[\!, qvar]); n = length(q)
-    y = Float64.(data[\!, Symbol(split(formula, "~")[1])])
+    q = Float64.(data[!, qvar]); n = length(q)
+    y = Float64.(data[!, Symbol(split(formula, "~")[1])])
     X_covars = split(strip(split(formula, "~")[2]), "+")
-    X = hcat(ones(n), [Float64.(data[\!, Symbol(c)]) for c in X_covars]...)
+    X = hcat(ones(n), [Float64.(data[!, Symbol(c)]) for c in X_covars]...)
     grid = collect(range(quantile(q, 0.15), quantile(q, 0.85), length=50))
     X_full = hcat(X, X)
     beta_full = X_full \ y; u_full = y - X_full * beta_full
@@ -564,10 +564,10 @@ function threshold_sup_wald(data, formula::String, qvar::Symbol)
     for g in grid
         r1 = q .<= g; n1 = sum(r1); n2 = n - n1
         n1 < 10 || n2 < 10 && continue
-        b1 = X[r1, :] \ y[r1]; b2 = X[.\!r1, :] \ y[.\!r1]
+        b1 = X[r1, :] \ y[r1]; b2 = X[.!r1, :] \ y[.!r1]
         diff = b1 - b2
         V1 = inv(Symmetric(X[r1, :]' * X[r1, :] + 1e-10 * I)) .* sigma2
-        V2 = inv(Symmetric(X[.\!r1, :]' * X[.\!r1, :] + 1e-10 * I)) .* sigma2
+        V2 = inv(Symmetric(X[.!r1, :]' * X[.!r1, :] + 1e-10 * I)) .* sigma2
         W = dot(diff, Symmetric(V1 + V2 + 1e-10 * I) \ diff)
         if W > max_wald; max_wald = W; end
     end

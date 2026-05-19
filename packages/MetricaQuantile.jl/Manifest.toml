@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "3f6646f26e54b01cf828af834b079b87b78f4f04"
+project_hash = "1e1b5521634f349a88189a420513267c014ed4e0"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -257,7 +257,7 @@ uuid = "10c70d11-b779-43d3-b8f2-49770e63c885"
 version = "0.1.0"
 
 [[deps.MetricaQuantile]]
-deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "QuantileRegressions", "Statistics", "StatsAPI", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "QuantileRegressions", "Random", "Statistics", "StatsAPI", "StatsModels"]
 path = "."
 uuid = "f212cb88-0759-40d3-bab4-b1a10623addb"
 version = "0.1.0"

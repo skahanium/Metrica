@@ -47,10 +47,12 @@ function ARCHModel(;
     variable::Symbol,
     time_column::Symbol,
     arch_order::Int,
+    mean_type::Symbol = :constant,
     max_iter::Int = 5000,
     tol::Float64 = 1e-5,
+    dist::Symbol = :gaussian,
 )
-    return ARCHModel(variable, time_column, arch_order, max_iter, tol)
+    return ARCHModel(variable, time_column, arch_order, mean_type, max_iter, tol, dist)
 end
 
 function _arch_min_nobs(q::Int)

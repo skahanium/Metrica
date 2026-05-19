@@ -128,7 +128,7 @@ function fit_arch_qmle(e, q; max_iter=5000, tol=1e-5, dist=:gaussian)
         elseif dist === :skewed_t; ν = 2.0 + exp(x[q+2]); λ = tanh(x[q+3]); return -skewed_t_loglik(e, h, ν, λ)
         else; return -arch_loglik(e, ω, α) end
     end
-    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_reltol=tol))
+    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_abstol=tol))
     xm = Optim.minimizer(r); ωm, αm = _pack_arch_params(xm[1], xm[2:end])
     νm = has_nu ? 2.0 + exp(xm[q+2]) : NaN; λm = has_λ ? tanh(xm[q+3]) : NaN
     okh, h = arch_conditional_variances(e, ωm, αm)
@@ -154,7 +154,7 @@ function fit_garch_qmle(e, p, q; max_iter=8000, tol=1e-5, dist=:gaussian)
         elseif dist === :skewed_t; ν = 2.0 + exp(x[n_base+1]); λ = tanh(x[n_base+2]); return -skewed_t_loglik(e, h, ν, λ)
         else; return -garch_loglik(e, ω, α, β) end
     end
-    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_reltol=tol))
+    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_abstol=tol))
     xm = Optim.minimizer(r); ωm, αm, βm = _pack_garch_params(xm[1], xm[2:end], p, q)
     νm = has_nu ? 2.0 + exp(xm[n_base+1]) : NaN; λm = has_λ ? tanh(xm[n_base+2]) : NaN
     okh, h = garch_conditional_variances(e, ωm, αm, βm)

@@ -694,10 +694,11 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
         end
     end
 
+    garch_demo_path = joinpath(@__DIR__, "..", "..", "..", "datasets", "demo", "garch_demo.csv")
+    garch_df = CSV.read(garch_demo_path, DataFrame)
+
     @testset "ARCH / GARCH" begin
-        root = joinpath(@__DIR__, "..", "..", "..")
-        demo_path = joinpath(root, "datasets", "demo", "garch_demo.csv")
-        df = CSV.read(demo_path, DataFrame)
+        df = garch_df
 
         gspec = Dict{String, Any}(
             "variable" => "ret",
@@ -732,7 +733,7 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
 
     @testset "GJR-GARCH" begin
         gm = GJRModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
-        r = fit(gm, df)
+        r = fit(gm, garch_df)
         @test r isa GJRFitResult
         @test isfinite(r.loglik)
         @test length(r.gamma) == 1
@@ -742,7 +743,7 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
 
     @testset "EGARCH" begin
         em = EGARCHModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
-        r = fit(em, df)
+        r = fit(em, garch_df)
         @test r isa EGARCHFitResult
         @test isfinite(r.loglik)
         pay = result_to_payload(r; include_augment=false)
@@ -751,7 +752,7 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
 
     @testset "GARCH standard errors" begin
         gm = GARCHModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
-        r = fit(gm, df)
+        r = fit(gm, garch_df)
         t = tidy(r)
         row = t.rows[2]  # omega
         @test row.stderror !== nothing
@@ -760,7 +761,7 @@ import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
 
     @testset "Volatility forecast + VaR" begin
         gm = GARCHModel(variable=:ret, time_column=:time, garch_p=1, garch_q=1, max_iter=8000, tol=1e-5)
-        r = fit(gm, df)
+        r = fit(gm, garch_df)
         h_f = forecast(r; steps=5)
         @test length(h_f) == 5
         @test all(v -> v > 0, h_f)

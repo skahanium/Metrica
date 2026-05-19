@@ -454,12 +454,16 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
     model_ss = tss - rss
     model_ms = model_df > 0 ? model_ss / model_df : 0.0
     resid_df = dof
-    resid_ms = rss / resid_df
+    resid_ms = resid_df > 0 ? rss / resid_df : NaN
     total_ss = tss
     total_df = nobs - 1
-    total_ms = tss / total_df
-    f_stat = (model_ms / resid_ms)
-    f_pvalue = 1 - cdf(FDist(model_df, resid_df), f_stat)
+    total_ms = total_df > 0 ? tss / total_df : NaN
+    f_stat = if model_df > 0 && resid_df > 0 && resid_ms > 0
+        model_ms / resid_ms
+    else
+        NaN
+    end
+    f_pvalue = isfinite(f_stat) ? 1 - cdf(FDist(model_df, resid_df), f_stat) : NaN
 
     warnings = MetricaBase.ModelWarning[]
     dropped_rows = n_total - n_effective

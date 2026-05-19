@@ -33,7 +33,7 @@ function fit_sem_ml(
         !isfinite(la) && return Inf
         return n / 2 * log(2π) + n / 2 * log(σ2) - la
     end
-    opt = Optim.optimize(nll, [0.0], Optim.NelderMead(), Optim.Options(iterations=400, f_tol=1e-7))
+    opt = Optim.optimize(nll, [0.0], Optim.NelderMead(), Optim.Options(iterations=400, f_reltol=1e-7))
     λhat = Optim.minimizer(opt)[1]
     A = I - λhat * Wd
     ly = A * y

@@ -38,6 +38,19 @@ struct EGARCHFitResult <: AbstractTSFitResult
     warnings::Vector{MetricaBase.ModelWarning}
 end
 
+function EGARCHModel(;
+    variable::Symbol,
+    time_column::Symbol,
+    garch_p::Int = 1,
+    garch_q::Int = 1,
+    mean_type::Symbol = :constant,
+    max_iter::Int = 8000,
+    tol::Float64 = 1e-5,
+    dist::Symbol = :gaussian,
+)
+    return EGARCHModel(variable, time_column, garch_p, garch_q, mean_type, max_iter, tol, dist)
+end
+
 const EZ_ABS_GAUSSIAN = sqrt(2.0 / π)
 
 function egarch_conditional_variances(e::Vector{Float64}, ω::Float64, α::Vector{Float64},
@@ -66,7 +79,7 @@ function egarch_conditional_variances(e::Vector{Float64}, ω::Float64, α::Vecto
             ln_ht += β[j] * (tj >= 1 ? log(max(h[tj], 1e-18)) : log_uncond)
         end
         ht = exp(ln_ht)
-        ht <= 1e-18 || !isfinite(ht) && return (false, h)
+        (ht <= 1e-18 || !isfinite(ht)) && return (false, h)
         h[t] = ht
     end
     return (true, h)
@@ -84,37 +97,36 @@ function egarch_loglik(e::Vector{Float64}, ω::Float64, α::Vector{Float64},
 end
 
 function _pack_egarch_params(params::Vector{Float64}, p::Int, q::Int)
-    ω = params[1] - 5.0  # ω 无约束
+    ω = params[1]  # log-variance intercept, unconstrained
     α = abs.(params[2:p+1]) .* 0.5
     γ = params[p+2:2p+1]
-    β = _softmax_scaled(params[2p+2:end], 0.95)
+    β_raw = params[2p+2:end]
+    ex = exp.(β_raw .- maximum(vcat(β_raw, 0.0)))
+    β = 0.95 .* ex ./ (1.0 + sum(ex))
     return ω, α, γ, β
 end
 
-function fit_egarch_qmle(e::Vector{Float64}, p::Int, q::Int; max_iter::Int=8000, tol::Float64=1e-5)
+function fit_egarch_qmle(e::Vector{Float64}, p::Int, q::Int; max_iter::Int=8000, tol::Float64=1e-5, dist::Symbol=:gaussian)
     v0 = var(e)
     if !(v0 > 0)
         return (NaN, NaN, Float64[], Float64[], Float64[], false, 0, "var_zero", Float64[], fill(NaN, 1+2p+q))
     end
     n_params = 1 + 2 * p + q
-    x0 = vcat(log(max(v0, 1e-8)), fill(0.1, p), zeros(q))  # ω, α, γ, β 初始值
-    if length(x0) != n_params
-        x0 = vcat(log(max(v0, 1e-8)), fill(0.1, n_params - 1))
-    end
+    x0 = vcat(0.5 * log(max(v0, 1e-8)), fill(0.1, p), zeros(p), zeros(q))
     function obj(x::Vector{Float64})
         ω, α, γ, β = _pack_egarch_params(x, p, q)
         -egarch_loglik(e, ω, α, γ, β)
     end
-    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_reltol=tol))
+    r = Optim.optimize(obj, x0, BFGS(), Optim.Options(iterations=max_iter, f_reltol=tol, g_abstol=tol))
     xm = Optim.minimizer(r)
     ωm, αm, γm, βm = _pack_egarch_params(xm, p, q)
     ll = egarch_loglik(e, ωm, αm, γm, βm)
     converged = Optim.converged(r) && isfinite(ll)
     iters = r.iterations
     okh, h = egarch_conditional_variances(e, ωm, αm, γm, βm)
-    !okh && (return (NaN, ωm, αm, γm, βm, false, iters, "invalid_variance", fill(NaN, length(e)), fill(NaN, n_params)))
-    se_all = _opg_standard_errors(xm, obj, length(e))
-    return (ll, ωm, αm, γm, βm, converged, iters, "BFGS", h, se_all)
+    !okh && (return (NaN, ωm, αm, γm, βm, false, iters, "invalid_variance", fill(NaN, length(e)), fill(NaN, n_params), "invalid_variance"))
+    se_all, hess_stat = _opg_standard_errors(xm, obj, length(e))
+    return (ll, ωm, αm, γm, βm, converged, iters, "BFGS", h, se_all, hess_stat)
 end
 
 function MetricaBase.fit(model::EGARCHModel, data::DataFrame)

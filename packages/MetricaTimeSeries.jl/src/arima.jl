@@ -206,7 +206,7 @@ function fit_mle(model::ARIMAModel, y::Vector{Float64}, n::Int)
         neg_loglik,
         initial_theta,
         Optim.NelderMead(),
-        Optim.Options(iterations=2000, g_tol=1e-10)
+        Optim.Options(iterations=2000, g_abstol=1e-10)
     )
 
     theta_hat = Optim.minimizer(opt_result)
@@ -442,7 +442,7 @@ function fit_css(model::ARIMAModel, y::Vector{Float64}, n::Int)
             css_objective,
             initial_theta,
             Optim.NelderMead(),
-            Optim.Options(iterations=1000, g_tol=1e-8)
+            Optim.Options(iterations=1000, g_abstol=1e-8)
         )
 
         theta_hat = Optim.minimizer(opt_result)

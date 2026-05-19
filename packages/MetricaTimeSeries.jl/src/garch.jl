@@ -51,10 +51,12 @@ function GARCHModel(;
     time_column::Symbol,
     garch_p::Int = 1,
     garch_q::Int = 1,
+    mean_type::Symbol = :constant,
     max_iter::Int = 8000,
     tol::Float64 = 1e-5,
+    dist::Symbol = :gaussian,
 )
-    return GARCHModel(variable, time_column, garch_p, garch_q, max_iter, tol)
+    return GARCHModel(variable, time_column, garch_p, garch_q, mean_type, max_iter, tol, dist)
 end
 
 function _garch_min_nobs(p::Int, q::Int)
@@ -107,6 +109,7 @@ function MetricaBase.fit(model::GARCHModel, data::DataFrame)
                 MetricaBase.warning,
             ),
         )
+    end
     if hess_stat != "" && hess_stat != "ok"
         push!(warnings, MetricaBase.ModelWarning(:singular_hessian, "Hessian 不可逆，OPG 标准误不可信", hess_stat, "", MetricaBase.warning))
         failure = isnothing(failure) ? "singular_hessian" : failure

@@ -68,9 +68,13 @@ end
     @test haskey(dw, :warnings)
     @test 0 <= dw.statistic <= 4  # DW 应在 [0, 4] 范围内
     @test dw.warnings isa Vector{Dict{String,Any}}
-    @test length(dw.warnings) >= 1
-    @test dw.warnings[1]["code"] == "dw_pvalue_approximate"
-    @test dw.warnings[1]["severity"] == "warning"
+    if dw.pvalue !== nothing
+        @test length(dw.warnings) >= 1
+        @test dw.warnings[1]["code"] == "dw_pvalue_approximate"
+        @test dw.warnings[1]["severity"] == "warning"
+    else
+        @test isempty(dw.warnings)
+    end
 end
 
 @testset "Breusch-Godfrey 检验" begin

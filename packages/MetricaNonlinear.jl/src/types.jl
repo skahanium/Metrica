@@ -39,20 +39,6 @@ function MetricaBase.model_capabilities(r::NLSFitResult)::MetricaBase.ModelCapab
     )
 end
 
-function MetricaBase.model_capabilities(r::ThresholdFitResult)::MetricaBase.ModelCapabilities
-    return MetricaBase.ModelCapabilities(
-        :partial,
-        :threshold,
-        [:threshold],
-        ["grid search + dual-regime OLS"],
-        [:gamma_hat, :n_below, :n_above, :rss_piecewise, :search_grid_meta, :bootstrap_ci, :sup_wald, :multi_threshold],
-        Symbol[],
-        Symbol[],
-        false,
-        ["首期仅支持单门限、双区制。Bootstrap CI、sup-Wald、多门限为二期功能。"],
-    )
-end
-
 """门限回归拟合结果。"""
 struct ThresholdFitResult <: MetricaBase.AbstractFittedModel
     formula_string::String
@@ -65,4 +51,18 @@ struct ThresholdFitResult <: MetricaBase.AbstractFittedModel
     diagnostics::Dict{Symbol, Any}
     fitted_values::Vector{Float64}
     residuals::Vector{Float64}
+end
+
+function MetricaBase.model_capabilities(r::ThresholdFitResult)::MetricaBase.ModelCapabilities
+    return MetricaBase.ModelCapabilities(
+        :partial,
+        :threshold,
+        [:threshold],
+        ["grid search + dual-regime OLS"],
+        [:gamma_hat, :n_below, :n_above, :rss_piecewise, :search_grid_meta, :bootstrap_ci, :sup_wald, :multi_threshold],
+        Symbol[],
+        Symbol[],
+        false,
+        ["首期仅支持单门限、双区制。Bootstrap CI、sup-Wald、多门限为二期功能。"],
+    )
 end

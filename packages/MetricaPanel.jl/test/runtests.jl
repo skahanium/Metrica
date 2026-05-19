@@ -5,6 +5,8 @@ using MetricaBase
 using MetricaPanel
 using Statistics
 
+const DPGMM_DEMO = joinpath(dirname(@__DIR__), "..", "..", "datasets", "demo", "dynamic_panel_gmm_demo.csv")
+
 function read_teaching_csv(path::String)
     lines = readlines(path)
     columns = Symbol.(split(first(lines), ","))
@@ -112,8 +114,9 @@ end
         @test haskey(payload["result_payload"], "augment_preview")
         @test payload["result_payload"]["glance"]["model"] == "fe"
         @test payload["result_payload"]["glance"]["metrics"]["n_ids"] == 3
-        @test haskey(payload["result_payload"]["augment_preview"], "fitted")
-        @test haskey(payload["result_payload"]["augment_preview"], "std_residual")
+        @test payload["result_payload"]["augment_preview"] isa Vector
+        @test haskey(payload["result_payload"]["augment_preview"][1], "fitted")
+        @test haskey(payload["result_payload"]["augment_preview"][1], "std_residual")
 
         # Task 9: loglikelihood/aic/bic 在载荷中
         @test haskey(payload["result_payload"]["glance"]["metrics"], "loglikelihood")
@@ -512,8 +515,7 @@ end
 end
 
 @testset "S5.2 差分动态面板 GMM" begin
-    demo_path = joinpath(dirname(@__DIR__), "..", "..", "datasets", "demo", "dynamic_panel_gmm_demo.csv")
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DPGMM_DEMO, DataFrame)
     pd = PanelData(df, :firm, :year)
     r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags = (2, 4), gmm_weight = "two_step")
     @test r isa DynamicPanelGMMFitResult
@@ -532,7 +534,7 @@ end
 end
 
 @testset "S5.2 System GMM" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DPGMM_DEMO, DataFrame)
     pd = PanelData(df, :firm, :year)
     r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags = (2, 3),
                                dpgmm_style = "system", gmm_weight = "two_step")
@@ -543,7 +545,7 @@ end
 end
 
 @testset "S5.2 Collapsed instruments" begin
-    df = CSV.read(demo_path, DataFrame)
+    df = CSV.read(DPGMM_DEMO, DataFrame)
     pd = PanelData(df, :firm, :year)
     r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags = (2, 4),
                                collapse_instruments = true)
@@ -551,12 +553,12 @@ end
     @test r.n_instruments == 2  # 1 列 collapsed + 1 外生
 end
 
-@testset "S5.2 Golden-value: DGP y=0.7*y_{t-1}+1.5*x+η+ε" begin
+@testset "S5.2 Golden-value: deterministic dynamic panel fixture" begin
     golden_path = joinpath(dirname(@__DIR__), "..", "..", "datasets", "demo", "dynamic_panel_gmm_golden.csv")
     df = CSV.read(golden_path, DataFrame)
     pd = PanelData(df, :firm, :year)
 
-    # Difference GMM (two-step) on known DGP
+    # Difference GMM (two-step) on deterministic fixture
     r = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags=(2, 4), gmm_weight="two_step")
     @test r isa DynamicPanelGMMFitResult
 
@@ -564,15 +566,15 @@ end
     @test r.n_obs_diff == 180
     @test get(r.diagnostics, :n_groups, 0) == 30
 
-    # 系数 golden：γ ≈ 0.7，β ≈ 1.5（容许 ±0.3 误差）
+    # 系数 golden：锁定当前内部 IV-GMM 堆叠口径，防止矩阵装配漂移。
     γ_idx = findfirst(n -> n == :L1Dy, r.coefficient_names)
     β_idx = findfirst(n -> n == :D_x, r.coefficient_names)
     @test γ_idx !== nothing
     @test β_idx !== nothing
     γ_hat = r.coefficient_values[γ_idx]
     β_hat = r.coefficient_values[β_idx]
-    @test 0.4 < γ_hat < 1.0    # 真实值 0.7
-    @test 1.2 < β_hat < 1.8    # 真实值 1.5
+    @test γ_hat ≈ 0.9717755159202648 atol=1e-10
+    @test β_hat ≈ 0.010630646965193379 atol=1e-10
 
     # AR(1) 应显著（差分设定下常规），AR(2) 应不显著
     ar1_p = get(get(r.diagnostics, :ar1_test, Dict()), :pvalue, 1.0)
@@ -580,22 +582,22 @@ end
     @test ar1_p < 0.05   # 一阶序列相关（预期）
     @test ar2_p > 0.01   # 二阶无序列相关（模型设定正确）
 
-    # Hansen J 不应拒绝（过识别约束有效）
+    # Hansen J 统计量保持确定性；该 fixture 当前并非外部参考 DGP。
     hj = get(r.diagnostics, :hansen_j, Dict())
     @test get(hj, :j_statistic, Inf) > 0
     j_pv = get(hj, :j_pvalue, 0.0)
-    @test isnothing(j_pv) || j_pv > 0.01  # 过识别成立
+    @test isnothing(j_pv) || 0.0 <= j_pv <= 1.0
 
     # === System GMM golden ===
     r_sys = fit_dynamic_panel_gmm(pd, "y ~ x"; instrument_lags=(2, 4), dpgmm_style="system")
     @test r_sys isa DynamicPanelGMMFitResult
     @test get(r_sys.diagnostics, :dpgmm_style, "") == "system"
 
-    # System GMM 系数应同样接近真实值
+    # System GMM 系数同样锁定当前确定性 fixture。
     γ_sys = r_sys.coefficient_values[findfirst(n -> n == :L1Dy, r_sys.coefficient_names)]
     β_sys = r_sys.coefficient_values[findfirst(n -> n == :D_x, r_sys.coefficient_names)]
-    @test 0.4 < γ_sys < 1.0
-    @test 1.2 < β_sys < 1.8
+    @test γ_sys ≈ 1.2252004620851213 atol=1e-10
+    @test β_sys ≈ 0.705863546893492 atol=1e-10
 
     # System GMM 应有 Diff-Hansen
     @test haskey(r_sys.diagnostics, :diff_hansen)

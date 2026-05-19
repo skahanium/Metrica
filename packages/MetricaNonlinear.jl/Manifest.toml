@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "e83db76120a68ff3241b7c7f43f7f67ab1c28817"
+project_hash = "a5ba93bbb9845d47283e1778aa85081c8c5e327a"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -418,7 +418,7 @@ uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 version = "0.1.0"
 
 [[deps.MetricaNonlinear]]
-deps = ["CSV", "DataFrames", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "FiniteDiff", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "Random", "Statistics", "StatsModels"]
 path = "."
 uuid = "7da9011b-ddab-4054-bbbc-d8aa09543254"
 version = "0.1.0"
