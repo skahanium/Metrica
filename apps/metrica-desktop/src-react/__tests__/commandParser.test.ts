@@ -113,7 +113,7 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('sur');
       expect(spec.formula).toBe('');
-      expect(spec.equations).toEqual(['y1 ~ x1 + x2', 'y2 ~ x1 + x2']);
+      expect(spec.params.equations).toEqual(['y1 ~ x1 + x2', 'y2 ~ x1 + x2']);
     }
   });
 
@@ -122,9 +122,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('system_2sls');
-      expect(spec.equations).toEqual(['y1 ~ x1 + x2']);
-      expect(spec.system_endogenous).toEqual([['x1']]);
-      expect(spec.system_instruments).toEqual([['z1']]);
+      expect(spec.params.equations).toEqual(['y1 ~ x1 + x2']);
+      expect(spec.params.system_endogenous).toEqual([['x1']]);
+      expect(spec.params.system_instruments).toEqual([['z1']]);
     }
   });
 
@@ -152,9 +152,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('panel');
-      expect(spec.panel_id).toBe('country');
-      expect(spec.panel_time).toBe('year');
-      expect(spec.panel_method).toBe('fe');
+      expect(spec.params.panel_id).toBe('country');
+      expect(spec.params.panel_time).toBe('year');
+      expect(spec.params.panel_method).toBe('fe');
     }
   });
 
@@ -163,8 +163,8 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('iv');
-      expect(spec.endog_columns).toEqual(['x1']);
-      expect(spec.instruments).toEqual(['z1', 'z2']);
+      expect(spec.params.endog_columns).toEqual(['x1']);
+      expect(spec.params.instruments).toEqual(['z1', 'z2']);
     }
   });
 
@@ -173,9 +173,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('gmm_linear');
-      expect(spec.endog_columns).toEqual(['x1']);
-      expect(spec.instruments).toEqual(['z1', 'z2']);
-      expect(spec.gmm_weight).toBe('one_step');
+      expect(spec.params.endog_columns).toEqual(['x1']);
+      expect(spec.params.instruments).toEqual(['z1', 'z2']);
+      expect(spec.params.gmm_weight).toBe('one_step');
     }
   });
 
@@ -184,7 +184,7 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('gmm_linear');
-      expect(spec.gmm_weight).toBeUndefined();
+      expect(spec.params.gmm_weight).toBeUndefined();
     }
   });
 
@@ -195,7 +195,7 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('quantile');
       expect(spec.formula).toBe('y ~ x1 + x2');
-      expect(spec.quantile_tau).toBe(0.5);
+      expect(spec.params.quantile_tau).toBe(0.5);
       expect(spec.vcov).toBeUndefined();
     }
   });
@@ -205,7 +205,7 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('quantile');
-      expect(spec.quantile_tau).toBe(0.5);
+      expect(spec.params.quantile_tau).toBe(0.5);
     }
   });
 
@@ -222,8 +222,8 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('nls');
       expect(spec.formula).toBe('y ~ x');
-      expect(spec.nls_start).toEqual([0.5, 0.5, 0.05]);
-      expect(spec.nls_family).toBe('exp_growth');
+      expect(spec.params.nls_start).toEqual([0.5, 0.5, 0.05]);
+      expect(spec.params.nls_family).toBe('exp_growth');
     }
   });
 
@@ -239,8 +239,8 @@ describe('parseToModelSpec', () => {
     expect(spec).not.toHaveProperty('error');
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('threshold');
-      expect(spec.threshold_variable).toBe('q');
-      expect(spec.threshold_grid?.length).toBe(5);
+      expect(spec.params.threshold_variable).toBe('q');
+      expect(spec.params.threshold_grid?.length).toBe(5);
       expect(spec.formula).toContain('q');
     }
   });
@@ -256,10 +256,10 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('panel_iv');
-      expect(spec.panel_id).toBe('firm');
-      expect(spec.panel_time).toBe('year');
-      expect(spec.endog_columns).toEqual(['x1']);
-      expect(spec.instruments).toEqual(['z1', 'z2']);
+      expect(spec.params.panel_id).toBe('firm');
+      expect(spec.params.panel_time).toBe('year');
+      expect(spec.params.endog_columns).toEqual(['x1']);
+      expect(spec.params.instruments).toEqual(['z1', 'z2']);
       expect(spec.vcov).toEqual({ type: 'HC1' });
     }
   });
@@ -269,10 +269,10 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('dynamic_panel_gmm');
-      expect(spec.panel_id).toBe('firm');
-      expect(spec.panel_time).toBe('year');
-      expect(spec.instrument_lags).toEqual([2, 4]);
-      expect(spec.gmm_weight).toBe('two_step');
+      expect(spec.params.panel_id).toBe('firm');
+      expect(spec.params.panel_time).toBe('year');
+      expect(spec.params.instrument_lags).toEqual([2, 4]);
+      expect(spec.params.gmm_weight).toBe('two_step');
     }
   });
 
@@ -281,10 +281,10 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('did');
-      expect(spec.panel_id).toBe('country');
-      expect(spec.panel_time).toBe('year');
-      expect(spec.treated_column).toBe('reform');
-      expect(spec.post_column).toBe('after2010');
+      expect(spec.params.panel_id).toBe('country');
+      expect(spec.params.panel_time).toBe('year');
+      expect(spec.params.treated_column).toBe('reform');
+      expect(spec.params.post_column).toBe('after2010');
     }
   });
 
@@ -308,9 +308,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('arima');
-      expect(spec.variable).toBe('gdp');
-      expect(spec.time_column).toBe('year');
-      expect(spec.order).toEqual([1, 1, 0]);
+      expect(spec.params.variable).toBe('gdp');
+      expect(spec.params.time_column).toBe('year');
+      expect(spec.params.order).toEqual([1, 1, 0]);
     }
   });
 
@@ -319,9 +319,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('var');
-      expect(spec.variables).toEqual(['gdp', 'inflation']);
-      expect(spec.time_column).toBe('year');
-      expect(spec.lags).toBe(2);
+      expect(spec.params.variables).toEqual(['gdp', 'inflation']);
+      expect(spec.params.time_column).toBe('year');
+      expect(spec.params.lags).toBe(2);
     }
   });
 
@@ -330,9 +330,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('ipw');
-      expect(spec.treatment_column).toBe('treated');
-      expect(spec.outcome_column).toBe('y');
-      expect(spec.propensity_formula).toBe('treated ~ x1 + x2');
+      expect(spec.params.treatment_column).toBe('treated');
+      expect(spec.params.outcome_column).toBe('y');
+      expect(spec.params.propensity_formula).toBe('treated ~ x1 + x2');
     }
   });
 
@@ -341,8 +341,8 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('aipw');
-      expect(spec.propensity_formula).toBe('treated ~ x1 + x2');
-      expect(spec.outcome_formula).toBe('y ~ x1 + x2');
+      expect(spec.params.propensity_formula).toBe('treated ~ x1 + x2');
+      expect(spec.params.outcome_formula).toBe('y ~ x1 + x2');
     }
   });
 
@@ -368,9 +368,9 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('survey_ols');
       expect(spec.formula).toBe('gdp ~ inflation');
-      expect(spec.strata_column).toBe('region');
-      expect(spec.psu_column).toBe('cluster_id');
-      expect(spec.weights_column).toBe('pop_wt');
+      expect(spec.params.strata_column).toBe('region');
+      expect(spec.params.psu_column).toBe('cluster_id');
+      expect(spec.params.weights_column).toBe('pop_wt');
     }
   });
 
@@ -379,9 +379,9 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('unitroot');
-      expect(spec.variable).toBe('gdp');
-      expect(spec.time_column).toBe('year');
-      expect(spec.deterministic).toBe('trend');
+      expect(spec.params.variable).toBe('gdp');
+      expect(spec.params.time_column).toBe('year');
+      expect(spec.params.deterministic).toBe('trend');
     }
   });
 
@@ -390,7 +390,7 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('arch');
-      expect(spec.arch_order).toBe(2);
+      expect(spec.params.arch_order).toBe(2);
     }
   });
 
@@ -405,8 +405,8 @@ describe('parseToModelSpec', () => {
     const spec = parseToModelSpec(r);
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('garch');
-      expect(spec.garch_p).toBe(1);
-      expect(spec.garch_q).toBe(1);
+      expect(spec.params.garch_p).toBe(1);
+      expect(spec.params.garch_q).toBe(1);
     }
   });
 
@@ -423,8 +423,8 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('spatial_lag');
       expect(spec.formula).toBe('y ~ x1');
-      expect(spec.spatial_weights_path).toBe('datasets/demo/spatial_demo_W.csv');
-      expect(spec.spatial_id_column).toBe('region');
+      expect(spec.params.spatial_weights_path).toBe('datasets/demo/spatial_demo_W.csv');
+      expect(spec.params.spatial_id_column).toBe('region');
     }
   });
 
@@ -453,8 +453,8 @@ describe('parseToModelSpec', () => {
     if (!('error' in spec)) {
       expect(spec.model_type).toBe('duration_cox');
       expect(spec.formula).toBe('ph ~ x1 + x2');
-      expect(spec.duration_time_column).toBe('time');
-      expect(spec.duration_event_column).toBe('fail');
+      expect(spec.params.duration_time_column).toBe('time');
+      expect(spec.params.duration_event_column).toBe('fail');
     }
   });
 

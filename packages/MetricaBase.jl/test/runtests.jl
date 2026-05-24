@@ -467,3 +467,5 @@ using MetricaBase
     end
 
 end
+
+include("test_serialize.jl")

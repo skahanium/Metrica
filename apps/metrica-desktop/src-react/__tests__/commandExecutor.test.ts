@@ -100,6 +100,7 @@ function makeFitRun(id: string, path = '/data/demo.csv'): FitModelRunRecord {
     model_spec: {
       model_type: 'logit',
       formula: 'y_bin ~ x1 + x2',
+      params: {},
     } as FitModelRunRecord['model_spec'],
     result_summary: logitResultSummary(),
   };

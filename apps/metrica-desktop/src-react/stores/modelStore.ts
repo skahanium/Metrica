@@ -164,21 +164,24 @@ export const useModelStore = create<ModelState>((set) => ({
     if (next.has(id)) next.delete(id); else next.add(id);
     return { selectedModelIds: next };
   }),
-  applyModelSpec: (spec) => set((state) => ({
-    modelType: (spec.model_type as ModelState['modelType']) ?? state.modelType,
-    formula: spec.formula ?? state.formula,
-    vcovType: spec.vcov?.type ?? state.vcovType,
-    weights: spec.weights ?? state.weights,
-    weightsColumn: spec.weights_column ?? state.weightsColumn,
-    clusterColumn: spec.cluster_column ?? state.clusterColumn,
-    panelId: spec.panel_id ?? state.panelId,
-    panelTime: spec.panel_time ?? state.panelTime,
-    panelMethod: (spec.panel_method as ModelState['panelMethod']) ?? state.panelMethod,
-    instruments: spec.instruments?.join(', ') ?? state.instruments,
-    endogColumns: spec.endog_columns?.join(', ') ?? state.endogColumns,
-    treatmentColumn: spec.treatment_column ?? state.treatmentColumn,
-    strataColumn: spec.strata_column ?? state.strataColumn,
-    psuColumn: spec.psu_column ?? state.psuColumn,
-    fpcColumn: spec.fpc_column ?? state.fpcColumn,
-  })),
+  applyModelSpec: (spec) => set((state) => {
+    const p = spec.params ?? {};
+    return {
+      modelType: (spec.model_type as ModelState['modelType']) ?? state.modelType,
+      formula: spec.formula ?? state.formula,
+      vcovType: spec.vcov?.type ?? state.vcovType,
+      weights: spec.weights ?? state.weights,
+      weightsColumn: (p.weights_column as string | undefined) ?? state.weightsColumn,
+      clusterColumn: spec.cluster_column ?? state.clusterColumn,
+      panelId: (p.panel_id as string | undefined) ?? state.panelId,
+      panelTime: (p.panel_time as string | undefined) ?? state.panelTime,
+      panelMethod: (p.panel_method as ModelState['panelMethod']) ?? state.panelMethod,
+      instruments: Array.isArray(p.instruments) ? p.instruments.join(', ') : state.instruments,
+      endogColumns: Array.isArray(p.endog_columns) ? p.endog_columns.join(', ') : state.endogColumns,
+      treatmentColumn: (p.treatment_column as string | undefined) ?? state.treatmentColumn,
+      strataColumn: (p.strata_column as string | undefined) ?? state.strataColumn,
+      psuColumn: (p.psu_column as string | undefined) ?? state.psuColumn,
+      fpcColumn: (p.fpc_column as string | undefined) ?? state.fpcColumn,
+    };
+  }),
 }));

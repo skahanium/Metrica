@@ -180,3 +180,61 @@ function fit_gwr(y::Vector{Float64}, X::Matrix{Float64}, coords::Matrix{Float64}
                          kernel, adaptive, String(distance_metric),
                          eff_params, sigma2, aicc, hat_diag, diag, warnings)
 end
+
+function _gwr_design_table(df::DataFrame, formula::AbstractString, coord_columns::Vector{String})
+    parsed = MetricaBase.parse_metrica_formula(formula)
+    parsed isa MetricaBase.ModelError && return parsed
+    yname, xnames = parsed
+    coord_syms = Symbol.(coord_columns)
+    needcols = unique(vcat([yname], xnames, coord_columns))
+    missingcols = setdiff(needcols, names(df))
+    !isempty(missingcols) &&
+        return MetricaBase.ModelError(
+            :gwr_missing_columns,
+            "数据缺少列",
+            join(missingcols, ", "),
+            "请检查公式与 spatial_coord_columns。",
+        )
+    subcc = dropmissing(select(df, needcols))
+    nrow(subcc) == 0 &&
+        return MetricaBase.ModelError(:gwr_empty_sample, "有效样本为空", "complete cases 为 0。", "请检查缺失值。")
+    n = nrow(subcc)
+    y = Vector{Float64}(undef, n)
+    X = zeros(Float64, n, 1 + length(xnames))
+    coords = zeros(Float64, n, length(coord_syms))
+    for (i, row) in enumerate(eachrow(subcc))
+        y[i] = Float64(row[Symbol(yname)])
+        X[i, 1] = 1.0
+        for (j, xn) in enumerate(xnames)
+            X[i, j + 1] = Float64(row[Symbol(xn)])
+        end
+        for (j, cs) in enumerate(coord_syms)
+            coords[i, j] = Float64(row[cs])
+        end
+    end
+    return (; y, X, coords)
+end
+
+"""
+从 DataFrame 与规格字典拟合 GWR（Runtime 桥接入口）。
+"""
+function fit_gwr_model(formula::AbstractString, df::DataFrame, spec::AbstractDict)
+    raw_coords = get(spec, "spatial_coord_columns", nothing)
+    (raw_coords === nothing || isempty(raw_coords)) &&
+        return MetricaBase.ModelError(
+            :gwr_missing_coords,
+            "缺少 spatial_coord_columns",
+            "",
+            "GWR/GTWR 须指定坐标列。",
+        )
+    coord_cols = String.(collect(raw_coords))
+    design = _gwr_design_table(df, formula, coord_cols)
+    design isa MetricaBase.ModelError && return design
+    kernel = String(get(spec, "gwr_kernel", "gaussian"))
+    bandwidth = if haskey(spec, "gwr_bandwidth") && spec["gwr_bandwidth"] !== nothing
+        Float64(spec["gwr_bandwidth"])
+    else
+        nothing
+    end
+    return fit_gwr(design.y, design.X, design.coords; kernel=kernel, bandwidth=bandwidth)
+end

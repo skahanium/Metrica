@@ -105,9 +105,7 @@ impl JuliaSession {
                     let _ = child.kill();
                     let _ = child.wait();
                     if e == "EOF" {
-                        return Err(format!(
-                            "Julia 守护进程在就绪前退出（EOF）。"
-                        ));
+                          return Err("Julia 守护进程在就绪前退出（EOF）。".to_string());
                     }
                     return Err(format!("读取 Julia 就绪信号失败: {e}"));
                 }

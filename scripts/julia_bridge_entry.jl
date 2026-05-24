@@ -229,6 +229,29 @@ else
         else
             MetricaSpatial.result_to_payload(result; include_augment=include_augment)
         end
+    elseif model_type in ("spatial_gwr", "spatial_gtwr")
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+        spec = Dict{String, Any}()
+        for key in (
+            :spatial_coord_columns, :gwr_kernel, :gwr_bandwidth,
+            :gtwr_time_column, :gtwr_time_scale,
+        )
+            if haskey(request.model_spec, key)
+                spec[String(key)] = request.model_spec[key]
+            end
+        end
+        result = if model_type == "spatial_gwr"
+            MetricaSpatial.fit_gwr_model(formula, df, spec)
+        else
+            MetricaSpatial.fit_gtwr_model(formula, df, spec)
+        end
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        if result isa MetricaBase.ModelError
+            MetricaLinear.error_to_payload(result)
+        else
+            MetricaSpatial.result_to_payload(result; include_augment=include_augment)
+        end
     elseif model_type == "duration_cox"
         using CSV, DataFrames
         df = CSV.read(dataset_path, DataFrame)
@@ -255,6 +278,22 @@ else
             MetricaLinear.error_to_payload(result)
         else
             MetricaDuration.result_to_payload(result; include_augment=include_augment)
+        end
+    elseif model_type == "bayes_linear"
+        using CSV, DataFrames
+        df = CSV.read(dataset_path, DataFrame)
+        result = MetricaBayes.fit_bayes_linear(df, formula;
+            bayes_seed=hasproperty(request.model_spec, :bayes_seed) ? request.model_spec.bayes_seed : nothing,
+            bayes_prior_scale=Float64(get(() -> 1.0, :bayes_prior_scale, request.model_spec)),
+            bayes_sigma2_known=Bool(get(() -> false, :bayes_sigma2_known, request.model_spec)),
+            bayes_sigma2_value=Float64(get(() -> NaN, :bayes_sigma2_value, request.model_spec)),
+            bayes_ig_alpha=Float64(get(() -> 2.0, :bayes_ig_alpha, request.model_spec)),
+            bayes_ig_beta=Float64(get(() -> 1.0, :bayes_ig_beta, request.model_spec)))
+        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
+        if result isa MetricaBase.ModelError
+            MetricaBayes.error_to_payload(result)
+        else
+            MetricaBayes.result_to_payload(result; include_augment=include_augment)
         end
     else
         # 通过 MODEL_REGISTRY 统一派发
@@ -346,23 +385,6 @@ else
                 end
             end
         end
-    elseif model_type == "bayes_linear"
-        using CSV, DataFrames
-        df = CSV.read(dataset_path, DataFrame)
-        result = MetricaBayes.fit_bayes_linear(df, formula;
-            bayes_seed=hasproperty(request.model_spec, :bayes_seed) ? request.model_spec.bayes_seed : nothing,
-            bayes_prior_scale=Float64(get(() -> 1.0, :bayes_prior_scale, request.model_spec)),
-            bayes_sigma2_known=Bool(get(() -> false, :bayes_sigma2_known, request.model_spec)),
-            bayes_sigma2_value=Float64(get(() -> NaN, :bayes_sigma2_value, request.model_spec)),
-            bayes_ig_alpha=Float64(get(() -> 2.0, :bayes_ig_alpha, request.model_spec)),
-            bayes_ig_beta=Float64(get(() -> 1.0, :bayes_ig_beta, request.model_spec)))
-        include_augment = haskey(request.options, :return_augment) && request.options.return_augment
-        if result isa MetricaBase.ModelError
-            MetricaBayes.error_to_payload(result)
-        else
-            MetricaBayes.result_to_payload(result; include_augment=include_augment)
-        end
-    else
         ModelT = MetricaBase.MODEL_REGISTRY[model_type]
         result = MetricaBase.fit(ModelT, formula, dataset_path; kwargs...)
         include_augment = haskey(request.options, :return_augment) && request.options.return_augment

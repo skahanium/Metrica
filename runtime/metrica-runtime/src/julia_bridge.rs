@@ -1,12 +1,13 @@
 use std::process::Command;
 
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 
-use crate::{DataCommandRequest, Message, TaskRequest, TaskResponse, ValidationError,
-    validate_model_request,
+use crate::{
+    flatten_model_spec_for_julia, resolve_dataset_path, resolve_working_dir, DataCommandRequest,
+    Message, TaskRequest, TaskResponse, ValidationError, validate_model_request,
     validate_spatial_weights_on_disk,
-    resolve_working_dir, resolve_dataset_path};
+};
 
 fn julia_bin() -> String {
     std::env::var("JULIA_BIN").unwrap_or_else(|_| "julia".to_string())
@@ -95,14 +96,23 @@ pub fn execute_fit_model(request: &TaskRequest) -> Result<TaskResponse, String> 
     } else {
         JULIA_SCRIPT
     };
-    let output = Command::new(&julia_bin())
+    let bridge_payload = json!({
+        "task_id": runtime_request.task_id,
+        "action": runtime_request.action,
+        "project_context": runtime_request.project_context,
+        "dataset_ref": runtime_request.dataset_ref,
+        "model_spec": flatten_model_spec_for_julia(&runtime_request.model_spec),
+        "options": runtime_request.options,
+    });
+
+    let output = Command::new(julia_bin())
         .arg(format!("--project={project_path}"))
         .arg("--startup-file=no")
         .arg("--color=no")
         .arg("-e")
         .arg(script)
         .arg(
-            serde_json::to_string(&runtime_request)
+            serde_json::to_string(&bridge_payload)
                 .map_err(|err| format!("序列化运行时请求失败: {err}"))?,
         )
         .arg(crate::repo_root().to_string_lossy().to_string())
@@ -163,7 +173,7 @@ pub fn execute_query_dataset(request: &DataCommandRequest) -> Result<TaskRespons
     };
 
     let project_path = julia_project_path();
-    let output = Command::new(&julia_bin())
+    let output = Command::new(julia_bin())
         .arg(format!("--project={project_path}"))
         .arg("--startup-file=no")
         .arg("--color=no")
@@ -220,10 +230,11 @@ fn validation_error_to_task_response(err: &ValidationError, request: &TaskReques
 }
 
 fn validate_fit_model_request(request: &TaskRequest) -> Option<TaskResponse> {
-    if let Some(err) = validate_model_request(&request.model_spec) {
-        return Some(validation_error_to_task_response(&err, request));
-    }
-    if let Some(err) = validate_spatial_weights_on_disk(request) {
+    let validated = match validate_model_request(&request.model_spec) {
+        Ok(v) => v,
+        Err(err) => return Some(validation_error_to_task_response(&err, request)),
+    };
+    if let Some(err) = validate_spatial_weights_on_disk(request, &validated) {
         return Some(validation_error_to_task_response(&err, request));
     }
     None

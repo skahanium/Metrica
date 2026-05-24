@@ -10,6 +10,24 @@ use metrica_runtime::{
 };
 use std::fs;
 
+use serde_json::json;
+
+fn merge_params(request: &mut metrica_runtime::TaskRequest, extra: serde_json::Value) {
+    let mut obj = request
+        .model_spec
+        .params
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    if let Some(extra) = extra.as_object() {
+        for (k, v) in extra {
+            obj.insert(k.clone(), v.clone());
+        }
+    }
+    request.model_spec.params = serde_json::Value::Object(obj);
+}
+
+
 /// 与 `sample_fit_model_request` 默认落盘目录一致，便于 list_runs / export / rerun 与 fit 使用同一 `working_dir`。
 fn default_demo_working_dir() -> String {
     if let Ok(p) = std::env::var("METRICA_DEMO_DIR") {
@@ -104,9 +122,11 @@ fn fit_model_runs_unitroot_through_time_series_bridge() {
     request.dataset_ref.path = path.to_string_lossy().to_string();
     request.model_spec.model_type = "unitroot".to_string();
     request.model_spec.formula = "y".to_string();
-    request.model_spec.variable = Some("y".to_string());
-    request.model_spec.time_column = Some("time".to_string());
-    request.model_spec.deterministic = Some("constant".to_string());
+    merge_params(&mut request, json!({
+        "variable": "y",
+        "time_column": "time",
+        "deterministic": "constant"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -127,10 +147,12 @@ fn fit_model_runs_garch_with_diagnostics() {
     request.dataset_ref.path = "datasets/demo/garch_demo.csv".to_string();
     request.model_spec.model_type = "garch".to_string();
     request.model_spec.formula = "ret".to_string();
-    request.model_spec.variable = Some("ret".to_string());
-    request.model_spec.time_column = Some("time".to_string());
-    request.model_spec.garch_p = Some(1);
-    request.model_spec.garch_q = Some(1);
+    merge_params(&mut request, json!({
+        "variable": "ret",
+        "time_column": "time",
+        "garch_p": 1,
+        "garch_q": 1
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -149,9 +171,11 @@ fn fit_model_runs_arch_with_diagnostics() {
     request.dataset_ref.path = "datasets/demo/garch_demo.csv".to_string();
     request.model_spec.model_type = "arch".to_string();
     request.model_spec.formula = "ret".to_string();
-    request.model_spec.variable = Some("ret".to_string());
-    request.model_spec.time_column = Some("time".to_string());
-    request.model_spec.arch_order = Some(1);
+    merge_params(&mut request, json!({
+        "variable": "ret",
+        "time_column": "time",
+        "arch_order": 1
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -169,9 +193,11 @@ fn fit_model_runs_spatial_lag_with_spatial_diagnostics() {
     request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
     request.model_spec.model_type = "spatial_lag".to_string();
     request.model_spec.formula = "y ~ x1".to_string();
-    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
-    request.model_spec.spatial_id_column = Some("region".to_string());
-    request.model_spec.spatial_row_standardize = Some(true);
+    merge_params(&mut request, json!({
+        "spatial_weights_path": "datasets/demo/spatial_demo_W.csv",
+        "spatial_id_column": "region",
+        "spatial_row_standardize": true
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -193,8 +219,10 @@ fn fit_model_runs_spatial_error_with_spatial_diagnostics() {
     request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
     request.model_spec.model_type = "spatial_error".to_string();
     request.model_spec.formula = "y ~ x1".to_string();
-    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
-    request.model_spec.spatial_id_column = Some("region".to_string());
+    merge_params(&mut request, json!({
+        "spatial_weights_path": "datasets/demo/spatial_demo_W.csv",
+        "spatial_id_column": "region"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -212,9 +240,11 @@ fn fit_model_runs_spatial_slx_with_effects_and_capabilities() {
     request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
     request.model_spec.model_type = "spatial_slx".to_string();
     request.model_spec.formula = "y ~ x1".to_string();
-    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
-    request.model_spec.spatial_id_column = Some("region".to_string());
-    request.model_spec.spatial_row_standardize = Some(true);
+    merge_params(&mut request, json!({
+        "spatial_weights_path": "datasets/demo/spatial_demo_W.csv",
+        "spatial_id_column": "region",
+        "spatial_row_standardize": true
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -240,8 +270,10 @@ fn fit_model_runs_duration_cox_with_hazard_ratios_and_diagnostics() {
     request.dataset_ref.path = "datasets/demo/duration_demo.csv".to_string();
     request.model_spec.model_type = "duration_cox".to_string();
     request.model_spec.formula = "ph ~ x1".to_string();
-    request.model_spec.duration_time_column = Some("time".to_string());
-    request.model_spec.duration_event_column = Some("fail".to_string());
+    merge_params(&mut request, json!({
+        "duration_time_column": "time",
+        "duration_event_column": "fail"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -261,9 +293,11 @@ fn fit_model_runs_gmm_linear_with_diagnostics() {
     request.dataset_ref.path = "datasets/demo/gmm_linear_demo.csv".to_string();
     request.model_spec.model_type = "gmm_linear".to_string();
     request.model_spec.formula = "y ~ x1 + x2".to_string();
-    request.model_spec.instruments = Some(vec!["z1".to_string(), "z2".to_string()]);
-    request.model_spec.endog_columns = Some(vec!["x1".to_string()]);
-    request.model_spec.gmm_weight = Some("two_step".to_string());
+    merge_params(&mut request, json!({
+        "instruments": ["z1", "z2"],
+        "endog_columns": ["x1"],
+        "gmm_weight": "two_step"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -286,7 +320,7 @@ fn fit_model_runs_quantile_with_tau_in_glance_metrics() {
     request.model_spec.model_type = "quantile".to_string();
     request.model_spec.formula = "y ~ x1 + x2".to_string();
     request.model_spec.vcov = None;
-    request.model_spec.quantile_tau = Some(0.5);
+    merge_params(&mut request, json!({ "quantile_tau": 0.5 }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -310,8 +344,10 @@ fn fit_model_runs_nls_with_diagnostics_keys() {
     request.model_spec.model_type = "nls".to_string();
     request.model_spec.formula = "y ~ x".to_string();
     request.model_spec.vcov = None;
-    request.model_spec.nls_family = Some("exp_growth".to_string());
-    request.model_spec.nls_start = Some(vec![0.5_f64, 0.5_f64, 0.05_f64]);
+    merge_params(&mut request, json!({
+        "nls_family": "exp_growth",
+        "nls_start": [0.5, 0.5, 0.05]
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -331,10 +367,12 @@ fn fit_model_runs_threshold_with_gamma_in_diagnostics() {
     request.model_spec.model_type = "threshold".to_string();
     request.model_spec.formula = "y ~ x + q".to_string();
     request.model_spec.vcov = None;
-    request.model_spec.threshold_variable = Some("q".to_string());
-    let g: Vec<f64> = (0..=20).map(|i| -1.0 + (2.0 / 20.0) * i as f64).collect();
-    request.model_spec.threshold_grid = Some(g);
-    request.model_spec.threshold_trim_frac = Some(0.1);
+    let g: Vec<f64> = (0..20).map(|i| -1.0 + 0.1 * i as f64).collect();
+    merge_params(&mut request, json!({
+        "threshold_variable": "q",
+        "threshold_grid": g,
+        "threshold_trim_frac": 0.1
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -355,11 +393,12 @@ fn fit_model_runs_sur_with_equation_glances_and_sigma() {
     request.model_spec.model_type = "sur".to_string();
     request.model_spec.formula = "".to_string();
     request.model_spec.vcov = None;
-    request.model_spec.equations = Some(vec![
-        "y1 ~ x1 + x2".to_string(),
-        "y2 ~ x1 + x2".to_string(),
-    ]);
-
+    merge_params(&mut request, json!({
+        "equations": [
+            "y1 ~ x1 + x2",
+            "y2 ~ x1 + x2"
+        ]
+    }));
     let response = execute_fit_model(&request).expect("runtime response");
 
     assert_eq!(response.status, "success");
@@ -384,10 +423,12 @@ fn fit_model_runs_dynamic_panel_gmm_with_diagnostics() {
     request.dataset_ref.path = "datasets/demo/dynamic_panel_gmm_demo.csv".to_string();
     request.model_spec.model_type = "dynamic_panel_gmm".to_string();
     request.model_spec.formula = "y ~ x".to_string();
-    request.model_spec.panel_id = Some("firm".to_string());
-    request.model_spec.panel_time = Some("year".to_string());
-    request.model_spec.instrument_lags = Some(vec![2, 4]);
-    request.model_spec.gmm_weight = Some("two_step".to_string());
+    merge_params(&mut request, json!({
+        "panel_id": "firm",
+        "panel_time": "year",
+        "instrument_lags": [2, 4],
+        "gmm_weight": "two_step"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -412,9 +453,11 @@ fn fit_model_runs_ipw_with_propensity_formula() {
     request.dataset_ref.path = path.to_string_lossy().to_string();
     request.model_spec.model_type = "ipw".to_string();
     request.model_spec.formula = "".to_string();
-    request.model_spec.treatment_column = Some("treated".to_string());
-    request.model_spec.outcome_column = Some("y".to_string());
-    request.model_spec.propensity_formula = Some("treated ~ x1 + x2".to_string());
+    merge_params(&mut request, json!({
+        "treatment_column": "treated",
+        "outcome_column": "y",
+        "propensity_formula": "treated ~ x1 + x2"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
 
@@ -471,15 +514,13 @@ fn fit_model_forwards_panel_request_to_julia() {
         .expect("tidy");
     assert!(!tidy.is_empty());
 
-    let augment = payload.get("augment_preview").expect("augment_preview");
-    assert!(augment
-        .get("fitted")
+    let augment = payload
+        .get("augment_preview")
         .and_then(|value| value.as_array())
-        .is_some());
-    assert!(augment
-        .get("residual")
-        .and_then(|value| value.as_array())
-        .is_some());
+        .expect("augment_preview rows");
+    assert!(!augment.is_empty());
+    assert!(augment[0].get("fitted").is_some());
+    assert!(augment[0].get("residual").is_some());
 
     let diagnostics = payload.get("diagnostics").expect("diagnostics");
     assert!(diagnostics.get("hausman").is_some());
@@ -490,8 +531,10 @@ fn fit_model_forwards_panel_request_to_julia() {
 #[test]
 fn fit_model_requires_panel_index_fields() {
     let mut request = sample_panel_fit_model_request();
-    request.model_spec.panel_id = None;
-    request.model_spec.panel_time = Some("".to_string());
+    merge_params(&mut request, json!({
+        "panel_id": null,
+        "panel_time": ""
+    }));
     let response = execute_fit_model(&request).expect("runtime response");
 
     assert_eq!(response.status, "error");
@@ -1159,7 +1202,8 @@ async fn fit_model_http_logit_returns_glance_and_tidy() {
         "dataset_ref": { "source": "file", "path": "datasets/teaching/s4_discrete_demo.csv", "format": "csv" },
         "model_spec": {
             "model_type": "logit",
-            "formula": "y_bin ~ x1 + x2"
+            "formula": "y_bin ~ x1 + x2",
+            "params": {}
         },
         "options": { "drop_missing": true, "return_augment": false }
     })
@@ -1196,9 +1240,11 @@ async fn fit_model_http_arima_returns_time_series_fields() {
         "model_spec": {
             "model_type": "arima",
             "formula": "y",
-            "variable": "y",
-            "time_column": "time",
-            "order": [1, 0, 0]
+            "params": {
+                "variable": "y",
+                "time_column": "time",
+                "order": [1, 0, 0]
+            }
         },
         "options": { "drop_missing": true, "return_augment": false }
     })
@@ -1237,9 +1283,11 @@ async fn fit_model_http_survey_ols_returns_survey_fields() {
         "model_spec": {
             "model_type": "survey_ols",
             "formula": "y ~ x1 + x2",
-            "weights_column": "wt",
-            "strata_column": "strata",
-            "psu_column": "psu"
+            "params": {
+                "weights_column": "wt",
+                "strata_column": "strata",
+                "psu_column": "psu"
+            }
         },
         "options": { "drop_missing": true, "return_augment": false }
     })
@@ -1268,9 +1316,11 @@ fn fit_model_runs_spatial_gwr_with_local_coefficients() {
     request.dataset_ref.path = "datasets/demo/spatial_demo_coords.csv".to_string();
     request.model_spec.model_type = "spatial_gwr".to_string();
     request.model_spec.formula = "y ~ x1 + x2".to_string();
-    request.model_spec.spatial_coord_columns = Some(vec!["lon".to_string(), "lat".to_string()]);
-    request.model_spec.gwr_kernel = Some("gaussian".to_string());
-    request.model_spec.gwr_bandwidth = Some(2.0);
+    merge_params(&mut request, json!({
+        "spatial_coord_columns": ["lon", "lat"],
+        "gwr_kernel": "gaussian",
+        "gwr_bandwidth": 2.0
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -1296,10 +1346,12 @@ fn fit_model_runs_spatial_gtwr_with_time_scale() {
     request.dataset_ref.path = "datasets/demo/spatial_demo_coords.csv".to_string();
     request.model_spec.model_type = "spatial_gtwr".to_string();
     request.model_spec.formula = "y ~ x1".to_string();
-    request.model_spec.spatial_coord_columns = Some(vec!["lon".to_string(), "lat".to_string()]);
-    request.model_spec.gtwr_time_column = Some("x2".to_string());
-    request.model_spec.gtwr_time_scale = Some(serde_json::Value::String("auto".to_string()));
-    request.model_spec.gwr_kernel = Some("bisquare".to_string());
+    merge_params(&mut request, json!({
+        "spatial_coord_columns": ["lon", "lat"],
+        "gtwr_time_column": "x2",
+        "gtwr_time_scale": "auto",
+        "gwr_kernel": "bisquare"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");
@@ -1318,8 +1370,10 @@ fn fit_model_runs_spatial_probit_with_posterior() {
     request.dataset_ref.path = "datasets/demo/spatial_demo.csv".to_string();
     request.model_spec.model_type = "spatial_probit".to_string();
     request.model_spec.formula = "y ~ x1".to_string();
-    request.model_spec.spatial_weights_path = Some("datasets/demo/spatial_demo_W.csv".to_string());
-    request.model_spec.spatial_id_column = Some("region".to_string());
+    merge_params(&mut request, json!({
+        "spatial_weights_path": "datasets/demo/spatial_demo_W.csv",
+        "spatial_id_column": "region"
+    }));
 
     let response = execute_fit_model(&request).expect("runtime response");
     assert_eq!(response.status, "success");

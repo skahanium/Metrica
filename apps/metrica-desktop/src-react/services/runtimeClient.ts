@@ -103,6 +103,243 @@ export interface FitModelParams {
   durationEventColumn?: string;
 }
 
+function splitList(raw: string): string[] {
+  return raw.split(/[,\s]+/).filter(Boolean);
+}
+
+function buildFamilyParams(p: FitModelParams): Record<string, unknown> {
+  const modelType = p.modelType ?? 'ols';
+  const params: Record<string, unknown> = {};
+  const {
+    panelId = '',
+    panelTime = '',
+    panelMethod = 'fe',
+    instruments = '',
+    endogColumns = '',
+    gmmWeight = '',
+    instrumentLags,
+    dpgmmStyle = '',
+    collapseInstruments,
+    treatmentColumn = '',
+    postColumn = '',
+    eventTimeColumn = '',
+    outcomeColumn = '',
+    propensityFormula = '',
+    outcomeFormula = '',
+    timeColumn = '',
+    tsVariable = '',
+    tsVariables = '',
+    orderP = 1,
+    orderD = 0,
+    orderQ = 0,
+    seasonalP = 0,
+    seasonalD = 0,
+    seasonalQ = 0,
+    seasonalS = 0,
+    tsLags = 2,
+    tsDeterministic = 'constant',
+    tsMethod = '',
+    strataColumn = '',
+    psuColumn = '',
+    fpcColumn = '',
+    equations,
+    systemEndogenous,
+    systemInstruments,
+    surMaxIter,
+    surTol,
+    quantileTau,
+    nlsFamily,
+    nlsStart,
+    nlsMaxIter,
+    nlsTol,
+    thresholdVariable,
+    thresholdGrid,
+    thresholdTrimFrac,
+    archOrder,
+    garchP,
+    garchQ,
+    garchMaxIter,
+    garchTol,
+    spatialWeightsPath,
+    spatialIdColumn,
+    spatialRowStandardize,
+    spatialCoordColumns,
+    spatialDistance,
+    gwrKernel,
+    gwrBandwidth,
+    gwrBandwidthSelection,
+    gwrAdaptive,
+    gtwrTimeColumn,
+    gtwrTimeScale,
+    durationTimeColumn,
+    durationEventColumn,
+  } = p;
+
+  if (modelType === 'panel' || modelType === 'panel_iv') {
+    if (panelId.trim()) params.panel_id = panelId.trim();
+    if (panelTime.trim()) params.panel_time = panelTime.trim();
+    if (modelType === 'panel' && panelMethod.trim()) {
+      params.panel_method = panelMethod.trim();
+    }
+    if (modelType === 'panel_iv') {
+      if (instruments.trim()) params.instruments = splitList(instruments);
+      if (endogColumns.trim()) params.endog_columns = splitList(endogColumns);
+    }
+  } else if (modelType === 'iv') {
+    if (instruments.trim()) params.instruments = splitList(instruments);
+    if (endogColumns.trim()) params.endog_columns = splitList(endogColumns);
+  } else if (modelType === 'gmm_linear') {
+    if (instruments.trim()) params.instruments = splitList(instruments);
+    if (endogColumns.trim()) params.endog_columns = splitList(endogColumns);
+    if (gmmWeight.trim()) params.gmm_weight = gmmWeight.trim();
+  } else if (modelType === 'dynamic_panel_gmm') {
+    if (panelId.trim()) params.panel_id = panelId.trim();
+    if (panelTime.trim()) params.panel_time = panelTime.trim();
+    params.instrument_lags = instrumentLags ?? [2, 4];
+    if (gmmWeight.trim()) params.gmm_weight = gmmWeight.trim();
+    if (dpgmmStyle.trim()) params.dpgmm_style = dpgmmStyle.trim();
+    if (typeof collapseInstruments === 'boolean') params.collapse_instruments = collapseInstruments;
+  } else if (modelType === 'did' || modelType === 'event_study') {
+    if (panelId.trim()) params.panel_id = panelId.trim();
+    if (panelTime.trim()) params.panel_time = panelTime.trim();
+    if (treatmentColumn?.trim()) params.treated_column = treatmentColumn.trim();
+    if (postColumn?.trim()) params.post_column = postColumn.trim();
+    if (eventTimeColumn?.trim()) params.event_time_column = eventTimeColumn.trim();
+  } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
+    if (treatmentColumn?.trim()) params.treatment_column = treatmentColumn.trim();
+    if (outcomeColumn?.trim()) params.outcome_column = outcomeColumn.trim();
+    if (propensityFormula?.trim()) params.propensity_formula = propensityFormula.trim();
+    if (outcomeFormula?.trim()) params.outcome_formula = outcomeFormula.trim();
+  } else if (
+    modelType === 'arima' ||
+    modelType === 'var' ||
+    modelType === 'unitroot' ||
+    modelType === 'cointegration' ||
+    modelType === 'arch' ||
+    modelType === 'garch' ||
+    modelType === 'gjr_garch' ||
+    modelType === 'egarch'
+  ) {
+    if (timeColumn.trim()) params.time_column = timeColumn.trim();
+    if (tsVariable.trim()) params.variable = tsVariable.trim();
+    if (tsVariables.trim()) {
+      params.variables = tsVariables.split(',').map((v) => v.trim()).filter(Boolean);
+    }
+    if (modelType === 'arima') {
+      params.order = [orderP, orderD, orderQ];
+      if (seasonalP > 0 || seasonalQ > 0) {
+        params.seasonal_order = [seasonalP, seasonalD, seasonalQ, seasonalS];
+      }
+    }
+    if (modelType !== 'arch' && modelType !== 'garch' && tsLags > 0) params.lags = tsLags;
+    if (modelType !== 'arch' && modelType !== 'garch' && tsDeterministic !== 'constant') {
+      params.deterministic = tsDeterministic;
+    }
+    if (modelType !== 'arch' && modelType !== 'garch' && tsMethod.trim()) {
+      params.ts_method = tsMethod.trim();
+    }
+    if (modelType === 'arch' && typeof archOrder === 'number' && Number.isFinite(archOrder)) {
+      params.arch_order = archOrder;
+    }
+    if (modelType === 'garch') {
+      if (typeof garchP === 'number' && Number.isFinite(garchP)) params.garch_p = garchP;
+      if (typeof garchQ === 'number' && Number.isFinite(garchQ)) params.garch_q = garchQ;
+    }
+    if (
+      (modelType === 'arch' || modelType === 'garch') &&
+      typeof garchMaxIter === 'number' &&
+      Number.isFinite(garchMaxIter)
+    ) {
+      params.garch_max_iter = garchMaxIter;
+    }
+    if (
+      (modelType === 'arch' || modelType === 'garch') &&
+      typeof garchTol === 'number' &&
+      Number.isFinite(garchTol)
+    ) {
+      params.garch_tol = garchTol;
+    }
+  } else if (
+    modelType === 'survey_ols' ||
+    modelType === 'survey_logit' ||
+    modelType === 'survey_probit' ||
+    modelType === 'survey_poisson'
+  ) {
+    if (p.weightsColumn?.trim()) params.weights_column = p.weightsColumn.trim();
+    if (strataColumn.trim()) params.strata_column = strataColumn.trim();
+    if (psuColumn.trim()) params.psu_column = psuColumn.trim();
+    if (fpcColumn.trim()) params.fpc_column = fpcColumn.trim();
+  } else if (modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls') {
+    if (equations && equations.length > 0) params.equations = equations;
+    if (modelType !== 'sur') {
+      if (systemEndogenous && systemEndogenous.length > 0) {
+        params.system_endogenous = systemEndogenous;
+      }
+      if (systemInstruments && systemInstruments.length > 0) {
+        params.system_instruments = systemInstruments;
+      }
+    }
+    if (modelType === 'sur') {
+      if (typeof surMaxIter === 'number' && Number.isFinite(surMaxIter)) params.sur_max_iter = surMaxIter;
+      if (typeof surTol === 'number' && Number.isFinite(surTol)) params.sur_tol = surTol;
+    }
+  } else if (modelType === 'quantile') {
+    params.quantile_tau =
+      typeof quantileTau === 'number' && Number.isFinite(quantileTau) ? quantileTau : 0.5;
+  } else if (modelType === 'nls') {
+    if (nlsFamily?.trim()) params.nls_family = nlsFamily.trim();
+    if (nlsStart && nlsStart.length === 3) params.nls_start = nlsStart;
+    if (typeof nlsMaxIter === 'number' && Number.isFinite(nlsMaxIter)) params.nls_max_iter = nlsMaxIter;
+    if (typeof nlsTol === 'number' && Number.isFinite(nlsTol)) params.nls_tol = nlsTol;
+  } else if (modelType === 'threshold') {
+    if (thresholdVariable?.trim()) params.threshold_variable = thresholdVariable.trim();
+    if (thresholdGrid && thresholdGrid.length >= 2) params.threshold_grid = thresholdGrid;
+    if (typeof thresholdTrimFrac === 'number' && Number.isFinite(thresholdTrimFrac)) {
+      params.threshold_trim_frac = thresholdTrimFrac;
+    }
+  } else if (
+    modelType === 'spatial_lag' ||
+    modelType === 'spatial_error' ||
+    modelType === 'spatial_slx' ||
+    modelType === 'spatial_sdm' ||
+    modelType === 'spatial_sdem' ||
+    modelType === 'spatial_sac' ||
+    modelType === 'spatial_probit'
+  ) {
+    const sw = spatialWeightsPath?.trim();
+    if (sw) params.spatial_weights_path = sw;
+    const sid = spatialIdColumn?.trim();
+    if (sid) params.spatial_id_column = sid;
+    if (typeof spatialRowStandardize === 'boolean') {
+      params.spatial_row_standardize = spatialRowStandardize;
+    }
+  } else if (modelType === 'spatial_gwr' || modelType === 'spatial_gtwr') {
+    if (spatialCoordColumns) params.spatial_coord_columns = spatialCoordColumns;
+    if (spatialDistance) params.spatial_distance = spatialDistance;
+    if (gwrKernel) params.gwr_kernel = gwrKernel;
+    if (gwrBandwidth !== undefined) params.gwr_bandwidth = gwrBandwidth;
+    if (gwrBandwidthSelection) params.gwr_bandwidth_selection = gwrBandwidthSelection;
+    if (typeof gwrAdaptive === 'boolean') params.gwr_adaptive = gwrAdaptive;
+    if (modelType === 'spatial_gtwr') {
+      if (gtwrTimeColumn) params.gtwr_time_column = gtwrTimeColumn;
+      if (gtwrTimeScale !== undefined) params.gtwr_time_scale = gtwrTimeScale;
+    }
+  } else if (
+    modelType === 'duration_cox' ||
+    modelType === 'aft_weibull' ||
+    modelType === 'aft_exponential' ||
+    modelType === 'aft_lognormal' ||
+    modelType === 'aft_loglogistic'
+  ) {
+    const tcol = durationTimeColumn?.trim();
+    const ecol = durationEventColumn?.trim();
+    if (tcol) params.duration_time_column = tcol;
+    if (ecol) params.duration_event_column = ecol;
+  }
+
+  return params;
+}
+
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
   const {
     datasetPath,
@@ -172,151 +409,72 @@ export function buildFitModelRequest(params: FitModelParams): FitModelRequest {
     durationEventColumn,
   } = params;
 
+  const needsVcov =
+    modelType === 'iv' ||
+    modelType === 'panel_iv' ||
+    modelType === 'gls' ||
+    modelType === 'spatial_lag' ||
+    modelType === 'spatial_sdm' ||
+    [
+      'logit',
+      'probit',
+      'poisson',
+      'ordered_logit',
+      'multinomial_logit',
+      'negbin',
+      'survey_ols',
+      'survey_logit',
+      'survey_probit',
+      'survey_poisson',
+    ].includes(modelType) ||
+    ![
+      'panel',
+      'panel_iv',
+      'dynamic_panel_gmm',
+      'did',
+      'event_study',
+      'ipw',
+      'psm',
+      'aipw',
+      'arima',
+      'var',
+      'unitroot',
+      'cointegration',
+      'arch',
+      'garch',
+      'gjr_garch',
+      'egarch',
+      'sur',
+      'system_2sls',
+      'system_3sls',
+      'quantile',
+      'nls',
+      'threshold',
+      'spatial_lag',
+      'spatial_error',
+      'spatial_slx',
+      'spatial_sdm',
+      'spatial_sdem',
+      'spatial_sac',
+      'spatial_probit',
+      'spatial_gwr',
+      'spatial_gtwr',
+      'duration_cox',
+      'aft_weibull',
+      'aft_exponential',
+      'aft_lognormal',
+      'aft_loglogistic',
+    ].includes(modelType);
+
   const modelSpec: FitModelRequest['model_spec'] = {
     model_type: modelType,
     formula,
+    params: buildFamilyParams(params),
   };
 
-  if (modelType === 'panel' || modelType === 'panel_iv') {
-    modelSpec.panel_id = panelId;
-    modelSpec.panel_time = panelTime;
-    if (modelType === 'panel') {
-      modelSpec.panel_method = panelMethod as 'fe' | 're' | 'fd' | 'between';
-    }
-    if (modelType === 'panel_iv') {
-      modelSpec.vcov = { type: vcovType };
-      if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
-      if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
-      if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
-    }
-  } else if (modelType === 'iv') {
-    modelSpec.vcov = { type: vcovType };
-    if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
-    if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
-    if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
-  } else if (modelType === 'gmm_linear') {
-    if (instruments.trim()) modelSpec.instruments = instruments.split(/[,\s]+/).filter(Boolean);
-    if (endogColumns.trim()) modelSpec.endog_columns = endogColumns.split(/[,\s]+/).filter(Boolean);
-    if (gmmWeight.trim()) modelSpec.gmm_weight = gmmWeight.trim();
-  } else if (modelType === 'dynamic_panel_gmm') {
-    modelSpec.panel_id = panelId;
-    modelSpec.panel_time = panelTime;
-    modelSpec.instrument_lags = instrumentLags ?? [2, 4];
-    if (gmmWeight.trim()) modelSpec.gmm_weight = gmmWeight.trim();
-    if (dpgmmStyle.trim()) modelSpec.dpgmm_style = dpgmmStyle.trim();
-    if (typeof collapseInstruments === 'boolean') modelSpec.collapse_instruments = collapseInstruments;
-  } else if (modelType === 'gls') {
-    modelSpec.vcov = { type: vcovType };
-  } else if (modelType === 'did' || modelType === 'event_study') {
-    modelSpec.panel_id = panelId;
-    modelSpec.panel_time = panelTime;
-    if (treatmentColumn?.trim()) modelSpec.treated_column = treatmentColumn.trim();
-    if (postColumn?.trim()) modelSpec.post_column = postColumn.trim();
-    if (eventTimeColumn?.trim()) modelSpec.event_time_column = eventTimeColumn.trim();
-  } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
-    if (treatmentColumn?.trim()) modelSpec.treatment_column = treatmentColumn.trim();
-    if (outcomeColumn?.trim()) modelSpec.outcome_column = outcomeColumn.trim();
-    if (propensityFormula?.trim()) modelSpec.propensity_formula = propensityFormula.trim();
-    if (outcomeFormula?.trim()) modelSpec.outcome_formula = outcomeFormula.trim();
-  } else if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration' || modelType === 'arch' || modelType === 'garch') {
-    if (timeColumn.trim()) modelSpec.time_column = timeColumn.trim();
-    if (tsVariable.trim()) modelSpec.variable = tsVariable.trim();
-    if (tsVariables.trim()) modelSpec.variables = tsVariables.split(',').map((v: string) => v.trim()).filter(Boolean);
-    if (modelType === 'arima') {
-      modelSpec.order = [orderP, orderD, orderQ];
-      if (seasonalP > 0 || seasonalQ > 0) {
-        modelSpec.seasonal_order = [seasonalP, seasonalD, seasonalQ, seasonalS];
-      }
-    }
-    if (modelType !== 'arch' && modelType !== 'garch' && tsLags > 0) modelSpec.lags = tsLags;
-    if (modelType !== 'arch' && modelType !== 'garch' && tsDeterministic !== 'constant') {
-      modelSpec.deterministic = tsDeterministic as 'constant' | 'trend' | 'none';
-    }
-    if (modelType !== 'arch' && modelType !== 'garch' && tsMethod.trim()) {
-      modelSpec.ts_method = tsMethod.trim() as 'mle' | 'css' | 'engle_granger' | 'johansen';
-    }
-    if (modelType === 'arch' && typeof archOrder === 'number' && Number.isFinite(archOrder)) {
-      modelSpec.arch_order = archOrder;
-    }
-    if (modelType === 'garch') {
-      if (typeof garchP === 'number' && Number.isFinite(garchP)) modelSpec.garch_p = garchP;
-      if (typeof garchQ === 'number' && Number.isFinite(garchQ)) modelSpec.garch_q = garchQ;
-    }
-    if ((modelType === 'arch' || modelType === 'garch') && typeof garchMaxIter === 'number' && Number.isFinite(garchMaxIter)) {
-      modelSpec.garch_max_iter = garchMaxIter;
-    }
-    if ((modelType === 'arch' || modelType === 'garch') && typeof garchTol === 'number' && Number.isFinite(garchTol)) {
-      modelSpec.garch_tol = garchTol;
-    }
-  } else if (modelType === 'logit' || modelType === 'probit' || modelType === 'poisson' || modelType === 'ordered_logit' || modelType === 'multinomial_logit' || modelType === 'negbin') {
-    modelSpec.vcov = { type: vcovType };
-  } else if (modelType === 'survey_ols' || modelType === 'survey_logit' || modelType === 'survey_probit' || modelType === 'survey_poisson') {
-    modelSpec.vcov = { type: vcovType };
-    if (weightsColumn.trim()) modelSpec.weights_column = weightsColumn.trim();
-    if (strataColumn.trim()) modelSpec.strata_column = strataColumn.trim();
-    if (psuColumn.trim()) modelSpec.psu_column = psuColumn.trim();
-    if (fpcColumn.trim()) modelSpec.fpc_column = fpcColumn.trim();
-  } else if (modelType === 'sur' || modelType === 'system_2sls' || modelType === 'system_3sls') {
-    if (equations && equations.length > 0) modelSpec.equations = equations;
-    if (modelType !== 'sur') {
-      if (systemEndogenous && systemEndogenous.length > 0) modelSpec.system_endogenous = systemEndogenous;
-      if (systemInstruments && systemInstruments.length > 0) modelSpec.system_instruments = systemInstruments;
-    }
-    if (modelType === 'sur') {
-      if (typeof surMaxIter === 'number' && Number.isFinite(surMaxIter)) modelSpec.sur_max_iter = surMaxIter;
-      if (typeof surTol === 'number' && Number.isFinite(surTol)) modelSpec.sur_tol = surTol;
-    }
-  } else if (modelType === 'quantile') {
-    const tau = typeof quantileTau === 'number' && Number.isFinite(quantileTau) ? quantileTau : 0.5;
-    modelSpec.quantile_tau = tau;
-  } else if (modelType === 'nls') {
-    if (nlsFamily?.trim()) modelSpec.nls_family = nlsFamily.trim();
-    if (nlsStart && nlsStart.length === 3) modelSpec.nls_start = nlsStart;
-    if (typeof nlsMaxIter === 'number' && Number.isFinite(nlsMaxIter)) modelSpec.nls_max_iter = nlsMaxIter;
-    if (typeof nlsTol === 'number' && Number.isFinite(nlsTol)) modelSpec.nls_tol = nlsTol;
-  } else if (modelType === 'threshold') {
-    if (thresholdVariable?.trim()) modelSpec.threshold_variable = thresholdVariable.trim();
-    if (thresholdGrid && thresholdGrid.length >= 2) modelSpec.threshold_grid = thresholdGrid;
-    if (typeof thresholdTrimFrac === 'number' && Number.isFinite(thresholdTrimFrac)) {
-      modelSpec.threshold_trim_frac = thresholdTrimFrac;
-    }
-  } else if (
-    modelType === 'spatial_lag' || modelType === 'spatial_error' || modelType === 'spatial_slx' ||
-    modelType === 'spatial_sdm' || modelType === 'spatial_sdem' || modelType === 'spatial_sac' ||
-    modelType === 'spatial_probit'
-  ) {
-    const sw = spatialWeightsPath?.trim();
-    if (sw) modelSpec.spatial_weights_path = sw;
-    const sid = spatialIdColumn?.trim();
-    if (sid) modelSpec.spatial_id_column = sid;
-    if (typeof spatialRowStandardize === 'boolean') {
-      modelSpec.spatial_row_standardize = spatialRowStandardize;
-    }
-    if (modelType === 'spatial_lag' || modelType === 'spatial_sdm') {
-      modelSpec.vcov = { type: vcovType };
-    }
-  } else if (modelType === 'spatial_gwr' || modelType === 'spatial_gtwr') {
-    const coordCols = spatialCoordColumns;
-    if (coordCols) modelSpec.spatial_coord_columns = coordCols;
-    if (spatialDistance) modelSpec.spatial_distance = spatialDistance;
-    if (gwrKernel) modelSpec.gwr_kernel = gwrKernel;
-    if (gwrBandwidth !== undefined) modelSpec.gwr_bandwidth = gwrBandwidth;
-    if (gwrBandwidthSelection) modelSpec.gwr_bandwidth_selection = gwrBandwidthSelection;
-    if (typeof gwrAdaptive === 'boolean') modelSpec.gwr_adaptive = gwrAdaptive;
-    if (modelType === 'spatial_gtwr') {
-      if (gtwrTimeColumn) modelSpec.gtwr_time_column = gtwrTimeColumn;
-      if (gtwrTimeScale !== undefined) modelSpec.gtwr_time_scale = gtwrTimeScale;
-    }
-  } else if (modelType === 'duration_cox') {
-    const tcol = durationTimeColumn?.trim();
-    const ecol = durationEventColumn?.trim();
-    if (tcol) modelSpec.duration_time_column = tcol;
-    if (ecol) modelSpec.duration_event_column = ecol;
-  } else {
-    modelSpec.vcov = { type: vcovType };
-    if (weightsColumn.trim()) modelSpec.weights = weightsColumn.trim();
-    if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
-  }
+  if (needsVcov) modelSpec.vcov = { type: vcovType };
+  if (weightsColumn.trim()) modelSpec.weights = weightsColumn.trim();
+  if (clusterColumn.trim()) modelSpec.cluster_column = clusterColumn.trim();
 
   return {
     task_id: createTaskId(),

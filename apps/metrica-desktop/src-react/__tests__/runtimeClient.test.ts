@@ -28,8 +28,8 @@ describe('buildFitModelRequest', () => {
       panelMethod: 'fe',
     });
     expect(req.model_spec.model_type).toBe('panel');
-    expect(req.model_spec.panel_id).toBe('firm');
-    expect(req.model_spec.panel_time).toBe('year');
+    expect(req.model_spec.params.panel_id).toBe('firm');
+    expect(req.model_spec.params.panel_time).toBe('year');
   });
 
   it('builds spatial_lag request with spatial fields', () => {
@@ -43,9 +43,9 @@ describe('buildFitModelRequest', () => {
       spatialRowStandardize: true,
     });
     expect(req.model_spec.model_type).toBe('spatial_lag');
-    expect(req.model_spec.spatial_weights_path).toBe('datasets/demo/spatial_demo_W.csv');
-    expect(req.model_spec.spatial_id_column).toBe('region');
-    expect(req.model_spec.spatial_row_standardize).toBe(true);
+    expect(req.model_spec.params.spatial_weights_path).toBe('datasets/demo/spatial_demo_W.csv');
+    expect(req.model_spec.params.spatial_id_column).toBe('region');
+    expect(req.model_spec.params.spatial_row_standardize).toBe(true);
     expect(req.model_spec.vcov?.type).toBe('classical');
   });
 
@@ -59,8 +59,8 @@ describe('buildFitModelRequest', () => {
       durationEventColumn: 'fail',
     });
     expect(req.model_spec.model_type).toBe('duration_cox');
-    expect(req.model_spec.duration_time_column).toBe('time');
-    expect(req.model_spec.duration_event_column).toBe('fail');
+    expect(req.model_spec.params.duration_time_column).toBe('time');
+    expect(req.model_spec.params.duration_event_column).toBe('fail');
     expect(req.model_spec.vcov).toBeUndefined();
   });
 
@@ -84,8 +84,8 @@ describe('buildFitModelRequest', () => {
       endogColumns: 'x1',
       vcovType: 'classical',
     });
-    expect(req.model_spec.instruments).toEqual(['z1', 'z2']);
-    expect(req.model_spec.endog_columns).toEqual(['x1']);
+    expect(req.model_spec.params.instruments).toEqual(['z1', 'z2']);
+    expect(req.model_spec.params.endog_columns).toEqual(['x1']);
   });
 
   it('passes panel IV fields without dropping panel identity', () => {
@@ -100,10 +100,10 @@ describe('buildFitModelRequest', () => {
       vcovType: 'HC1',
     });
     expect(req.model_spec.model_type).toBe('panel_iv');
-    expect(req.model_spec.panel_id).toBe('firm');
-    expect(req.model_spec.panel_time).toBe('year');
-    expect(req.model_spec.instruments).toEqual(['z1', 'z2']);
-    expect(req.model_spec.endog_columns).toEqual(['x1']);
+    expect(req.model_spec.params.panel_id).toBe('firm');
+    expect(req.model_spec.params.panel_time).toBe('year');
+    expect(req.model_spec.params.instruments).toEqual(['z1', 'z2']);
+    expect(req.model_spec.params.endog_columns).toEqual(['x1']);
     expect(req.model_spec.vcov?.type).toBe('HC1');
   });
 
@@ -116,7 +116,7 @@ describe('buildFitModelRequest', () => {
       endogColumns: 'x1',
       vcovType: 'classical',
     });
-    expect(req.model_spec.instruments).toEqual(['z1', 'z2', 'z3']);
+    expect(req.model_spec.params.instruments).toEqual(['z1', 'z2', 'z3']);
   });
 
   it('sets treated_column for DID model', () => {
@@ -128,7 +128,7 @@ describe('buildFitModelRequest', () => {
       panelId: 'id',
       panelTime: 'year',
     });
-    expect(req.model_spec.treated_column).toBe('treated');
+    expect(req.model_spec.params.treated_column).toBe('treated');
   });
 
   it('passes causal propensity and outcome formulas', () => {
@@ -141,10 +141,10 @@ describe('buildFitModelRequest', () => {
       propensityFormula: 'treated ~ x1 + x2',
       outcomeFormula: 'y ~ x1 + x2',
     });
-    expect(req.model_spec.treatment_column).toBe('treated');
-    expect(req.model_spec.outcome_column).toBe('y');
-    expect(req.model_spec.propensity_formula).toBe('treated ~ x1 + x2');
-    expect(req.model_spec.outcome_formula).toBe('y ~ x1 + x2');
+    expect(req.model_spec.params.treatment_column).toBe('treated');
+    expect(req.model_spec.params.outcome_column).toBe('y');
+    expect(req.model_spec.params.propensity_formula).toBe('treated ~ x1 + x2');
+    expect(req.model_spec.params.outcome_formula).toBe('y ~ x1 + x2');
   });
 
   it('passes time series fields', () => {
@@ -157,9 +157,9 @@ describe('buildFitModelRequest', () => {
       tsLags: 2,
     });
     expect(req.model_spec.model_type).toBe('var');
-    expect(req.model_spec.time_column).toBe('year');
-    expect(req.model_spec.variables).toEqual(['gdp', 'inflation']);
-    expect(req.model_spec.lags).toBe(2);
+    expect(req.model_spec.params.time_column).toBe('year');
+    expect(req.model_spec.params.variables).toEqual(['gdp', 'inflation']);
+    expect(req.model_spec.params.lags).toBe(2);
   });
 
   it('passes arch fields (arch_order, optional garch_max_iter / garch_tol)', () => {
@@ -174,13 +174,13 @@ describe('buildFitModelRequest', () => {
       garchTol: 1e-4,
     });
     expect(req.model_spec.model_type).toBe('arch');
-    expect(req.model_spec.time_column).toBe('time');
-    expect(req.model_spec.variable).toBe('ret');
-    expect(req.model_spec.arch_order).toBe(2);
-    expect(req.model_spec.garch_max_iter).toBe(3000);
-    expect(req.model_spec.garch_tol).toBe(1e-4);
-    expect(req.model_spec.order).toBeUndefined();
-    expect(req.model_spec.lags).toBeUndefined();
+    expect(req.model_spec.params.time_column).toBe('time');
+    expect(req.model_spec.params.variable).toBe('ret');
+    expect(req.model_spec.params.arch_order).toBe(2);
+    expect(req.model_spec.params.garch_max_iter).toBe(3000);
+    expect(req.model_spec.params.garch_tol).toBe(1e-4);
+    expect(req.model_spec.params.order).toBeUndefined();
+    expect(req.model_spec.params.lags).toBeUndefined();
   });
 
   it('passes garch fields (garch_p / garch_q and shared optimizer keys)', () => {
@@ -196,14 +196,14 @@ describe('buildFitModelRequest', () => {
       garchTol: 1e-5,
     });
     expect(req.model_spec.model_type).toBe('garch');
-    expect(req.model_spec.time_column).toBe('time');
-    expect(req.model_spec.variable).toBe('ret');
-    expect(req.model_spec.garch_p).toBe(1);
-    expect(req.model_spec.garch_q).toBe(1);
-    expect(req.model_spec.garch_max_iter).toBe(4000);
-    expect(req.model_spec.garch_tol).toBe(1e-5);
-    expect(req.model_spec.arch_order).toBeUndefined();
-    expect(req.model_spec.order).toBeUndefined();
+    expect(req.model_spec.params.time_column).toBe('time');
+    expect(req.model_spec.params.variable).toBe('ret');
+    expect(req.model_spec.params.garch_p).toBe(1);
+    expect(req.model_spec.params.garch_q).toBe(1);
+    expect(req.model_spec.params.garch_max_iter).toBe(4000);
+    expect(req.model_spec.params.garch_tol).toBe(1e-5);
+    expect(req.model_spec.params.arch_order).toBeUndefined();
+    expect(req.model_spec.params.order).toBeUndefined();
   });
 
   it('passes dynamic_panel_gmm panel index and instrument_lags', () => {
@@ -219,12 +219,12 @@ describe('buildFitModelRequest', () => {
       collapseInstruments: false,
     });
     expect(req.model_spec.model_type).toBe('dynamic_panel_gmm');
-    expect(req.model_spec.panel_id).toBe('firm');
-    expect(req.model_spec.panel_time).toBe('year');
-    expect(req.model_spec.instrument_lags).toEqual([2, 5]);
-    expect(req.model_spec.gmm_weight).toBe('one_step');
-    expect(req.model_spec.dpgmm_style).toBe('difference');
-    expect(req.model_spec.collapse_instruments).toBe(false);
+    expect(req.model_spec.params.panel_id).toBe('firm');
+    expect(req.model_spec.params.panel_time).toBe('year');
+    expect(req.model_spec.params.instrument_lags).toEqual([2, 5]);
+    expect(req.model_spec.params.gmm_weight).toBe('one_step');
+    expect(req.model_spec.params.dpgmm_style).toBe('difference');
+    expect(req.model_spec.params.collapse_instruments).toBe(false);
   });
 
   it('passes sur equations and optional sur_max_iter', () => {
@@ -237,9 +237,9 @@ describe('buildFitModelRequest', () => {
       surTol: 1e-5,
     });
     expect(req.model_spec.model_type).toBe('sur');
-    expect(req.model_spec.equations).toEqual(['y1 ~ x1', 'y2 ~ x2']);
-    expect(req.model_spec.sur_max_iter).toBe(8);
-    expect(req.model_spec.sur_tol).toBe(1e-5);
+    expect(req.model_spec.params.equations).toEqual(['y1 ~ x1', 'y2 ~ x2']);
+    expect(req.model_spec.params.sur_max_iter).toBe(8);
+    expect(req.model_spec.params.sur_tol).toBe(1e-5);
     expect(req.model_spec.vcov).toBeUndefined();
   });
 
@@ -252,8 +252,8 @@ describe('buildFitModelRequest', () => {
       systemEndogenous: [['x1']],
       systemInstruments: [['z1']],
     });
-    expect(req.model_spec.system_endogenous).toEqual([['x1']]);
-    expect(req.model_spec.system_instruments).toEqual([['z1']]);
+    expect(req.model_spec.params.system_endogenous).toEqual([['x1']]);
+    expect(req.model_spec.params.system_instruments).toEqual([['z1']]);
   });
 });
 

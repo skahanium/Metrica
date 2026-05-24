@@ -6,7 +6,7 @@ function fit_spatial(
     df::DataFrame,
     spec::AbstractDict{String, <:Any},
     working_dir::AbstractString,
-)::Union{SpatialFitResult, MetricaBase.ModelError}
+)::Union{SpatialFitResult, ProbitFitResult, MetricaBase.ModelError}
     idcol = String(get(spec, "spatial_id_column", ""))
     isempty(strip(idcol)) &&
         return MetricaBase.ModelError(
@@ -266,12 +266,21 @@ function fit_spatial(
         return SpatialFitResult(:spatial_sac, pairs, se,
             "GS2SLS（SAC）", resid, fitted, n, dof,
             rho, :rho, diag, warnings, nothing)
+    elseif model_type == "spatial_probit"
+        y_int = Int.(round.(ys))
+        n_iter = Int(get(spec, "bayes_n_iter", 2000))
+        n_warmup = Int(get(spec, "bayes_n_warmup", 500))
+        seed = get(spec, "bayes_seed", nothing)
+        seed_val = seed === nothing ? nothing : Int(seed)
+        prior_scale = Float64(get(spec, "bayes_prior_scale", 10.0))
+        return fit_spatial_probit(y_int, Xs, W;
+            n_iter=n_iter, n_warmup=n_warmup, seed=seed_val, prior_scale=prior_scale)
     else
         return MetricaBase.ModelError(
             :spatial_unknown_model,
             "未知空间模型类型",
             model_type,
-            "支持 spatial_lag、spatial_error、spatial_slx、spatial_sdm、spatial_sdem、spatial_sac。",
+            "支持 spatial_lag、spatial_error、spatial_slx、spatial_sdm、spatial_sdem、spatial_sac、spatial_probit。",
         )
     end
 end

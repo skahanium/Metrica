@@ -96,15 +96,10 @@ pub fn spawn_julia_actor(session: JuliaSession) -> (mpsc::Sender<JuliaCommand>, 
 
     std::thread::spawn(move || {
         let mut session = session;
-        loop {
-            match cmd_rx.blocking_recv() {
-                Some((action, params, reply_tx)) => {
-                    let result = session.send_request(&action, params);
-                    healthy_flag.store(result.is_ok(), Ordering::Release);
-                    let _ = reply_tx.send(result);
-                }
-                None => break,
-            }
+        while let Some((action, params, reply_tx)) = cmd_rx.blocking_recv() {
+            let result = session.send_request(&action, params);
+            healthy_flag.store(result.is_ok(), Ordering::Release);
+            let _ = reply_tx.send(result);
         }
     });
 

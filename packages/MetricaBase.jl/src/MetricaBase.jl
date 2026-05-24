@@ -252,6 +252,8 @@ struct AugmentTable
     nobs::Int
 end
 
+AugmentTable() = AugmentTable(Dict{Symbol, Vector{Float64}}(), 0)
+
 """
 面板数据容器。
 

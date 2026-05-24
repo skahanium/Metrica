@@ -540,7 +540,7 @@ uuid = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 version = "0.1.0"
 
 [[deps.MetricaNonlinear]]
-deps = ["CSV", "DataFrames", "Distributions", "FiniteDiff", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "Statistics", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "FiniteDiff", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Optim", "Random", "Statistics", "StatsModels"]
 path = "../MetricaNonlinear.jl"
 uuid = "7da9011b-ddab-4054-bbbc-d8aa09543254"
 version = "0.1.0"
@@ -558,7 +558,7 @@ uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 version = "0.1.0"
 
 [[deps.MetricaQuantile]]
-deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "QuantileRegressions", "Statistics", "StatsAPI", "StatsModels"]
+deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "QuantileRegressions", "Random", "Statistics", "StatsAPI", "StatsModels"]
 path = "../MetricaQuantile.jl"
 uuid = "f212cb88-0759-40d3-bab4-b1a10623addb"
 version = "0.1.0"

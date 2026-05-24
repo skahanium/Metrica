@@ -64,7 +64,7 @@ function MetricaBase.augment(result::GMMLinearFitResult)
     std_residuals = sigma > 0 ? residuals ./ sigma : zeros(nobs_val)
 
     XtX = X' * X
-    leverage = if det(XtX) > eps(Float64)
+    leverage = if _invertible_bread(XtX)
         XtX_inv = inv(XtX)
         [dot(X[i, :], XtX_inv * X[i, :]) for i in 1:nobs_val]
     else

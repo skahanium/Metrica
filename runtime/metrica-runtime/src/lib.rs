@@ -1,3 +1,4 @@
+pub mod model_params;
 pub mod types;
 pub mod validation;
 pub mod examples;
@@ -8,6 +9,7 @@ pub mod persistence;
 pub mod handlers;
 pub mod server;
 
+pub use model_params::*;
 pub use types::*;
 pub use validation::*;
 pub use examples::*;
@@ -37,7 +39,7 @@ pub fn resolve_working_dir(raw_working_dir: &str) -> std::path::PathBuf {
 }
 
 /// 将数据集相对路径解析为绝对路径字符串。
-pub fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::PathBuf) -> String {
+pub fn resolve_dataset_path(raw_path: &str, working_dir: &std::path::Path) -> String {
     let dataset_path = std::path::PathBuf::from(raw_path);
     if dataset_path.is_absolute() {
         return dataset_path.to_string_lossy().to_string();
@@ -88,8 +90,14 @@ mod tests {
         let request = examples::sample_panel_fit_model_request();
         assert_eq!(request.action, "fit_model");
         assert_eq!(request.model_spec.model_type, "panel");
-        assert_eq!(request.model_spec.panel_id.as_deref(), Some("firm"));
-        assert_eq!(request.model_spec.panel_time.as_deref(), Some("year"));
+        assert_eq!(
+            request.model_spec.params.get("panel_id").and_then(|v| v.as_str()),
+            Some("firm")
+        );
+        assert_eq!(
+            request.model_spec.params.get("panel_time").and_then(|v| v.as_str()),
+            Some("year")
+        );
     }
 
     #[test]

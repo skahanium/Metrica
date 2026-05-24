@@ -1,6 +1,14 @@
 import { getGrammar } from './commandGrammar';
 import type { ModelSpec, DiagnosticSpec } from '../types/protocol';
 
+function createModelSpec(
+  model_type: ModelSpec['model_type'],
+  formula: string,
+  params: Record<string, unknown> = {},
+): ModelSpec {
+  return { model_type, formula, params };
+}
+
 // ---- 解析类型 ----
 
 export interface ParsedOption {
@@ -240,18 +248,14 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   if (verb === 'sur') {
     const br = parseParenEquationBlocks(positionals);
     if (!br.ok) return { error: br.error };
-    const spec: ModelSpec = {
-      model_type: 'sur',
-      formula: '',
-      equations: br.equations,
-    };
+    const spec = createModelSpec('sur', '', { equations: br.equations });
     if (optMap.has('maxiter')) {
       const n = parseInt(String(optMap.get('maxiter')).trim(), 10);
-      if (!Number.isNaN(n)) spec.sur_max_iter = n;
+      if (!Number.isNaN(n)) spec.params.sur_max_iter = n;
     }
     if (optMap.has('tol')) {
       const t = parseFloat(String(optMap.get('tol')).trim());
-      if (!Number.isNaN(t)) spec.sur_tol = t;
+      if (!Number.isNaN(t)) spec.params.sur_tol = t;
     }
     return spec;
   }
@@ -274,13 +278,11 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     }
     const methodRaw = (optMap.get('method') || 'twostep').trim().toLowerCase();
     const model_type: ModelSpec['model_type'] = methodRaw === '3sls' ? 'system_3sls' : 'system_2sls';
-    return {
-      model_type,
-      formula: '',
+    return createModelSpec(model_type, '', {
       equations: br.equations,
       system_endogenous,
       system_instruments,
-    };
+    });
   }
 
   // svy 前缀命令：提取子模型类型和选项
@@ -321,10 +323,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     formula = positionals[0];
   }
 
-  const spec: ModelSpec = {
-    model_type: modelType as ModelSpec['model_type'],
-    formula,
-  };
+  const spec = createModelSpec(modelType as ModelSpec['model_type'], formula);
 
   // ---- 通用选项 ----
 
@@ -336,29 +335,29 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
 
   // ---- 面板选项 ----
 
-  if (optMap.has('id')) spec.panel_id = optMap.get('id');
-  if (optMap.has('time')) spec.panel_time = optMap.get('time');
+  if (optMap.has('id')) spec.params.panel_id = optMap.get('id');
+  if (optMap.has('time')) spec.params.panel_time = optMap.get('time');
   if (optMap.has('method') && modelType !== 'panel_iv' && modelType !== 'dynamic_panel_gmm'
     && modelType !== 'sur' && modelType !== 'system_2sls' && modelType !== 'system_3sls' && modelType !== 'quantile'
     && modelType !== 'nls' && modelType !== 'threshold' && modelType !== 'arch' && modelType !== 'garch') {
-    spec.panel_method = optMap.get('method') as ModelSpec['panel_method'];
+    spec.params.panel_method = optMap.get('method');
   }
 
   // ---- IV 选项 ----
 
   if (optMap.has('endogenous')) {
-    spec.endog_columns = optMap.get('endogenous')!.split(/\s+/).filter(Boolean);
+    spec.params.endog_columns = optMap.get('endogenous')!.split(/\s+/).filter(Boolean);
   }
   if (optMap.has('instruments')) {
-    spec.instruments = optMap.get('instruments')!.split(/\s+/).filter(Boolean);
+    spec.params.instruments = optMap.get('instruments')!.split(/\s+/).filter(Boolean);
   }
 
   if (modelType === 'gmm_linear' && optMap.has('weight')) {
-    spec.gmm_weight = optMap.get('weight');
+    spec.params.gmm_weight = optMap.get('weight');
   }
 
   if (modelType === 'dynamic_panel_gmm') {
-    if (!spec.panel_id || !spec.panel_time) {
+    if (!spec.params.panel_id || !spec.params.panel_time) {
       return { error: 'xtabond 需要 id(...) 与 time(...) 指定面板索引列。' };
     }
     if (optMap.has('lags')) {
@@ -366,13 +365,13 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
       if (parts.length !== 2 || parts.some((n) => Number.isNaN(n))) {
         return { error: 'lags(min max) 需要两个整数，例如 lags(2 4)。' };
       }
-      spec.instrument_lags = [parts[0], parts[1]];
+      spec.params.instrument_lags = [parts[0], parts[1]];
     } else {
-      spec.instrument_lags = [2, 4];
+      spec.params.instrument_lags = [2, 4];
     }
-    if (optMap.has('weight')) spec.gmm_weight = optMap.get('weight');
-    if (optMap.has('style')) spec.dpgmm_style = optMap.get('style');
-    if (optMap.has('collapse')) spec.collapse_instruments = optMap.get('collapse') === 'true';
+    if (optMap.has('weight')) spec.params.gmm_weight = optMap.get('weight');
+    if (optMap.has('style')) spec.params.dpgmm_style = optMap.get('style');
+    if (optMap.has('collapse')) spec.params.collapse_instruments = optMap.get('collapse') === 'true';
   }
 
   if (modelType === 'quantile') {
@@ -388,7 +387,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     if (!(tau > 1e-8 && tau < 1 - 1e-8)) {
       return { error: '分位点 τ 须严格位于开区间 (0,1)，且满足实现要求 1e-8 < τ < 1-1e-8。' };
     }
-    spec.quantile_tau = tau;
+    spec.params.quantile_tau = tau;
     spec.vcov = undefined;
     spec.cluster_column = undefined;
     spec.weights = undefined;
@@ -405,7 +404,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
         return { error: '首期 nls 仅支持 family(exp_growth)。' };
       }
     }
-    spec.nls_family = fam;
+    spec.params.nls_family = fam;
     if (!optMap.has('start')) {
       return { error: 'nls 须提供 start(β1 β2 β3) 三个有限初值。' };
     }
@@ -417,20 +416,20 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     if (starts.some((x) => !Number.isFinite(x))) {
       return { error: 'start 初值须全为有限实数。' };
     }
-    spec.nls_start = starts;
+    spec.params.nls_start = starts;
     if (optMap.has('maxiter')) {
       const m = parseInt(String(optMap.get('maxiter')), 10);
       if (!Number.isFinite(m) || m < 1) {
         return { error: 'maxiter(...) 须为正整数。' };
       }
-      spec.nls_max_iter = m;
+      spec.params.nls_max_iter = m;
     }
     if (optMap.has('tol')) {
       const t = parseFloat(String(optMap.get('tol')));
       if (!Number.isFinite(t) || t <= 0) {
         return { error: 'tol(...) 须为有限正数。' };
       }
-      spec.nls_tol = t;
+      spec.params.nls_tol = t;
     }
   }
 
@@ -441,7 +440,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     if (!optMap.has('qvar') || !String(optMap.get('qvar')).trim()) {
       return { error: 'threg 需要 qvar(切换变量列名)，且该列须出现在公式右侧。' };
     }
-    spec.threshold_variable = String(optMap.get('qvar')).trim();
+    spec.params.threshold_variable = String(optMap.get('qvar')).trim();
     if (!optMap.has('grid')) {
       return { error: 'threg 需要 grid(min max n)，例如 grid(-1 1 21)。' };
     }
@@ -449,13 +448,13 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
     if ('error' in gr) {
       return { error: gr.error };
     }
-    spec.threshold_grid = gr.grid;
+    spec.params.threshold_grid = gr.grid;
     if (optMap.has('trim')) {
       const tr = parseFloat(String(optMap.get('trim')));
       if (!Number.isFinite(tr) || tr < 0 || tr >= 0.45) {
         return { error: 'trim 须在 [0, 0.45) 区间内。' };
       }
-      spec.threshold_trim_frac = tr;
+      spec.params.threshold_trim_frac = tr;
     }
   }
 
@@ -463,37 +462,37 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
   // did / event_study 使用 treated_column；ipw / psm / aipw 使用 treatment_column
 
   if (modelType === 'did' || modelType === 'event_study') {
-    if (optMap.has('treat')) spec.treated_column = optMap.get('treat');
-    if (optMap.has('post')) spec.post_column = optMap.get('post');
-    if (optMap.has('eventtime')) spec.event_time_column = optMap.get('eventtime');
+    if (optMap.has('treat')) spec.params.treated_column = optMap.get('treat');
+    if (optMap.has('post')) spec.params.post_column = optMap.get('post');
+    if (optMap.has('eventtime')) spec.params.event_time_column = optMap.get('eventtime');
   } else if (modelType === 'ipw' || modelType === 'psm' || modelType === 'aipw') {
-    if (optMap.has('treat')) spec.treatment_column = optMap.get('treat');
-    if (optMap.has('outcome')) spec.outcome_column = optMap.get('outcome');
-    if (optMap.has('propensity')) spec.propensity_formula = optMap.get('propensity');
-    if (optMap.has('outcome_model')) spec.outcome_formula = optMap.get('outcome_model');
+    if (optMap.has('treat')) spec.params.treatment_column = optMap.get('treat');
+    if (optMap.has('outcome')) spec.params.outcome_column = optMap.get('outcome');
+    if (optMap.has('propensity')) spec.params.propensity_formula = optMap.get('propensity');
+    if (optMap.has('outcome_model')) spec.params.outcome_formula = optMap.get('outcome_model');
   }
 
   // ---- 时间序列选项 ----
 
   if (modelType === 'arima' || modelType === 'var' || modelType === 'unitroot' || modelType === 'cointegration' || modelType === 'arch' || modelType === 'garch') {
-    if (optMap.has('time')) spec.time_column = optMap.get('time');
+    if (optMap.has('time')) spec.params.time_column = optMap.get('time');
     const ar = optMap.has('ar') ? parseInt(optMap.get('ar')!) : 1;
     const i = optMap.has('i') ? parseInt(optMap.get('i')!) : 0;
     const ma = optMap.has('ma') ? parseInt(optMap.get('ma')!) : 0;
     if (modelType === 'arima' && (optMap.has('ar') || optMap.has('i') || optMap.has('ma'))) {
-      spec.order = [ar, i, ma];
+      spec.params.order = [ar, i, ma];
     }
-    if (optMap.has('lags')) spec.lags = parseInt(optMap.get('lags')!);
+    if (optMap.has('lags')) spec.params.lags = parseInt(optMap.get('lags')!);
     if (modelType === 'cointegration' && optMap.has('method')) {
-      spec.ts_method = optMap.get('method') as 'mle' | 'css' | 'engle_granger' | 'johansen';
+      spec.params.ts_method = optMap.get('method') as 'mle' | 'css' | 'engle_granger' | 'johansen';
     }
     if (optMap.has('deterministic')) {
-      spec.deterministic = optMap.get('deterministic') as 'constant' | 'trend' | 'none';
+      spec.params.deterministic = optMap.get('deterministic') as 'constant' | 'trend' | 'none';
     }
     if (modelType === 'var' || modelType === 'cointegration') {
-      spec.variables = positionals;
+      spec.params.variables = positionals;
     } else if (positionals.length >= 1 && spec.formula) {
-      spec.variable = positionals[0];
+      spec.params.variable = positionals[0];
     }
     if (modelType === 'arch') {
       if (!optMap.has('arch')) {
@@ -507,7 +506,7 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
       if (qv < 1 || qv > 12) {
         return { error: 'arch_order 须在 1–12 之间（与 Runtime 校验一致）。' };
       }
-      spec.arch_order = qv;
+      spec.params.arch_order = qv;
     }
     if (modelType === 'garch') {
       if (optMap.has('garch')) {
@@ -516,14 +515,14 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
           if (parts.some((n) => Number.isNaN(n))) {
             return { error: 'garch(p q) 须为两个整数。' };
           }
-          spec.garch_p = parts[0];
-          spec.garch_q = parts[1];
+          spec.params.garch_p = parts[0];
+          spec.params.garch_q = parts[1];
         } else if (parts.length === 1) {
           if (Number.isNaN(parts[0])) {
             return { error: 'garch(q) 须为整数。' };
           }
-          spec.garch_p = 1;
-          spec.garch_q = parts[0];
+          spec.params.garch_p = 1;
+          spec.params.garch_q = parts[0];
         } else {
           return { error: 'garch(...) 须为 p q 两个整数，或单个整数 q（默认 p=1）。' };
         }
@@ -533,18 +532,18 @@ export function parseToModelSpec(parsed: ParsedCommand): ModelSpec | { error: st
         if (Number.isNaN(ap)) {
           return { error: '在 garch 命令中 arch(p) 表示 GARCH 的 ARCH 阶 p，须为整数。' };
         }
-        spec.garch_p = ap;
+        spec.params.garch_p = ap;
       }
       if (optMap.has('maxiter')) {
         const m = parseInt(String(optMap.get('maxiter')), 10);
-        if (!Number.isNaN(m) && m >= 1) spec.garch_max_iter = m;
+        if (!Number.isNaN(m) && m >= 1) spec.params.garch_max_iter = m;
       }
       if (optMap.has('tol')) {
         const t = parseFloat(String(optMap.get('tol')));
-        if (Number.isFinite(t) && t > 0) spec.garch_tol = t;
+        if (Number.isFinite(t) && t > 0) spec.params.garch_tol = t;
       }
-      const pFin = spec.garch_p ?? 1;
-      const qFin = spec.garch_q ?? 1;
+      const pFin = spec.params.garch_p ?? 1;
+      const qFin = spec.params.garch_q ?? 1;
       if (pFin < 1 || qFin < 1 || pFin > 5 || qFin > 5 || pFin + qFin > 8) {
         return { error: 'garch_p/garch_q 须满足 1≤p,q≤5 且 p+q≤8。' };
       }
@@ -572,12 +571,10 @@ function parseStcoxToModelSpec(
   }
   const rhs = covars.join(' + ');
   const formula = `ph ~ ${rhs}`;
-  return {
-    model_type: 'duration_cox',
-    formula,
+  return createModelSpec('duration_cox', formula, {
     duration_time_column: timeCol,
     duration_event_column: eventCol,
-  };
+  });
 }
 
 /** 去掉选项括号值的成对引号 */
@@ -639,16 +636,14 @@ function parseSpregToModelSpec(
     return { error: `spreg 的 model(...) 须为 lag / sar / error / sem / slx / sdm / sdem / sac，收到：${modelRaw}` };
   }
 
-  const spec: ModelSpec = {
-    model_type,
-    formula,
+  const spec = createModelSpec(model_type, formula, {
     spatial_weights_path,
     spatial_id_column,
-  };
+  });
 
   if (optMap.has('rowstd')) {
     const v = String(optMap.get('rowstd')).trim().toLowerCase();
-    spec.spatial_row_standardize = !(v === 'false' || v === '0' || v === 'no');
+    spec.params.spatial_row_standardize = !(v === 'false' || v === '0' || v === 'no');
   }
   if (optMap.has('robust')) {
     spec.vcov = { type: 'HC1' };
@@ -674,18 +669,25 @@ function parseGwrToModelSpec(verb: string, positionals: string[], optMap: Map<st
     return { error: 'GTWR 需要 time(...) 选项。' };
   }
 
-  return {
-    model_type: isGtwr ? 'spatial_gtwr' : 'spatial_gwr',
-    formula,
+  const gwrParams: Record<string, unknown> = {
     spatial_coord_columns: coordRaw.length >= 2 ? [coordRaw[0], coordRaw[1]] : ['lon', 'lat'],
     spatial_distance: String(optMap.get('distance') ?? 'euclidean'),
     gwr_kernel: String(optMap.get('kernel') ?? 'gaussian'),
-    gwr_bandwidth: optMap.has('bandwidth') ? Number(optMap.get('bandwidth')) : undefined,
-    gwr_bandwidth_selection: optMap.has('bandwidth') ? (String(optMap.get('bandwidth')) === 'cv' ? 'cv' : String(optMap.get('bandwidth')) === 'aicc' ? 'aicc' : undefined) : undefined,
     gwr_adaptive: optMap.has('adaptive') ? String(optMap.get('adaptive')) !== 'false' : false,
-    gtwr_time_column: isGtwr ? timeCol : undefined,
-    gtwr_time_scale: isGtwr && optMap.has('time_scale') ? (String(optMap.get('time_scale')) === 'auto' ? 'auto' : Number(optMap.get('time_scale'))) : undefined,
   };
+  if (optMap.has('bandwidth')) {
+    gwrParams.gwr_bandwidth = Number(optMap.get('bandwidth'));
+    const bw = String(optMap.get('bandwidth'));
+    if (bw === 'cv' || bw === 'aicc') gwrParams.gwr_bandwidth_selection = bw;
+  }
+  if (isGtwr) {
+    gwrParams.gtwr_time_column = timeCol;
+    if (optMap.has('time_scale')) {
+      gwrParams.gtwr_time_scale =
+        String(optMap.get('time_scale')) === 'auto' ? 'auto' : Number(optMap.get('time_scale'));
+    }
+  }
+  return createModelSpec(isGtwr ? 'spatial_gtwr' : 'spatial_gwr', formula, gwrParams);
 }
 
 function parseSpprobitToModelSpec(positionals: string[], optMap: Map<string, unknown>): ModelSpec | { error: string } {
@@ -702,23 +704,20 @@ function parseSpprobitToModelSpec(positionals: string[], optMap: Map<string, unk
   const wp = String(optMap.get('spatial_weights') ?? optMap.get('weights') ?? '').trim();
   const id = String(optMap.get('spatial_id') ?? optMap.get('id') ?? 'region').trim();
 
-  return {
-    model_type: 'spatial_probit',
-    formula,
+  return createModelSpec('spatial_probit', formula, {
     spatial_weights_path: wp,
     spatial_id_column: id,
-  };
+  });
 }
 
 function parseBayesregToModelSpec(positionals: string[], optMap: Map<string, unknown>): ModelSpec | { error: string } {
   if (positionals.length < 2) return { error: 'bayesreg 需要至少 1 个因变量和 1 个自变量。' };
   const yVar = positionals[0]; const xVars = positionals.slice(1);
   const formula = `${yVar} ~ ${xVars.join(' + ')}`;
-  return {
-    model_type: 'bayes_linear', formula,
-    bayes_seed: optMap.has('seed') ? Number(optMap.get('seed')) : undefined,
-    bayes_prior_scale: optMap.has('prior_scale') ? Number(optMap.get('prior_scale')) : undefined,
-  };
+  const bayesParams: Record<string, unknown> = {};
+  if (optMap.has('seed')) bayesParams.bayes_seed = Number(optMap.get('seed'));
+  if (optMap.has('prior_scale')) bayesParams.bayes_prior_scale = Number(optMap.get('prior_scale'));
+  return createModelSpec('bayes_linear', formula, bayesParams);
 }
 
 // ---- 诊断命令解析 ----
@@ -802,18 +801,15 @@ function parseSvyToModelSpec(
     formula = rest[0];
   }
 
-  const spec: ModelSpec = {
-    model_type: submodelMap[submodel] as ModelSpec['model_type'],
-    formula,
-  };
+  const spec = createModelSpec(submodelMap[submodel] as ModelSpec['model_type'], formula);
 
   if (optMap.has('robust')) spec.vcov = { type: 'HC1' };
   if (optMap.has('cluster')) spec.cluster_column = optMap.get('cluster');
   // svy 的 weights 选项映射为 weights_column
-  if (optMap.has('weights')) spec.weights_column = optMap.get('weights');
-  if (optMap.has('strata')) spec.strata_column = optMap.get('strata');
-  if (optMap.has('psu')) spec.psu_column = optMap.get('psu');
-  if (optMap.has('fpc')) spec.fpc_column = optMap.get('fpc');
+  if (optMap.has('weights')) spec.params.weights_column = optMap.get('weights');
+  if (optMap.has('strata')) spec.params.strata_column = optMap.get('strata');
+  if (optMap.has('psu')) spec.params.psu_column = optMap.get('psu');
+  if (optMap.has('fpc')) spec.params.fpc_column = optMap.get('fpc');
 
   return spec;
 }

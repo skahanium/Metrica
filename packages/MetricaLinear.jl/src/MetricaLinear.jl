@@ -5,6 +5,14 @@ using DataFrames
 using Distributions
 using JSON3
 using LinearAlgebra
+
+"""Bread matrix numerically invertible for leverage (Julia stdlib has no `rcond`)."""
+function _invertible_bread(bread::AbstractMatrix{<:AbstractFloat})
+    n = size(bread, 1)
+    n == 0 && return false
+    c = cond(bread)
+    return isfinite(c) && (1 / c) > n * eps(eltype(bread))
+end
 using Statistics
 using StatsModels
 using MetricaBase
@@ -57,7 +65,7 @@ function MetricaBase.augment(result::OLSFitResult)
     # 计算杠杆值（hat matrix 对角线）
     # WLS: H = X(X'WX)^{-1}X'W，杠杆值 h_ii 使用 bread 矩阵
     bread = result.bread_matrix
-    if det(bread) > eps(Float64)
+    if _invertible_bread(bread)
         leverage = [dot(X[i, :], bread * X[i, :]) for i in 1:nobs]
     else
         leverage = fill(NaN, nobs)

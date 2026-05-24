@@ -46,10 +46,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - name: Prepare Julia env for runtime bridge
+        run: julia --project=packages/MetricaRuntime.jl -e 'using Pkg; Pkg.instantiate()'
       - name: Rust check
         run: cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
       - name: Rust test
         run: cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml
+      - name: Runtime vertical slice (serial)
+        run: cargo test --test vertical_slice --manifest-path runtime/metrica-runtime/Cargo.toml -- --test-threads=1
 
   app-test:
     runs-on: ubuntu-latest
@@ -73,3 +80,21 @@ jobs:
           version: '1.12'
       - name: Check model_type alignment
         run: julia scripts/check_model_type_alignment.jl
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Rust clippy
+        run: cargo clippy --manifest-path runtime/metrica-runtime/Cargo.toml -- -D warnings
+      - name: App TypeScript check
+        run: |
+          cd apps/metrica-desktop
+          npm ci
+          npm run build

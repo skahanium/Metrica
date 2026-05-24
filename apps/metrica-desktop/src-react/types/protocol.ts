@@ -598,122 +598,32 @@ export type SaveParadigm = 'commands_only' | 'commands_and_results';
 
 // ---- 运行时请求/响应 ----
 
+export type ModelType =
+  | 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'pca'
+  | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls'
+  | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin'
+  | 'did' | 'event_study' | 'did_iv' | 'rd' | 'rd_iv' | 'ipw' | 'psm' | 'aipw'
+  | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'gjr_garch' | 'egarch'
+  | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson'
+  | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'spatial_sdm' | 'spatial_sdem' | 'spatial_sac'
+  | 'spatial_gwr' | 'spatial_gtwr' | 'spatial_probit'
+  | 'duration_cox' | 'aft_weibull' | 'aft_exponential' | 'aft_lognormal' | 'aft_loglogistic'
+  | 'bayes_linear' | 'bayes_logistic' | 'bayes_probit' | 'bayes_hierarchical';
+
+/** Runtime wire format: common fields + nested `params` for model-family-specific options. */
 export interface ModelSpec {
-  model_type: 'ols' | 'iv' | 'gmm_linear' | 'quantile' | 'nls' | 'threshold' | 'gls' | 'pca' | 'panel' | 'panel_iv' | 'dynamic_panel_gmm' | 'sur' | 'system_2sls' | 'system_3sls' | 'logit' | 'probit' | 'poisson' | 'ordered_logit' | 'multinomial_logit' | 'negbin' | 'did' | 'event_study' | 'did_iv' | 'rd' | 'rd_iv' | 'ipw' | 'psm' | 'aipw' | 'arima' | 'var' | 'unitroot' | 'cointegration' | 'arch' | 'garch' | 'gjr_garch' | 'egarch' | 'survey_ols' | 'survey_logit' | 'survey_probit' | 'survey_poisson' | 'spatial_lag' | 'spatial_error' | 'spatial_slx' | 'spatial_sdm' | 'spatial_sdem' | 'spatial_sac' | 'spatial_gwr' | 'spatial_gtwr' | 'spatial_probit' | 'duration_cox' | 'aft_weibull' | 'aft_exponential' | 'aft_lognormal' | 'aft_loglogistic' | 'bayes_linear' | 'bayes_logistic' | 'bayes_probit' | 'bayes_hierarchical';
+  model_type: ModelType;
   formula: string;
   vcov?: { type: string };
   weights?: string;
   cluster_column?: string;
-  panel_id?: string;
-  panel_time?: string;
-  panel_method?: 'fe' | 're' | 'fd' | 'between' | 'hdfde' | 'cre' | 'panel_iv';
-  instruments?: string[];
-  endog_columns?: string[];
-  /** 仅 `gmm_linear` / `dynamic_panel_gmm`：`one_step` | `two_step` */
-  gmm_weight?: string;
-  /** 仅 `dynamic_panel_gmm`：首期 `difference`；`system` 二期 */
-  dpgmm_style?: string;
-  /** 仅 `dynamic_panel_gmm`：工具滞后层 `[min_lag, max_lag]` */
-  instrument_lags?: [number, number];
-  collapse_instruments?: boolean;
-  omega_spec?: string;
-  treatment_column?: string;
-  treated_column?: string;
-  post_column?: string;
-  event_time_column?: string;
-  outcome_column?: string;
-  propensity_formula?: string;
-  outcome_formula?: string;
-  // S4c: TimeSeries 字段
-  time_column?: string;
-  variable?: string;
-  variables?: string[];
-  order?: [number, number, number];
-  seasonal_order?: [number, number, number, number];
-  ts_method?: 'mle' | 'css' | 'engle_granger' | 'johansen';
-  lags?: number;
-  deterministic?: 'constant' | 'trend' | 'none';
-  /** 仅 `arch`：ARCH 阶 q（1–12） */
-  arch_order?: number;
-  /** 仅 `garch`：默认 1 */
-  garch_p?: number;
-  garch_q?: number;
-  /** `arch` / `garch`：优化控制 */
-  garch_max_iter?: number;
-  garch_tol?: number;
-  // S4d: Survey 字段
-  weights_column?: string;
-  strata_column?: string;
-  psu_column?: string;
-  fpc_column?: string;
-  /** `sur` / `system_2sls` / `system_3sls`：各方程公式字符串（与 CLI 括号块一一对应） */
-  equations?: string[];
-  /** `system_2sls` / `system_3sls`：按方程分组的内生变量名 */
-  system_endogenous?: string[][];
-  /** `system_2sls` / `system_3sls`：按方程分组的外生工具列名 */
-  system_instruments?: string[][];
-  /** 仅 `sur`：FGLS 最大迭代次数 */
-  sur_max_iter?: number;
-  /** 仅 `sur`：系数变化收敛阈值 */
-  sur_tol?: number;
-  /** 仅 `quantile`：单分位点 τ（开区间 (0,1)） */
-  quantile_tau?: number;
-  /** 仅 `nls`：白名单族（首期 exp_growth） */
-  nls_family?: string;
-  nls_start?: number[];
-  nls_max_iter?: number;
-  nls_tol?: number;
-  /** 仅 `threshold` */
-  threshold_variable?: string;
-  threshold_grid?: number[];
-  threshold_trim_frac?: number;
-  /** 空间模型：边表 CSV（列 id_i, id_j, w） */
-  spatial_weights_path?: string;
-  spatial_id_column?: string;
-  spatial_row_standardize?: boolean;
-  /** GWR/GTWR：坐标列名数组，如 ["lon", "lat"] */
-  spatial_coord_columns?: string[];
-  /** 距离度量：euclidean / haversine / projected */
-  spatial_distance?: string;
-  /** 坐标参考系 */
-  spatial_crs?: string;
-  /** GWR 核函数：gaussian / bisquare */
-  gwr_kernel?: string;
-  /** GWR 固定带宽（与 bandwidth_selection 互斥） */
-  gwr_bandwidth?: number;
-  /** GWR 带宽选择：cv / aicc */
-  gwr_bandwidth_selection?: string;
-  /** GWR 自适应带宽 */
-  gwr_adaptive?: boolean;
-  /** GTWR 时间列名 */
-  gtwr_time_column?: string;
-  /** GTWR 时间尺度（数或 "auto"） */
-  gtwr_time_scale?: number | string;
-  /** 仅 `duration_cox`：随访时间列名（须为正有限实数） */
-  duration_time_column?: string;
-  /** 仅 `duration_cox`：事件指示列（0=删失，1=事件） */
-  duration_event_column?: string;
-  /** 仅 `bayes_linear` / `bayes_logistic` / `bayes_probit` / `bayes_hierarchical` */
-  bayes_seed?: number;
-  bayes_prior_scale?: number;
-  bayes_iter?: number;
-  bayes_warmup?: number;
-  bayes_chains?: number;
-  /** 仅 `bayes_hierarchical` */
-  bayes_group_column?: string;
+  params: Record<string, unknown>;
 }
 
-// === ModelSpec 判别联合变体（Phase 4b：向后平坦序列化） ==========================
+// === 模型族 params 类型（嵌套在 ModelSpec.params 中） ============================
 
 /**
- * `ModelSpec`（定义见上）是 Rust Runtime 之间传递的线格式 —— 单接口，所有可选字段平坦展开。
- * 下方各变体接口和 `ModelSpecVariant` 判别联合提供类型安全的模型族访问。
- * 通过 `toVariant()` / `toFlat()` 在两种表示间转换。
- */
-
-/**
- * 每个模型族的专用接口，仅包含该族相关字段。与 `ModelSpec` 共享 `formula` 等核心字段。
- * 通过 `toVariant()` / `toFlat()` 在两种表示间转换。
+ * 每个模型族的 `params` 对象形状。`ModelSpec` 的公共字段为 formula / vcov / weights / cluster_column。
  */
 
 /** 核心模型字段 —— 所有变体共享 */
@@ -891,60 +801,16 @@ export function isModelFamily(modelType: string, family: string): boolean {
   return MODEL_TYPE_FAMILY[modelType] === family;
 }
 
-// ---- 平坦 / 判别联合 转换 ----
-
-/** 从 ModelSpec 转换为 ModelSpecVariant。浅拷贝：仅提取该变体相关字段。 */
-export function toVariant(spec: ModelSpec): ModelSpecVariant {
-  const core: ModelSpecCore = {
-    formula: spec.formula,
-    vcov: spec.vcov,
-    weights: spec.weights,
-    cluster_column: spec.cluster_column,
-  };
-  const mt = spec.model_type;
-
-  switch (getModelFamily(mt)) {
-    case 'linear':
-      return { ...core, model_type: mt as LinearSpec['model_type'], instruments: spec.instruments, endog_columns: spec.endog_columns, gmm_weight: spec.gmm_weight } as LinearSpec;
-    case 'panel':
-      return { ...core, model_type: mt as PanelSpec['model_type'], panel_id: spec.panel_id, panel_time: spec.panel_time, panel_method: spec.panel_method, instruments: spec.instruments, endog_columns: spec.endog_columns, gmm_weight: spec.gmm_weight, dpgmm_style: spec.dpgmm_style, instrument_lags: spec.instrument_lags, collapse_instruments: spec.collapse_instruments, omega_spec: spec.omega_spec, treated_column: spec.treated_column, post_column: spec.post_column, event_time_column: spec.event_time_column } as PanelSpec;
-    case 'discrete':
-      return { ...core, model_type: mt as DiscreteSpec['model_type'] } as DiscreteSpec;
-    case 'causal':
-      return { ...core, model_type: mt as CausalSpec['model_type'], treatment_column: spec.treatment_column, outcome_column: spec.outcome_column, propensity_formula: spec.propensity_formula, outcome_formula: spec.outcome_formula } as CausalSpec;
-    case 'system':
-      return { ...core, model_type: mt as SystemSpec['model_type'], equations: spec.equations, system_endogenous: spec.system_endogenous, system_instruments: spec.system_instruments, sur_max_iter: spec.sur_max_iter, sur_tol: spec.sur_tol } as SystemSpec;
-    case 'time_series':
-      return { ...core, model_type: mt as TimeSeriesSpec['model_type'], time_column: spec.time_column, variable: spec.variable, variables: spec.variables, order: spec.order, seasonal_order: spec.seasonal_order, ts_method: spec.ts_method, lags: spec.lags, deterministic: spec.deterministic, arch_order: spec.arch_order, garch_p: spec.garch_p, garch_q: spec.garch_q, garch_max_iter: spec.garch_max_iter, garch_tol: spec.garch_tol } as TimeSeriesSpec;
-    case 'survey':
-      return { ...core, model_type: mt as SurveySpec['model_type'], weights_column: spec.weights_column, strata_column: spec.strata_column, psu_column: spec.psu_column, fpc_column: spec.fpc_column } as SurveySpec;
-    case 'spatial':
-      return { ...core, model_type: mt as SpatialSpec['model_type'], spatial_weights_path: spec.spatial_weights_path, spatial_id_column: spec.spatial_id_column, spatial_row_standardize: spec.spatial_row_standardize, spatial_coord_columns: spec.spatial_coord_columns, spatial_distance: spec.spatial_distance, spatial_crs: spec.spatial_crs, gwr_kernel: spec.gwr_kernel, gwr_bandwidth: spec.gwr_bandwidth, gwr_bandwidth_selection: spec.gwr_bandwidth_selection, gwr_adaptive: spec.gwr_adaptive, gtwr_time_column: spec.gtwr_time_column, gtwr_time_scale: spec.gtwr_time_scale } as SpatialSpec;
-    case 'duration':
-      return { ...core, model_type: mt as DurationSpec['model_type'], duration_time_column: spec.duration_time_column, duration_event_column: spec.duration_event_column } as DurationSpec;
-    case 'bayes':
-      return { ...core, model_type: mt as BayesSpec['model_type'], bayes_seed: spec.bayes_seed, bayes_prior_scale: spec.bayes_prior_scale, bayes_iter: spec.bayes_iter, bayes_warmup: spec.bayes_warmup, bayes_chains: spec.bayes_chains, bayes_group_column: spec.bayes_group_column } as BayesSpec;
-    case 'nonlinear':
-      return { ...core, model_type: mt as NonlinearSpec['model_type'], nls_family: spec.nls_family, nls_start: spec.nls_start, nls_max_iter: spec.nls_max_iter, nls_tol: spec.nls_tol, threshold_variable: spec.threshold_variable, threshold_grid: spec.threshold_grid, threshold_trim_frac: spec.threshold_trim_frac } as NonlinearSpec;
-    case 'quantile':
-      return { ...core, model_type: 'quantile' as const, quantile_tau: spec.quantile_tau } as QuantileSpec;
-    default:
-      // Fallback：未知 model_type，返回仅含核心字段的平坦对象
-      return { ...core, model_type: mt as any } as ModelSpecVariant;
-  }
-}
-
-/** 从 ModelSpecVariant 转换为 ModelSpec。解构展开后补充缺失的平坦字段。 */
-export function toFlat(variant: ModelSpecVariant): ModelSpec {
-  return { ...variant } as ModelSpec;
-}
-
-/** GenericFlat — 带 string model_type 的写版本（用于构造 ModelSpec 的写时宽松类型）。 */
-export type ModelSpecWrite = ModelSpec & Record<string, unknown>;
-
 /** Exported header guard */
 export function isModelSpec(v: unknown): v is ModelSpec {
-  return typeof v === 'object' && v !== null && 'model_type' in v && 'formula' in v;
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    'model_type' in v &&
+    'formula' in v &&
+    'params' in v &&
+    typeof (v as ModelSpec).params === 'object'
+  );
 }
 export interface GWRLocalCoefficientRow {
   obs: number;

@@ -98,3 +98,72 @@ function fit_gtwr(y::Vector{Float64}, X::Matrix{Float64}, coords::Matrix{Float64
                          eff_params, sigma2, aicc, hat_diag, diag,
                          MetricaBase.ModelWarning[])
 end
+
+"""
+从 DataFrame 与规格字典拟合 GTWR（Runtime 桥接入口）。
+"""
+function fit_gtwr_model(formula::AbstractString, df::DataFrame, spec::AbstractDict)
+    raw_coords = get(spec, "spatial_coord_columns", nothing)
+    (raw_coords === nothing || isempty(raw_coords)) &&
+        return MetricaBase.ModelError(
+            :gtwr_missing_coords,
+            "缺少 spatial_coord_columns",
+            "",
+            "GTWR 须指定坐标列。",
+        )
+    time_col = String(get(spec, "gtwr_time_column", ""))
+    isempty(strip(time_col)) &&
+        return MetricaBase.ModelError(
+            :gtwr_missing_time_column,
+            "缺少 gtwr_time_column",
+            "",
+            "GTWR 须指定时间列。",
+        )
+    coord_cols = String.(collect(raw_coords))
+    parsed = MetricaBase.parse_metrica_formula(formula)
+    parsed isa MetricaBase.ModelError && return parsed
+    yname, xnames = parsed
+    coord_syms = Symbol.(coord_cols)
+    needcols = unique(vcat([yname], xnames, coord_cols, [time_col]))
+    missingcols = setdiff(needcols, names(df))
+    !isempty(missingcols) &&
+        return MetricaBase.ModelError(
+            :gtwr_missing_columns,
+            "数据缺少列",
+            join(missingcols, ", "),
+            "请检查公式、坐标列与时间列。",
+        )
+    subcc = dropmissing(select(df, needcols))
+    nrow(subcc) == 0 &&
+        return MetricaBase.ModelError(:gtwr_empty_sample, "有效样本为空", "complete cases 为 0。", "请检查缺失值。")
+    n = nrow(subcc)
+    y = Vector{Float64}(undef, n)
+    X = zeros(Float64, n, 1 + length(xnames))
+    coords = zeros(Float64, n, length(coord_syms))
+    times = Vector{Float64}(undef, n)
+    for (i, row) in enumerate(eachrow(subcc))
+        y[i] = Float64(row[Symbol(yname)])
+        X[i, 1] = 1.0
+        for (j, xn) in enumerate(xnames)
+            X[i, j + 1] = Float64(row[Symbol(xn)])
+        end
+        for (j, cs) in enumerate(coord_syms)
+            coords[i, j] = Float64(row[cs])
+        end
+        times[i] = Float64(row[Symbol(time_col)])
+    end
+    kernel = String(get(spec, "gwr_kernel", "gaussian"))
+    bandwidth = if haskey(spec, "gwr_bandwidth") && spec["gwr_bandwidth"] !== nothing
+        Float64(spec["gwr_bandwidth"])
+    else
+        nothing
+    end
+    time_scale = if haskey(spec, "gtwr_time_scale") && spec["gtwr_time_scale"] !== nothing
+        ts = spec["gtwr_time_scale"]
+        (ts == "auto" || ts == :auto) ? nothing : Float64(ts)
+    else
+        nothing
+    end
+    return fit_gtwr(y, X, coords, times;
+        kernel=kernel, bandwidth=bandwidth, time_scale=time_scale)
+end

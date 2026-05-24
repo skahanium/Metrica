@@ -17,8 +17,13 @@ function posterior_predictive(r::BayesFitResult, X_new::Matrix{Float64}; n_draws
             draws[:, i] = rand(MvNormal(r.posterior_mean, Symmetric(Σ_n .* σ2_draw)))
         end
     end
-    pred_mean = vec(mean(X_new * draws, dims=2))
-    pred_lo = vec(quantile([X_new * draws[:, i] for i in 1:n_draws] |> x -> reduce(hcat, x), 0.025))
-    pred_hi = vec(quantile([X_new * draws[:, i] for i in 1:n_draws] |> x -> reduce(hcat, x), 0.975))
+    n_new = size(X_new, 1)
+    preds = zeros(n_new, n_draws)
+    for j in 1:n_draws
+        preds[:, j] = X_new * draws[:, j]
+    end
+    pred_mean = vec(mean(preds, dims=2))
+    pred_lo = [quantile(view(preds, i, :), 0.025) for i in 1:n_new]
+    pred_hi = [quantile(view(preds, i, :), 0.975) for i in 1:n_new]
     return Dict{Symbol, Any}(:mean => pred_mean, :ci_lower => pred_lo, :ci_upper => pred_hi)
 end

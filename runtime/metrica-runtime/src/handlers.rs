@@ -20,7 +20,7 @@ use crate::types::{
 };
 use crate::{
     health_summary, resolve_dataset_path, resolve_working_dir, safe_runs_path, sanitize_id,
-    validate_model_request, validate_spatial_weights_on_disk,
+    validate_model_request, validate_spatial_weights_on_disk, ValidatedModelParams,
 };
 
 use crate::server::AppState;
@@ -541,7 +541,7 @@ pub(crate) async fn export_report_handler(
     let params = match request.format.as_str() {
         "markdown" => {
             let run_record_dict = serde_json::to_value(&run_record)
-                .and_then(|v| serde_json::from_value::<serde_json::Value>(v))
+                .and_then(serde_json::from_value::<serde_json::Value>)
                 .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
             json!({ "run_record": run_record_dict, "result": result_summary })
         }
@@ -685,16 +685,23 @@ async fn handle_model_request(
         );
     }
 
-    if request.action == actions::FIT_MODEL {
-        if let Some(response) = validate_fit_model_request(&request) {
-            return response;
+    let validated = if request.action == actions::FIT_MODEL {
+        match validate_fit_model_request(&request) {
+            Ok(v) => Some(v),
+            Err(resp) => return resp,
         }
-    }
+    } else {
+        None
+    };
 
     let working_dir = resolve_working_dir(&request.project_context.working_dir);
     let dataset_path = resolve_dataset_path(&request.dataset_ref.path, &working_dir);
 
-    let mut params = build_model_params(&request);
+    let mut params = if let Some(ref validated) = validated {
+        build_model_params(&request, validated)
+    } else {
+        build_model_params_inspect(&request)
+    };
     params["dataset_path"] = json!(dataset_path.clone());
     params["working_dir"] = json!(working_dir.to_string_lossy().to_string());
 
@@ -806,96 +813,69 @@ async fn handle_query_dataset_request(
 
 // === 模型参数构建 ===============================================================
 
-fn build_model_params(request: &TaskRequest) -> serde_json::Value {
-    let vcov = request.model_spec.vcov.as_ref()
+fn build_model_params(request: &TaskRequest, validated: &ValidatedModelParams) -> serde_json::Value {
+    let vcov = request
+        .model_spec
+        .vcov
+        .as_ref()
         .map(|spec| spec.kind.as_str())
         .unwrap_or("classical");
 
-    let mut params = json!({
-        "dataset_path": "",
-        "formula": request.model_spec.formula,
-        "model_type": request.model_spec.model_type,
-        "vcov": vcov,
-        "weights": request.model_spec.weights,
-        "return_augment": request.options.return_augment,
-        "preview_rows": request.options.preview_rows,
-    });
-
-    if let Some(ref col) = request.model_spec.cluster_column { params["cluster_column"] = json!(col); }
-    if let Some(ref panel_id) = request.model_spec.panel_id { params["panel_id"] = json!(panel_id); }
-    if let Some(ref panel_time) = request.model_spec.panel_time { params["panel_time"] = json!(panel_time); }
-    if let Some(ref panel_method) = request.model_spec.panel_method { params["panel_method"] = json!(panel_method); }
-    if let Some(ref instruments) = request.model_spec.instruments { params["instruments"] = json!(instruments); }
-    if let Some(ref endog_columns) = request.model_spec.endog_columns { params["endog_columns"] = json!(endog_columns); }
-    if let Some(ref gw) = request.model_spec.gmm_weight { params["gmm_weight"] = json!(gw); }
-    if let Some(ref ds) = request.model_spec.dpgmm_style { params["dpgmm_style"] = json!(ds); }
-    if let Some(ref il) = request.model_spec.instrument_lags { params["instrument_lags"] = json!(il); }
-    if let Some(c) = request.model_spec.collapse_instruments { params["collapse_instruments"] = json!(c); }
-    if let Some(ref omega_spec) = request.model_spec.omega_spec { params["omega_spec"] = json!(omega_spec); }
-    if let Some(ref col) = request.model_spec.treatment_column { params["treatment_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.treated_column { params["treated_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.post_column { params["post_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.event_time_column { params["event_time_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.outcome_column { params["outcome_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.time_column { params["time_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.variable { params["variable"] = json!(col); }
-    if let Some(ref cols) = request.model_spec.variables { params["variables"] = json!(cols); }
-    if let Some(ref order) = request.model_spec.order { params["order"] = json!(order); }
-    if let Some(ref order) = request.model_spec.seasonal_order { params["seasonal_order"] = json!(order); }
-    if let Some(ref m) = request.model_spec.ts_method { params["ts_method"] = json!(m); }
-    if let Some(lags) = request.model_spec.lags { params["lags"] = json!(lags); }
-    if let Some(ref det) = request.model_spec.deterministic { params["deterministic"] = json!(det); }
-    if let Some(ao) = request.model_spec.arch_order { params["arch_order"] = json!(ao); }
-    if let Some(gp) = request.model_spec.garch_p { params["garch_p"] = json!(gp); }
-    if let Some(gq) = request.model_spec.garch_q { params["garch_q"] = json!(gq); }
-    if let Some(n) = request.model_spec.garch_max_iter { params["garch_max_iter"] = json!(n); }
-    if let Some(t) = request.model_spec.garch_tol { params["garch_tol"] = json!(t); }
-    if let Some(ref col) = request.model_spec.weights_column { params["weights_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.strata_column { params["strata_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.psu_column { params["psu_column"] = json!(col); }
-    if let Some(ref col) = request.model_spec.fpc_column { params["fpc_column"] = json!(col); }
-    if let Some(ref eqs) = request.model_spec.equations { params["equations"] = json!(eqs); }
-    if let Some(ref se) = request.model_spec.system_endogenous { params["system_endogenous"] = json!(se); }
-    if let Some(ref si) = request.model_spec.system_instruments { params["system_instruments"] = json!(si); }
-    if let Some(n) = request.model_spec.sur_max_iter { params["sur_max_iter"] = json!(n); }
-    if let Some(t) = request.model_spec.sur_tol { params["sur_tol"] = json!(t); }
-
-    if request.model_spec.model_type == "quantile" {
-        params["quantile_tau"] = json!(request.model_spec.quantile_tau.unwrap_or(0.5));
+    let mut map = serde_json::Map::new();
+    map.insert("dataset_path".to_string(), json!(""));
+    map.insert("formula".to_string(), json!(request.model_spec.formula));
+    map.insert("model_type".to_string(), json!(request.model_spec.model_type));
+    map.insert("vcov".to_string(), json!(vcov));
+    if let Some(ref w) = request.model_spec.weights {
+        map.insert("weights".to_string(), json!(w));
     }
-    if request.model_spec.model_type == "nls" {
-        if let Some(ref fam) = request.model_spec.nls_family { params["nls_family"] = json!(fam); }
-        if let Some(ref s) = request.model_spec.nls_start { params["nls_start"] = json!(s); }
-        if let Some(n) = request.model_spec.nls_max_iter { params["nls_max_iter"] = json!(n); }
-        if let Some(t) = request.model_spec.nls_tol { params["nls_tol"] = json!(t); }
+    map.insert(
+        "return_augment".to_string(),
+        json!(request.options.return_augment),
+    );
+    map.insert(
+        "preview_rows".to_string(),
+        json!(request.options.preview_rows),
+    );
+    if let Some(ref col) = request.model_spec.cluster_column {
+        map.insert("cluster_column".to_string(), json!(col));
     }
-    if request.model_spec.model_type == "threshold" {
-        if let Some(ref v) = request.model_spec.threshold_variable { params["threshold_variable"] = json!(v); }
-        if let Some(ref g) = request.model_spec.threshold_grid { params["threshold_grid"] = json!(g); }
-        if let Some(tf) = request.model_spec.threshold_trim_frac { params["threshold_trim_frac"] = json!(tf); }
-    }
-    if let Some(ref p) = request.model_spec.spatial_weights_path { params["spatial_weights_path"] = json!(p); }
-    if let Some(ref p) = request.model_spec.spatial_id_column { params["spatial_id_column"] = json!(p); }
-    if let Some(b) = request.model_spec.spatial_row_standardize { params["spatial_row_standardize"] = json!(b); }
-    if let Some(ref coords) = request.model_spec.spatial_coord_columns { params["spatial_coord_columns"] = json!(coords); }
-    if let Some(ref dist) = request.model_spec.spatial_distance { params["spatial_distance"] = json!(dist); }
-    if let Some(ref crs) = request.model_spec.spatial_crs { params["spatial_crs"] = json!(crs); }
-    if let Some(ref kern) = request.model_spec.gwr_kernel { params["gwr_kernel"] = json!(kern); }
-    if let Some(bw) = request.model_spec.gwr_bandwidth { params["gwr_bandwidth"] = json!(bw); }
-    if let Some(ref bwsel) = request.model_spec.gwr_bandwidth_selection { params["gwr_bandwidth_selection"] = json!(bwsel); }
-    if let Some(adp) = request.model_spec.gwr_adaptive { params["gwr_adaptive"] = json!(adp); }
-    if let Some(ref tc) = request.model_spec.gtwr_time_column { params["gtwr_time_column"] = json!(tc); }
-    if let Some(ref ts) = request.model_spec.gtwr_time_scale { params["gtwr_time_scale"] = ts.clone(); }
-    if let Some(ref c) = request.model_spec.duration_time_column { params["duration_time_column"] = json!(c); }
-    if let Some(ref c) = request.model_spec.duration_event_column { params["duration_event_column"] = json!(c); }
-    if let Some(seed) = request.model_spec.bayes_seed { params["bayes_seed"] = json!(seed); }
-    if let Some(scale) = request.model_spec.bayes_prior_scale { params["bayes_prior_scale"] = json!(scale); }
-    if let Some(iter) = request.model_spec.bayes_iter { params["bayes_iter"] = json!(iter); }
-    if let Some(warmup) = request.model_spec.bayes_warmup { params["bayes_warmup"] = json!(warmup); }
-    if let Some(chains) = request.model_spec.bayes_chains { params["bayes_chains"] = json!(chains); }
-    if let Some(ref group) = request.model_spec.bayes_group_column { params["bayes_group_column"] = json!(group); }
 
-    params
+    validated.merge_into_flat(&mut map);
+
+    if request.model_spec.model_type == "quantile" && !map.contains_key("quantile_tau") {
+        map.insert("quantile_tau".to_string(), json!(0.5));
+    }
+
+    serde_json::Value::Object(map)
+}
+
+fn build_model_params_inspect(request: &TaskRequest) -> serde_json::Value {
+    let vcov = request
+        .model_spec
+        .vcov
+        .as_ref()
+        .map(|spec| spec.kind.as_str())
+        .unwrap_or("classical");
+
+    let mut map = serde_json::Map::new();
+    map.insert("dataset_path".to_string(), json!(""));
+    map.insert("formula".to_string(), json!(request.model_spec.formula));
+    map.insert("model_type".to_string(), json!(request.model_spec.model_type));
+    map.insert("vcov".to_string(), json!(vcov));
+    if let Some(ref w) = request.model_spec.weights {
+        map.insert("weights".to_string(), json!(w));
+    }
+    map.insert(
+        "return_augment".to_string(),
+        json!(request.options.return_augment),
+    );
+    map.insert(
+        "preview_rows".to_string(),
+        json!(request.options.preview_rows),
+    );
+    crate::model_params::merge_value_into_map(&mut map, request.model_spec.params.clone());
+    serde_json::Value::Object(map)
 }
 
 // === 校验桥接 ===================================================================
@@ -910,14 +890,16 @@ fn validation_error_to_response(err: &ValidationError, task_id: &str) -> axum::r
     )
 }
 
-fn validate_fit_model_request(request: &TaskRequest) -> Option<axum::response::Response> {
-    if let Some(err) = validate_model_request(&request.model_spec) {
-        return Some(validation_error_to_response(&err, &request.task_id));
+#[allow(clippy::result_large_err)]
+fn validate_fit_model_request(
+    request: &TaskRequest,
+) -> Result<ValidatedModelParams, axum::response::Response> {
+    let validated = validate_model_request(&request.model_spec)
+        .map_err(|err| validation_error_to_response(&err, &request.task_id))?;
+    if let Some(err) = validate_spatial_weights_on_disk(request, &validated) {
+        return Err(validation_error_to_response(&err, &request.task_id));
     }
-    if let Some(err) = validate_spatial_weights_on_disk(request) {
-        return Some(validation_error_to_response(&err, &request.task_id));
-    }
-    None
+    Ok(validated)
 }
 
 // === 错误响应 ===================================================================
@@ -950,6 +932,7 @@ pub fn json_error_response(
 
 // === 辅助函数 ===================================================================
 
+#[allow(clippy::result_large_err)]
 fn resolve_transform_output_path(
     working_dir: &std::path::Path,
     task_id: &str,

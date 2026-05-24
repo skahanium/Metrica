@@ -3,7 +3,14 @@ module MetricaGMM
 using CSV
 using DataFrames
 using Distributions: TDist, FDist, Chisq, cdf, quantile
-using LinearAlgebra: Symmetric, cholesky, inv, dot, rank, diag, I, tr, eigvals
+using LinearAlgebra: Symmetric, cholesky, inv, dot, rank, diag, I, tr, eigvals, cond
+
+function _invertible_bread(bread::AbstractMatrix{<:AbstractFloat})
+    n = size(bread, 1)
+    n == 0 && return false
+    c = cond(bread)
+    return isfinite(c) && (1 / c) > n * eps(eltype(bread))
+end
 using Optim
 using Statistics
 using StatsModels

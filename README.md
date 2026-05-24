@@ -35,7 +35,7 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 - **当前仓库整体发布线：** `0.1.0`（与 [CHANGELOG.md](CHANGELOG.md) 最新条目、[CITATION.cff](CITATION.cff) 中的 `version` 一致）。
 - **论文与软件引用：** 以根目录 [CITATION.cff](CITATION.cff) 为准（含 `date-released`）；GitHub 仓库页的「Cite this repository」也由此生成。
-- **各组件版本字段：** Julia Core 为各 `packages/*/Project.toml` 的 `version`（另有 `scripts/daemon/Project.toml`）；Runtime 为 `runtime/metrica-runtime/Cargo.toml`；桌面壳为 `apps/metrica-desktop/src-tauri/Cargo.toml`。正式发布时应与上述发布线一致，清单见 [docs/governance/versioning.md](docs/governance/versioning.md#仓库内须同步的版本字段)。
+- **各组件版本字段：** Julia Core 为各 `packages/*/Project.toml` 的 `version`（另有 `scripts/daemon/Project.toml`）；Runtime 为 `runtime/metrica-runtime/Cargo.toml`；桌面原生壳（wry + tao，目录名 `src-tauri` 为历史路径，非 [Tauri](https://tauri.app/) 框架）为 `apps/metrica-desktop/src-tauri/Cargo.toml`。正式发布时应与上述发布线一致，清单见 [docs/governance/versioning.md](docs/governance/versioning.md#仓库内须同步的版本字段)。
 - **前端 npm 包：** `apps/metrica-desktop/package.json` 未维护 `version` 字段；若需对外报桌面版本，以 **桌面壳工程** `Cargo.toml` 为准。
 
 发版步骤与质量门禁见 [docs/governance/release-process.md](docs/governance/release-process.md) 与 [docs/quality/release-checklist.md](docs/quality/release-checklist.md)。
@@ -67,7 +67,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 # Runtime（需要 Rust）
 cd runtime/metrica-runtime && cargo build --release
 
-# 桌面 App（需要 Node.js + Rust）
+# 桌面 App（需要 Node.js + Rust；`src-tauri` 为原生壳工程目录，非 Tauri 框架）
 cd apps/metrica-desktop && npm ci && cargo run --manifest-path src-tauri/Cargo.toml
 ```
 
