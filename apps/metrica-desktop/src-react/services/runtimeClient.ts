@@ -2,7 +2,7 @@ import type {
   DataCommandRequest, DataCommandResult,
   DataOp, FitModelRequest, TaskResponse, DatasetSummary, TransformRequest, TransformResult,
   TransformTaskResponse, SaveProjectRequest, ProjectManifest, LoadProjectRequest, ListRunsRequest,
-  RerunTaskRequest, RunRecord, DiagnosticSpec,
+  RerunTaskRequest, RunRecord, DiagnosticSpec, ModelFamilyParams,
 } from '../types/protocol';
 
 const DEFAULT_BASE = 'http://127.0.0.1:47821';
@@ -107,7 +107,7 @@ function splitList(raw: string): string[] {
   return raw.split(/[,\s]+/).filter(Boolean);
 }
 
-function buildFamilyParams(p: FitModelParams): Record<string, unknown> {
+function buildFamilyParams(p: FitModelParams): ModelFamilyParams {
   const modelType = p.modelType ?? 'ols';
   const params: Record<string, unknown> = {};
   const {
@@ -337,7 +337,7 @@ function buildFamilyParams(p: FitModelParams): Record<string, unknown> {
     if (ecol) params.duration_event_column = ecol;
   }
 
-  return params;
+  return params as ModelFamilyParams;
 }
 
 export function buildFitModelRequest(params: FitModelParams): FitModelRequest {

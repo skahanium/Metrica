@@ -1,10 +1,10 @@
 import { getGrammar } from './commandGrammar';
-import type { ModelSpec, DiagnosticSpec } from '../types/protocol';
+import type { ModelSpec, ModelFamilyParams, DiagnosticSpec } from '../types/protocol';
 
 function createModelSpec(
   model_type: ModelSpec['model_type'],
   formula: string,
-  params: Record<string, unknown> = {},
+  params: ModelFamilyParams = {} as ModelFamilyParams,
 ): ModelSpec {
   return { model_type, formula, params };
 }

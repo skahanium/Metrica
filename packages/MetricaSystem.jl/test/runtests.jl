@@ -221,3 +221,29 @@ end
     )
     @test r isa MetricaBase.ModelError || r isa SystemEquationsFitResult
 end
+
+@testset "SUR 已知 DGP 系数符号与量级" begin
+    n = 500
+    x1 = [sin(0.17 * i) + 0.3 * cos(0.11 * i) for i in 1:n]
+    x2 = [cos(0.13 * i) - 0.2 * sin(0.09 * i) for i in 1:n]
+    e1 = [0.4 * sin(0.31 * i + 1.0) for i in 1:n]
+    e2 = [0.4 * cos(0.27 * i + 2.0) + 0.25 * e1[i] for i in 1:n]
+    y1 = 1.0 .+ 2.0 .* x1 .+ e1
+    y2 = -0.5 .+ 1.5 .* x2 .+ e2
+    tmp = joinpath(@__DIR__, "sur_dgp.csv")
+    open(tmp, "w") do io
+        println(io, "y1,y2,x1,x2")
+        for i in 1:n
+            println(io, "$(y1[i]),$(y2[i]),$(x1[i]),$(x2[i])")
+        end
+    end
+    r = fit(SURModel, "", tmp; equations=["y1 ~ x1", "y2 ~ x2"])
+    rm(tmp; force=true)
+    @test r isa SystemEquationsFitResult
+    rows = tidy(r).rows
+    labels = r.tidy_equation_labels
+    b_y1_x1 = only(row.estimate for (lab, row) in zip(labels, rows) if lab == "eq1" && row.name == :x1)
+    b_y2_x2 = only(row.estimate for (lab, row) in zip(labels, rows) if lab == "eq2" && row.name == :x2)
+    @test b_y1_x1 > 1.2
+    @test b_y2_x2 > 0.9
+end

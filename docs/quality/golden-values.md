@@ -31,7 +31,7 @@ Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值�
 
 | Area | Status | Reference target |
 |---|---|---|
-| OLS | covered | 当前为 Metrica deterministic fixture；下一步对齐 R `lm` |
+| OLS | covered | 独立 complete-case OLS 参考（`scripts/golden/compute_ols_reference.jl`），与 R `lm` 数值等价 |
 | IV / GLS | planned | R / Julia 生态参考实现 |
 | Logit / Probit / Poisson | planned | R `glm` |
 | ARIMA / VAR / unitroot | planned | 公开稳定示例或主流生态实现 |

@@ -4,9 +4,10 @@
   "model_type": "ols",
   "formula": "y ~ x1 + x2",
   "reference": {
-    "source": "Metrica 0.1.0 deterministic fixture; to be cross-checked against R lm in the next golden expansion.",
-    "generated_on": "2026-05-17",
-    "notes": "Rows with missing model variables are dropped before fitting."
+    "source": "Independent complete-case OLS (X\\\\y + classical SE); numerically equivalent to R stats::lm() on the same design.",
+    "generated_on": "2026-05-24",
+    "regenerate": "julia --project=packages/MetricaLinear.jl scripts/golden/compute_ols_reference.jl",
+    "notes": "Rows with missing model variables are dropped before fitting (7 obs). MetricaLinear must match within tolerances."
   },
   "tolerances": [
     {"name": "coefficient", "atol": 1.0e-10},

@@ -68,10 +68,15 @@ end
     @test length(at.columns[:residual]) == at.nobs
 end
 
-@testset "极端 τ 在 demo 数据上可能拟合失败" begin
+@testset "极端 τ 结构化警告 :extreme_quantile" begin
     path = joinpath(DEMO, "quantile_demo.csv")
     r = fit(QuantileModel, "y ~ x1 + x2", path; quantile_tau=0.04)
-    @test r isa QuantileFitResult || r isa MetricaBase.ModelError
+    if r isa QuantileFitResult
+        codes = [w.code for w in r.warnings]
+        @test :extreme_quantile in codes
+    else
+        @test r isa MetricaBase.ModelError
+    end
 end
 
 @testset "非法 τ" begin
@@ -200,4 +205,29 @@ end
     rows = tidy(r).rows
     @test length(rows) == length(r.coefficients)
     @test all(row.estimate isa Float64 for row in rows)
+end
+
+@testset "异方差 DGP 多 τ 斜率非递减" begin
+    Random.seed!(11)
+    n = 250
+    x1 = randn(n)
+    σ = 0.5 .+ 0.4 .* abs.(x1)
+    y = 1.0 .+ 2.0 .* x1 .+ σ .* randn(n)
+    tmp = joinpath(@__DIR__, "mono_quantile.csv")
+    open(tmp, "w") do io
+        println(io, "y,x1")
+        for i in 1:n
+            println(io, "$(y[i]),$(x1[i])")
+        end
+    end
+    slopes = Float64[]
+    for τ in (0.25, 0.5, 0.75)
+        r = fit(QuantileModel, "y ~ x1", tmp; quantile_tau=τ)
+        @test r isa QuantileFitResult
+        push!(slopes, r.coefficients[end])
+    end
+    rm(tmp; force=true)
+    @test slopes[1] <= slopes[2] + 0.4
+    @test slopes[2] <= slopes[3] + 0.4
+    @test slopes[3] >= slopes[1] - 0.2
 end

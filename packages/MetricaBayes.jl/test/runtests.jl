@@ -219,3 +219,19 @@ end
     df = DataFrame(y=[1.0, 2.0], x1=[1.0, 2.0])
     @test_throws Exception fit_bayes_linear_mcmc(df, "y ~ missing"; bayes_iter=50, bayes_warmup=20)
 end
+
+@testset "Bayes linear 单观测可拟合" begin
+    df = DataFrame(y=[2.0], x1=[1.0])
+    r = fit_bayes_linear(df, "y ~ x1"; bayes_sigma2_known=true, bayes_sigma2_value=1.0)
+    @test r isa BayesFitResult
+    @test r.n_obs == 1
+end
+
+@testset "Bayes linear 全缺失行后无有效样本" begin
+    df = DataFrame(y=[missing, missing], x1=[missing, 1.0])
+    r = fit_bayes_linear(df, "y ~ x1"; bayes_sigma2_known=true, bayes_sigma2_value=1.0)
+    @test r isa MetricaBase.ModelError || r isa BayesFitResult
+    if r isa MetricaBase.ModelError
+        @test r.code == :bayes_empty_sample
+    end
+end

@@ -610,6 +610,12 @@ export type ModelType =
   | 'duration_cox' | 'aft_weibull' | 'aft_exponential' | 'aft_lognormal' | 'aft_loglogistic'
   | 'bayes_linear' | 'bayes_logistic' | 'bayes_probit' | 'bayes_hierarchical';
 
+/** 嵌套 `params` 对象：各 `*Spec` 去掉顶层公共字段后的判别联合。 */
+export type ModelFamilyParams = Omit<
+  ModelSpecVariant,
+  'model_type' | 'formula' | 'vcov' | 'weights' | 'cluster_column'
+>;
+
 /** Runtime wire format: common fields + nested `params` for model-family-specific options. */
 export interface ModelSpec {
   model_type: ModelType;
@@ -617,7 +623,7 @@ export interface ModelSpec {
   vcov?: { type: string };
   weights?: string;
   cluster_column?: string;
-  params: Record<string, unknown>;
+  params: ModelFamilyParams;
 }
 
 // === 模型族 params 类型（嵌套在 ModelSpec.params 中） ============================
