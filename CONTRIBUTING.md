@@ -54,9 +54,13 @@ Metrica 处于回顾完善阶段。优先接受：
 1. Fork 本仓库
 2. 从 `main` 分支创建你的特性分支
 3. 编写代码和测试
-4. 确保全部测试通过：
+4. 确保测试通过（按改动范围选择）：
    ```bash
+   # 快速：核心 Julia + Runtime 单测 + App
    bash scripts/dev/test-core.sh
+   # 合并前建议：与 CI 对齐的完整 P0 门禁
+   bash scripts/dev/test-p0.sh
+   # 或：make test-p0
    ```
 5. 提交 PR（使用 PR 模板）
 6. 等待 review
@@ -77,7 +81,7 @@ bash scripts/dev/test-package.sh MetricaLinear.jl
 
 - Julia：遵循 `packages/` 下现有包的命名和结构模式
 - Rust：`cargo fmt` + `cargo clippy`
-- TypeScript：遵循 `apps/metrica-desktop/` 下的 ESLint 配置
+- TypeScript：`npm run build`（类型检查）；仓库当前无 ESLint 配置
 - 核心文档使用简体中文；代码注释中英文均可
 - Commit 消息格式：`feat(scope): description` 或 `fix(scope): description`
 
@@ -88,10 +92,10 @@ bash scripts/dev/test-package.sh MetricaLinear.jl
 - 数值结果变更应补充或更新 golden-value fixture，格式见 [docs/quality/golden-values.md](docs/quality/golden-values.md)
 - 发布前质量门禁见 [docs/quality/release-checklist.md](docs/quality/release-checklist.md)
 - 版本和破坏性变更规则见 [docs/governance/versioning.md](docs/governance/versioning.md)
-- 所有 Julia 包：`julia --project=<pkg> -e 'using Pkg; Pkg.test()'`
-- PR 阻塞 Julia 核心链路：`make test-julia-core`
-- Runtime：`cargo test --lib`
-- App：`cd apps/metrica-desktop && npm test`
+- 完整 P0 门禁（18 个 Julia 包 + 对齐脚本 + Runtime 串行集成 + App）：`bash scripts/dev/test-p0.sh` 或 `make test-p0`
+- 快速 PR 检查：`bash scripts/dev/test-core.sh`（核心 Julia + Runtime 单测 + App）
+- 所有 Julia 包：`julia --project=packages/<Pkg>.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'`
+- Runtime 集成测试须串行：`cargo test --test vertical_slice --manifest-path runtime/metrica-runtime/Cargo.toml -- --test-threads=1`
 
 ## Review 规则
 

@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -38,11 +36,12 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia-version }}
-      - name: Test ${{ matrix.package }}
-        run: julia --project=packages/${{ matrix.package }} -e 'using Pkg; Pkg.test()'
+      - name: Instantiate and test ${{ matrix.package }}
+        run: julia --project=packages/${{ matrix.package }} -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
 
   rust-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1

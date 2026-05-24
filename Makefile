@@ -1,4 +1,4 @@
-.PHONY: test test-julia test-julia-core test-rust test-app check lint clean
+.PHONY: test test-julia test-julia-core test-rust test-app test-p0 check lint clean
 
 # 全栈测试
 test:
@@ -20,10 +20,15 @@ test-julia-core:
 	julia --project=packages/MetricaBase.jl -e 'using Pkg; Pkg.test()'
 	julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.test()'
 
-# Rust 编译检查 + 测试
+# Rust 编译检查 + 单元测试 + 串行 vertical_slice（与 CI rust-check 一致）
 test-rust:
 	cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
 	cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml
+	cargo test --test vertical_slice --manifest-path runtime/metrica-runtime/Cargo.toml -- --test-threads=1
+
+# 与 CI 主路径对齐的完整 P0 门禁（耗时较长，合并前建议跑）
+test-p0:
+	bash scripts/dev/test-p0.sh
 
 # App 测试
 test-app:
@@ -33,13 +38,13 @@ test-app:
 check-rust:
 	cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
 
-# Rust lint
+# Rust lint（与 CI lint job 一致）
 lint-rust:
-	cargo clippy --manifest-path runtime/metrica-runtime/Cargo.toml
+	cargo clippy --manifest-path runtime/metrica-runtime/Cargo.toml -- -D warnings
 
-# App lint
+# App 类型检查（仓库无 ESLint 配置，与 CI 使用 npm run build）
 lint-app:
-	cd apps/metrica-desktop && npx eslint src-react/
+	cd apps/metrica-desktop && npm ci && npm run build
 
 # 全量 lint
 lint: lint-rust lint-app
