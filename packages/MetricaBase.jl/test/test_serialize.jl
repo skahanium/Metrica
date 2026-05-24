@@ -104,6 +104,14 @@ using MetricaBase, Test
         @test build_augment_preview(empty_at) == []
     end
 
+    @testset "build_glance_envelope 空 metrics 与 warnings" begin
+        gl = ModelGlance(:dataset_describe, 0, 0, Dict{Symbol, MetricValue}(), ModelWarning[])
+        gd, ws = build_glance_envelope(gl)
+        @test gd["nobs"] == 0
+        @test isempty(gd["metrics"])
+        @test isempty(ws)
+    end
+
     @testset "try_capabilities" begin
         struct CapResultTest end
         MetricaBase.model_capabilities(::CapResultTest) = ModelCapabilities(

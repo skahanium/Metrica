@@ -68,12 +68,12 @@ end
     @test length(at.columns[:residual]) == at.nobs
 end
 
-@testset "极端 τ 结构化警告 :extreme_quantile" begin
+@testset "τ 近边界结构化警告 :tau_near_boundary" begin
     path = joinpath(DEMO, "quantile_demo.csv")
-    r = fit(QuantileModel, "y ~ x1 + x2", path; quantile_tau=0.04)
+    r = fit(QuantileModel, "y ~ x1 + x2", path; quantile_tau=0.01)
     if r isa QuantileFitResult
         codes = [w.code for w in r.warnings]
-        @test :extreme_quantile in codes
+        @test :tau_near_boundary in codes
     else
         @test r isa MetricaBase.ModelError
     end

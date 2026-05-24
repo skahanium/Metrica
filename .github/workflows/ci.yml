@@ -92,6 +92,7 @@ jobs:
           node-version: 20
       - name: Rust clippy
         run: cargo clippy --manifest-path runtime/metrica-runtime/Cargo.toml -- -D warnings
+      # 仓库未配置 ESLint；lint 以 tsc/vite build 作类型检查（见 CONTRIBUTING.md）。
       - name: App TypeScript check
         run: |
           cd apps/metrica-desktop

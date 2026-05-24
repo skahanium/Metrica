@@ -6,12 +6,16 @@ using Distributions
 using JSON3
 using LinearAlgebra
 
-"""Bread matrix numerically invertible for leverage (Julia stdlib has no `rcond`)."""
+"""
+Bread 矩阵是否数值可逆（用于杠杆值）。
+
+Julia 标准库无 `rcond`；此处用 `1/cond(bread)` 作为逆条件数近似（与 `rcond` 同阶判定）。
+"""
 function _invertible_bread(bread::AbstractMatrix{<:AbstractFloat})
     n = size(bread, 1)
     n == 0 && return false
-    c = cond(bread)
-    return isfinite(c) && (1 / c) > n * eps(eltype(bread))
+    inv_cond = 1 / cond(bread)
+    return isfinite(inv_cond) && inv_cond > n * eps(eltype(bread))
 end
 using Statistics
 using StatsModels

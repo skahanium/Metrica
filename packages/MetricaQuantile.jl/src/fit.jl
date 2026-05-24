@@ -93,8 +93,8 @@ function MetricaBase.fit(
         push!(
             warnings,
             MetricaBase.ModelWarning(
-                :extreme_quantile,
-                "极端分位点",
+                :tau_near_boundary,
+                get(MetricaBase.WARNING_CODE, :tau_near_boundary, "分位点 τ 接近边界"),
                 "τ 接近 0 或 1 时，系数与标准误的渐近近似可能不稳定，小样本下尤甚。",
                 "可尝试更居中的分位点或增大样本。",
                 MetricaBase.info,
