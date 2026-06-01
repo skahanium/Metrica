@@ -65,7 +65,7 @@ function MetricaBase.augment(result::GMMLinearFitResult)
 
     XtX = X' * X
     leverage = if _invertible_bread(XtX)
-        XtX_inv = inv(XtX)
+        XtX_inv = inv(cholesky(Symmetric(XtX)))
         [dot(X[i, :], XtX_inv * X[i, :]) for i in 1:nobs_val]
     else
         fill(NaN, nobs_val)
@@ -101,7 +101,7 @@ function MetricaBase.predict(result::GMMLinearFitResult;
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
-    XtX_inv = inv(result.design_matrix' * result.design_matrix)
+    XtX_inv = inv(cholesky(Symmetric(result.design_matrix' * result.design_matrix)))
 
     se_pred = if interval === :confidence
         [sqrt(sigma^2 * dot(X[i, :], XtX_inv * X[i, :])) for i in 1:size(X, 1)]

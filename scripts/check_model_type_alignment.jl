@@ -4,7 +4,7 @@
 
 CI script to verify that the list of supported model_type values is consistent
 across:
-  - Rust: `model_required_fields()` keys (HashMap in validation.rs)
+  - Rust: `model_required_fields()` keys (HashMap in validation/required.rs)
   - Julia: `MODEL_REGISTRY` keys (populated by each package __init__)
   - README: model_type table entries
 
@@ -13,17 +13,12 @@ Exit code 0 if aligned, 1 with a diff if misaligned.
 
 using Test
 
-# ----- Extract Rust model_type list from validation.rs -----
+# ----- Extract Rust model_type list from validation/required.rs -----
 function parse_rust_model_types(filepath::String)::Vector{String}
     types = String[]
-    open(filepath) do f
-        for line in eachline(f)
-            # Match lines like: ("ols", vec![]), or ("iv", vec!["instruments", ...]),
-            m = match(r"""^\s*\(\s*"([^"]+)"\s*,.*\),?$""", line)
-            if m !== nothing
-                push!(types, m[1])
-            end
-        end
+    content = read(filepath, String)
+    for m in eachmatch(r"\(\"([^\"]+)\"\s*,\s*vec!", content)
+        push!(types, m[1])
     end
     sort!(types)
     return types
@@ -140,7 +135,7 @@ const PARAM_SPEC_PAIRS = [
 
 # ----- Main -----
 repo_root = abspath(joinpath(@__FILE__, "..", ".."))
-rust_file = joinpath(repo_root, "runtime", "metrica-runtime", "src", "validation.rs")
+rust_file = joinpath(repo_root, "runtime", "metrica-runtime", "src", "validation", "required.rs")
 readme_file = joinpath(repo_root, "README.md")
 packages_dir = joinpath(repo_root, "packages")
 
@@ -149,7 +144,7 @@ julia_types = parse_julia_model_types(packages_dir)
 readme_types = parse_readme_model_types(readme_file)
 
 println("── model_type alignment check ──")
-println("\nRust  validation.rs  entries:  ", length(rust_types))
+println("\nRust  validation/required.rs  entries:  ", length(rust_types))
 println("Julia MODEL_REGISTRY entries:   ", length(julia_types))
 println("README table entries:           ", length(readme_types))
 

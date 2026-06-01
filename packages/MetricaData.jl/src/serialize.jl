@@ -65,7 +65,7 @@ function operate(df::DataFrame, op::Dict{String, Any})
     elseif op_type == "impute_missing"
         return impute_missing(df)
     else
-        return OpResult(op_type, nothing, error = Dict("message" => "Unknown operation: $op_type"))
+        return OpResult(op_type, nothing, error = Dict{String, Any}("message" => "Unknown operation: $op_type"))
     end
 end
 

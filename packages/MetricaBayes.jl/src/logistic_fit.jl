@@ -79,7 +79,7 @@ function fit_bayes_probit(df::DataFrame, formula::AbstractString;
             # data augmentation: z | β, y
             mu = X * beta_curr
             for i in 1:n
-                z[i] = y[i] == 1 ? rand(Truncated(Normal(mu[i], 1.0), 0.0, Inf)) : rand(Truncated(Normal(mu[i], 1.0), -Inf, 0.0))
+                z[i] = y[i] == 1 ? rand(truncated(Normal(mu[i], 1.0), 0.0, Inf)) : rand(truncated(Normal(mu[i], 1.0), -Inf, 0.0))
             end
             # β | z
             prec = X' * X + I(p)/tau2

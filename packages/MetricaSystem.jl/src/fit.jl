@@ -2,7 +2,7 @@
 
 using DataFrames
 using Distributions: TDist, FDist, Chisq, cdf, quantile
-using LinearAlgebra: I, Symmetric, inv, rank, diag, dot
+using LinearAlgebra: I, Symmetric, cholesky, inv, rank, diag, dot
 using Statistics: mean
 using StatsModels: coefnames
 
@@ -79,10 +79,10 @@ end
 function _sigma_inv(Sigma::Matrix{Float64})
     S = Symmetric(0.5 .* (Sigma .+ Sigma'))
     try
-        return inv(Matrix(S))
+        return inv(cholesky(S))
     catch
         σ = max(eps(Float64), minimum(diag(S)) * 1.0e-6)
-        return inv(Matrix(Symmetric(S + σ * I)))
+        return inv(cholesky(Symmetric(S + σ * I)))
     end
 end
 
@@ -222,7 +222,7 @@ function _fit_sur_equations(filtered::DataFrame, equations::Vector{String}; max_
         Gram[rg, rh] .= w .* (Xs[g]' * Xs[h])
     end
     vcov_full = try
-        inv(Symmetric(Gram))
+        inv(cholesky(Symmetric(Gram)))
     catch
         return MetricaBase.ModelError(
             :singular_gls_system, "SUR 法方程奇异",
@@ -461,7 +461,7 @@ function MetricaBase.fit(::Type{System3SLSModel}, _formula::AbstractString, data
         rhs[rg] .= acc
     end
     vcov_full = try
-        inv(Symmetric(Gram))
+        inv(cholesky(Symmetric(Gram)))
     catch
         return MetricaBase.ModelError(
             :singular_gls_system, "3SLS 法方程奇异",
@@ -550,7 +550,7 @@ end
 # === 系统级 robust sandwich covariance =========================================
 function system_robust_vcov(X::Vector{Matrix{Float64}}, y::Vector{Vector{Float64}}, beta::Vector{Float64}, Sigma::Matrix{Float64})
     G = length(X); n = length(y[1])
-    Omega_inv = inv(Symmetric(Sigma + 1e-10 * I))
+    Omega_inv = inv(cholesky(Symmetric(Sigma + 1e-10 * I)))
     Gram = zeros(size(X[1], 2) * G, size(X[1], 2) * G)
     meat = zeros(size(X[1], 2) * G, size(X[1], 2) * G)
     for g in 1:G
@@ -567,7 +567,7 @@ function system_robust_vcov(X::Vector{Matrix{Float64}}, y::Vector{Vector{Float64
         end
         meat .+= si * si'
     end
-    Gram_inv = inv(Symmetric(Gram + 1e-10 * I))
+    Gram_inv = inv(cholesky(Symmetric(Gram + 1e-10 * I)))
     V_robust = Gram_inv * meat * Gram_inv
     return V_robust
 end

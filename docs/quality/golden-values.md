@@ -32,7 +32,13 @@ Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值�
 | Area | Status | Reference target |
 |---|---|---|
 | OLS | covered | 独立 complete-case OLS 参考（`scripts/golden/compute_ols_reference.jl`），与 R `lm` 数值等价 |
-| IV / GLS | planned | R / Julia 生态参考实现 |
+| IV / GLS | covered | 独立 complete-case 2SLS / GLS 参考（`scripts/golden/compute_iv_reference.jl`、`scripts/golden/compute_gls_reference.jl`） |
 | Logit / Probit / Poisson | planned | R `glm` |
 | ARIMA / VAR / unitroot | planned | 公开稳定示例或主流生态实现 |
 | GMM / dynamic panel / spatial / bayes | planned | 先登记缺口，再分模型族补齐 |
+
+## 未来事项
+
+### Rust params 强类型 wire 格式
+
+当前 `ModelSpec.params` 在 Rust 侧为 `serde_json::Value`，校验后收敛为 `ValidatedModelParams` 枚举。编译期族内字段安全已在 Rust 解析层保障，wire JSON 层不做额外编解码约束。未来可将 `Value` 替换为 serde 标签枚举，使族参数形状在反序列化阶段即获得类型安全。该改动破坏性小（TS 侧已发送结构化 `ModelFamilyParams`）、对现有校验路径无感知影响。延后至下一开发阶段考虑。

@@ -202,7 +202,7 @@ end
 
     # OLS 的 bread 应等于 (X'X)^{-1}
     ols = fit(OLSModel, "y ~ x1 + x2", DEMO_CSV)
-    @test ols.bread_matrix ≈ inv(ols.design_matrix' * ols.design_matrix) atol=1e-12
+    @test ols.bread_matrix ≈ inv(ols.design_matrix' * ols.design_matrix) atol=1e-10
 end
 
 @testset "HC1 协方差链路" begin

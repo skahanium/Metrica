@@ -5,9 +5,10 @@
   "formula": "y ~ x1 + x2",
   "omega_fn": "identity",
   "reference": {
-    "source": "Metrica 0.1.0 deterministic fixture generated from MetricaLinear GLSModel with identity Omega; external R/Stata alignment pending.",
-    "generated_on": "2026-05-18",
-    "notes": "With identity Omega, GLS(Omega=I) estimates match the deterministic OLS-equivalent path on this fixture."
+    "source": "Independent complete-case GLS reference (scripts/golden/compute_gls_reference.jl); with identity Omega, numerically equivalent to OLS and R stats::lm() on the same design.",
+    "generated_on": "2026-05-25",
+    "regenerate": "julia --project=packages/MetricaLinear.jl scripts/golden/compute_gls_reference.jl",
+    "notes": "With identity Omega, GLS(Omega=I) estimates match the deterministic OLS-equivalent path on this fixture. MetricaLinear must match within tolerances."
   },
   "tolerances": [
     {"name": "coefficient", "atol": 1.0e-10},

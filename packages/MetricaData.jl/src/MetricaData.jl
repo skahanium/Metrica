@@ -1,6 +1,7 @@
 module MetricaData
 
 using DataFrames
+using MetricaBase
 
 include("transform.jl")
 include("reshape.jl")

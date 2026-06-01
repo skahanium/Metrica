@@ -504,7 +504,7 @@ uuid = "c1d2e3f4-a5b6-7890-cdef-123456789abc"
 version = "0.1.0"
 
 [[deps.MetricaData]]
-deps = ["CSV", "DataFrames", "Statistics"]
+deps = ["CSV", "DataFrames", "MetricaBase", "Statistics"]
 path = "../MetricaData.jl"
 uuid = "2248ac24-609b-424e-8643-ff19a1f22962"
 version = "0.1.0"

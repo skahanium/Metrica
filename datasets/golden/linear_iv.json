@@ -6,9 +6,10 @@
   "instruments": ["z1", "z2"],
   "endog_columns": ["x2"],
   "reference": {
-    "source": "Metrica 0.1.0 deterministic fixture generated from MetricaLinear IVModel; external R/Stata alignment pending.",
-    "generated_on": "2026-05-18",
-    "notes": "Fixture generated from MetricaBase.fit(IVModel, \"y ~ x1 + x2\", linear_iv.csv; instruments=[\"z1\", \"z2\"], endog=[\"x2\"])."
+    "source": "Independent complete-case 2SLS reference (scripts/golden/compute_iv_reference.jl); numerically equivalent to R ivreg::ivreg() on the same design.",
+    "generated_on": "2026-05-25",
+    "regenerate": "julia --project=packages/MetricaLinear.jl scripts/golden/compute_iv_reference.jl",
+    "notes": "Two-stage least squares with classical standard errors. MetricaLinear must match within tolerances."
   },
   "tolerances": [
     {"name": "coefficient", "atol": 1.0e-10},

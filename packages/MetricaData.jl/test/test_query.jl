@@ -88,3 +88,53 @@ end
         @test bad_result["messages"][1]["code"] == "unknown_variable"
     end
 end
+
+@testset "describe_dataset without variables returns all columns" begin
+    df = DataFrame(a = [1, 2], b = [3.0, 4.0])
+    with_temp_csv(df) do path
+        result = MetricaData.describe_dataset(path)
+        @test result["status"] == "success"
+        payload = result["result_payload"]
+        @test payload["kind"] == "describe"
+        @test [item["name"] for item in payload["variables"]] == ["a", "b"]
+    end
+end
+
+@testset "summarize_dataset with missing numeric values" begin
+    df = DataFrame(
+        y = Union{Missing, Float64}[1.0, missing, 5.0, missing, 9.0],
+        group = ["a", "b", "a", "b", "a"],
+    )
+    with_temp_csv(df) do path
+        result = MetricaData.summarize_dataset(path)
+        @test result["status"] == "success"
+        payload = result["result_payload"]
+        @test payload["kind"] == "summarize"
+        y_row = only(Base.filter(item -> item["name"] == "y", payload["variables"]))
+        @test y_row["obs"] == 3
+        @test y_row["mean"] ≈ 5.0
+    end
+end
+
+@testset "browse_dataset empty dataset" begin
+    df = DataFrame(x = Float64[], y = String[])
+    with_temp_csv(df) do path
+        result = MetricaData.browse_dataset(path)
+        @test result["status"] == "success"
+        payload = result["result_payload"]
+        @test payload["kind"] == "browse"
+        @test payload["dataset_summary"]["row_count"] == 0
+    end
+end
+
+@testset "tabulate_dataset all same value" begin
+    df = DataFrame(code = ["a", "a", "a"])
+    with_temp_csv(df) do path
+        result = MetricaData.tabulate_dataset(path; variable = "code")
+        @test result["status"] == "success"
+        payload = result["result_payload"]
+        @test length(payload["rows"]) == 1
+        @test payload["rows"][1]["count"] == 3
+        @test payload["rows"][1]["cum_pct"] ≈ 100.0
+    end
+end

@@ -32,9 +32,9 @@ function fit_spatial_probit(y::Vector{Int}, X::Matrix{Float64}, W::Matrix{Float6
         for i in 1:n
             mu_i = dot(X[i, :], beta) + rho * Wy_star[i]
             if y[i] == 1
-                y_star[i] = rand(Truncated(Normal(mu_i, 1.0), 0.0, Inf))
+                y_star[i] = rand(truncated(Normal(mu_i, 1.0), 0.0, Inf))
             else
-                y_star[i] = rand(Truncated(Normal(mu_i, 1.0), -Inf, 0.0))
+                y_star[i] = rand(truncated(Normal(mu_i, 1.0), -Inf, 0.0))
             end
         end
 

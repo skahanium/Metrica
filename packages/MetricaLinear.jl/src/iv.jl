@@ -50,7 +50,7 @@ function MetricaBase.augment(result::IVFitResult)
 
     XtX = X' * X
     leverage = if _invertible_bread(XtX)
-        XtX_inv = inv(XtX)
+        XtX_inv = inv(cholesky(Symmetric(XtX)))
         [dot(X[i, :], XtX_inv * X[i, :]) for i in 1:nobs_val]
     else
         fill(NaN, nobs_val)
@@ -87,7 +87,7 @@ function MetricaBase.predict(result::IVFitResult;
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
     # 使用第二阶段矩阵计算投影，与 2SLS vcov 口径一致
-    XtX_inv = inv(result.second_stage_matrix' * result.second_stage_matrix)
+    XtX_inv = inv(cholesky(Symmetric(result.second_stage_matrix' * result.second_stage_matrix)))
 
     se_pred = if interval === :confidence
         [sqrt(sigma^2 * dot(X[i, :], XtX_inv * X[i, :])) for i in 1:size(X, 1)]

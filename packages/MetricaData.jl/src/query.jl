@@ -22,11 +22,13 @@ function query_error(code::AbstractString, text::AbstractString; hint::Union{Not
 end
 
 """
-    query_success(payload; messages=Any[])
+    query_success(payload; warnings=ModelWarning[])
 
 构造数据查看命令使用的结构化成功载荷。
+warnings 为 `MetricaBase.ModelWarning` 向量，内部转为标准化 messages 信封。
 """
-function query_success(payload::Dict{String, Any}; messages::Vector{Any}=Any[])
+function query_success(payload::Dict{String, Any}; warnings::Vector{MetricaBase.ModelWarning}=MetricaBase.ModelWarning[])
+    messages = [MetricaBase.warning_to_dict(w) for w in warnings]
     return Dict(
         "status" => "success",
         "messages" => messages,
@@ -281,16 +283,17 @@ function tabulate_dataset(path::AbstractString; variable::AbstractString, max_le
         sort!(string.(unique_values))
     end
 
-    warning_messages = Any[]
+    warning_messages = MetricaBase.ModelWarning[]
     truncated = false
     if length(sorted_values) > max_levels
         sorted_values = sorted_values[1:max_levels]
         truncated = true
-        push!(warning_messages, Dict(
-            "level" => "warning",
-            "code" => "tabulate_truncated",
-            "text" => "唯一值数量过多，仅显示前 $(max_levels) 个水平。",
-            "hint" => "如需完整频数表，请后续扩展导出能力。",
+        push!(warning_messages, MetricaBase.ModelWarning(
+            :tabulate_truncated,
+            "频数表截断",
+            "唯一值数量过多，仅显示前 $(max_levels) 个水平。",
+            "如需完整频数表，请后续扩展导出能力。",
+            MetricaBase.warning,
         ))
     end
 
@@ -318,7 +321,7 @@ function tabulate_dataset(path::AbstractString; variable::AbstractString, max_le
             "truncated" => truncated,
             "rows" => rows,
         );
-        messages = warning_messages,
+        warnings = warning_messages,
     )
 end
 

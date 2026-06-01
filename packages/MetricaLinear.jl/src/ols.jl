@@ -265,7 +265,7 @@ GMM 最优 sandwich 口径（bread 与 meat 均反映 Z 投影）。
 function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float64}, nobs::Int, dof::Int, vcov::Symbol, cluster_values::Union{Nothing, AbstractVector}, instrument_matrix::Union{Nothing, Matrix{Float64}}=nothing)
     ncoef = size(X_eff, 2)
     xtx = transpose(X_eff) * X_eff
-    xtx_inv = inv(xtx)
+    xtx_inv = inv(cholesky(Symmetric(xtx)))
     rss = sum(abs2, effective_residuals)
     sigma2 = rss / dof
 
@@ -278,9 +278,9 @@ function compute_vcov(X_eff::Matrix{Float64}, effective_residuals::Vector{Float6
             # Bread = (X'Z(Z'Z)^{-1}Z'X)^{-1}
             # Meat  = X'Z(Z'Z)^{-1}(Σ e_i² z_i z_i')(Z'Z)^{-1}Z'X
             Z = instrument_matrix
-            ZtZ_inv = inv(transpose(Z) * Z)
+            ZtZ_inv = inv(cholesky(Symmetric(transpose(Z) * Z)))
             XZ = transpose(X_eff) * Z
-            bread = inv(XZ * ZtZ_inv * transpose(XZ))
+            bread = inv(cholesky(Symmetric(XZ * ZtZ_inv * transpose(XZ))))
             ninst = size(Z, 2)
             meat_inner = zeros(ninst, ninst)
             for index in 1:nobs
@@ -438,7 +438,7 @@ function MetricaBase.fit(::Type{OLSModel}, formula::AbstractString, data;
 
     # bread 矩阵：(X_eff'X_eff)^{-1}
     # OLS: (X'X)^{-1}；WLS: (X'WX)^{-1}
-    bread_matrix = inv(X_eff' * X_eff)
+    bread_matrix = inv(cholesky(Symmetric(X_eff' * X_eff)))
 
     vcov_result = compute_vcov(X_eff, effective_residuals, nobs, dof, vcov, cluster_values)
     vcov_result isa MetricaBase.ModelError && return vcov_result

@@ -47,7 +47,7 @@ function MetricaBase.augment(result::GLSFitResult)
     sigma = sqrt(sum(abs2, residuals) / (nobs_val - size(X, 2)))
     std_residuals = sigma > 0 ? residuals ./ sigma : zeros(nobs_val)
 
-    XtX_gls_inv = inv(X_gls' * X_gls)
+    XtX_gls_inv = inv(cholesky(Symmetric(X_gls' * X_gls)))
     leverage = [dot(X[i, :], XtX_gls_inv * X[i, :]) for i in 1:nobs_val]
 
     k = size(X, 2)
@@ -80,7 +80,7 @@ function MetricaBase.predict(result::GLSFitResult;
     dof_val = n - k
     t_crit = quantile(TDist(dof_val), 1 - (1 - level) / 2)
     sigma = result.glance_table.metrics[:sigma]
-    XtX_gls_inv = inv(result.design_matrix_gls' * result.design_matrix_gls)
+    XtX_gls_inv = inv(cholesky(Symmetric(result.design_matrix_gls' * result.design_matrix_gls)))
 
     se_pred = if interval === :confidence
         [sqrt(sigma^2 * dot(X[i, :], XtX_gls_inv * X[i, :])) for i in 1:size(X, 1)]
@@ -152,7 +152,7 @@ function MetricaBase.fit(::Type{GLSModel}, formula::AbstractString, data;
             "请确保 omega_fn 返回的矩阵是正定的。")
     end
 
-    L_inv = inv(Matrix(omega_chol.L))
+    L_inv = Matrix(omega_chol.L) \ I
     X_gls = L_inv * X
     y_gls = L_inv * y
 

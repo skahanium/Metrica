@@ -571,6 +571,8 @@ const WARNING_CODE = Dict(
     :unitroot_conflict => "单位根检验结论冲突",
     :pp_adf_conflict => "PP 与 ADF 检验结论不一致",
     :var_instability => "VAR 模型参数可能存在结构性不稳定",
+    # 数据操作
+    :tabulate_truncated => "唯一值数量超过显示上限，频数表已截断",
     # 模型构建
     :mle_se_unavailable => "MLE 标准误不可用，使用伪方差估计",
     :css_se_unavailable => "CSS 标准误不可用",

@@ -136,3 +136,41 @@ end
     @test result["error"]["op_index"] == 1
     @test occursin("metrica-missing-file.csv", result["error"]["message"])
 end
+
+@testset "empty dataset filter returns empty" begin
+    df = DataFrame(x = Float64[], y = Float64[])
+    result = MetricaData.filter(df, "x > 0")
+    @test result.status == "ok"
+    @test nrow(result.df) == 0
+end
+
+@testset "single row generate" begin
+    df = DataFrame(x = [1.0], y = [2.0])
+    result = MetricaData.generate(df, "z", "x + y")
+    @test result.status == "ok"
+    @test result.df.z == [3.0]
+end
+
+@testset "all missing column impute skips with warning" begin
+    df = DataFrame(x = Union{Missing, Float64}[missing, missing, missing])
+    result = MetricaData.impute_missing(df)
+    @test result.status == "ok"
+    @test !isempty(result.warnings)
+end
+
+@testset "impute_missing mixed columns" begin
+    df = DataFrame(
+        xf = Union{Missing, Float64}[10.0, missing, 30.0],
+        xs = Union{Missing, String}[missing, "b", "b"],
+    )
+    result = MetricaData.impute_missing(df)
+    @test result.status == "ok"
+    @test occursin("xf=均值", result.notes)
+    @test occursin("xs=众数", result.notes)
+end
+
+@testset "sort descending" begin
+    df = DataFrame(x = [1, 3, 2], y = [4, 6, 5])
+    result = MetricaData.sort(df, [:x])
+    @test result.df.x == [1, 2, 3]
+end

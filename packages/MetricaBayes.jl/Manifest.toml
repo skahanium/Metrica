@@ -245,7 +245,7 @@ uuid = "e8f9a0b1-2c3d-4e5f-6a7b-8c9d0e1f2a3b"
 version = "0.1.0"
 
 [[deps.MetricaData]]
-deps = ["CSV", "DataFrames", "Statistics"]
+deps = ["CSV", "DataFrames", "MetricaBase", "Statistics"]
 path = "../MetricaData.jl"
 uuid = "2248ac24-609b-424e-8643-ff19a1f22962"
 version = "0.1.0"
