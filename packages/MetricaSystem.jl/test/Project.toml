@@ -1,4 +1,5 @@
 [deps]
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 MetricaBase = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"

@@ -1,15 +1,5 @@
 using CSV
 
-function with_temp_csv(f::Function, df::DataFrame)
-    path = tempname() * ".csv"
-    CSV.write(path, df)
-    try
-        return f(path)
-    finally
-        rm(path; force = true)
-    end
-end
-
 @testset "describe_dataset 返回真实变量与数据集规模" begin
     df = DataFrame(region = ["A", "B"], year = [2020, 2021], y = [1.0, 2.0])
     with_temp_csv(df) do path
@@ -124,6 +114,23 @@ end
         payload = result["result_payload"]
         @test payload["kind"] == "browse"
         @test payload["dataset_summary"]["row_count"] == 0
+    end
+end
+
+@testset "tabulate_dataset truncation emits ModelWarning envelope" begin
+    codes = string.(1:25)
+    df = DataFrame(code = codes)
+    with_temp_csv(df) do path
+        result = MetricaData.tabulate_dataset(path; variable = "code", max_levels = 5)
+        @test result["status"] == "success"
+        msgs = result["messages"]
+        @test length(msgs) == 1
+        @test msgs[1]["severity"] == "warning"
+        @test msgs[1]["code"] == "tabulate_truncated"
+        @test occursin("5", msgs[1]["detail"])
+        payload = result["result_payload"]
+        @test payload["truncated"] == true
+        @test length(payload["rows"]) == 5
     end
 end
 

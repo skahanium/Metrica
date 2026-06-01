@@ -1384,3 +1384,217 @@ fn fit_model_runs_spatial_probit_with_posterior() {
         .expect("rho_posterior_mean");
     assert!(rho_mean.is_finite());
 }
+
+fn golden_datasets_dir() -> std::path::PathBuf {
+    repo_root().join("datasets")
+}
+
+#[test]
+fn fit_model_runs_golden_ols_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/linear_ols.csv".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+    request.model_spec.model_type = "ols".to_string();
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    let nobs = payload
+        .get("glance")
+        .and_then(|g| g.get("nobs"))
+        .and_then(|v| v.as_u64())
+        .expect("nobs");
+    assert_eq!(nobs, 7);
+}
+
+#[test]
+fn fit_model_runs_golden_iv_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/linear_iv.csv".to_string();
+    request.model_spec.model_type = "iv".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+    merge_params(&mut request, json!({
+        "instruments": ["z1", "z2"],
+        "endog_columns": ["x2"]
+    }));
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+}
+
+#[test]
+fn fit_model_runs_golden_logit_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/discrete_logit.csv".to_string();
+    request.model_spec.model_type = "logit".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("tidy").is_some());
+}
+
+#[test]
+fn fit_model_runs_golden_did_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/causal_did.csv".to_string();
+    request.model_spec.model_type = "did".to_string();
+    request.model_spec.formula = "y ~ treated * post + x1".to_string();
+    merge_params(&mut request, json!({
+        "panel_id": "id",
+        "panel_time": "time",
+        "treated_column": "treated",
+        "post_column": "post"
+    }));
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("treat_effect").is_some());
+}
+
+#[test]
+fn fit_model_runs_golden_gls_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/linear_gls.csv".to_string();
+    request.model_spec.model_type = "gls".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert_eq!(
+        payload
+            .get("glance")
+            .and_then(|g| g.get("model"))
+            .and_then(|v| v.as_str()),
+        Some("gls")
+    );
+}
+
+#[test]
+fn fit_model_runs_golden_probit_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/discrete_probit.csv".to_string();
+    request.model_spec.model_type = "probit".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+}
+
+#[test]
+fn fit_model_runs_golden_poisson_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/discrete_poisson.csv".to_string();
+    request.model_spec.model_type = "poisson".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+}
+
+#[test]
+fn fit_model_runs_golden_cox_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/duration_cox.csv".to_string();
+    request.model_spec.model_type = "duration_cox".to_string();
+    request.model_spec.formula = "ph ~ x1".to_string();
+    merge_params(&mut request, json!({
+        "duration_time_column": "time",
+        "duration_event_column": "fail"
+    }));
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("hazard_ratios").is_some());
+}
+
+#[test]
+fn fit_model_runs_golden_sur_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "demo/sur_system_demo.csv".to_string();
+    request.model_spec.model_type = "sur".to_string();
+    request.model_spec.formula = "".to_string();
+    request.model_spec.vcov = None;
+    merge_params(&mut request, json!({
+        "equations": ["y1 ~ x1 + x2", "y2 ~ x1 + x2"]
+    }));
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+}
+
+#[test]
+fn fit_model_runs_golden_dynamic_panel_gmm_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "demo/dynamic_panel_gmm_golden.csv".to_string();
+    request.model_spec.model_type = "dynamic_panel_gmm".to_string();
+    request.model_spec.formula = "y ~ x".to_string();
+    merge_params(&mut request, json!({
+        "panel_id": "firm",
+        "panel_time": "year",
+        "instrument_lags": [2, 4],
+        "gmm_weight": "two_step"
+    }));
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+}
+
+#[test]
+fn fit_model_runs_golden_gmm_linear_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/gmm_linear.csv".to_string();
+    request.model_spec.model_type = "gmm_linear".to_string();
+    request.model_spec.formula = "y ~ x1 + x2".to_string();
+    merge_params(
+        &mut request,
+        json!({
+            "instruments": ["z1", "z2"],
+            "endog_columns": ["x1"],
+            "gmm_weight": "two_step"
+        }),
+    );
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("gmm_diagnostics").or_else(|| payload.get("diagnostics")).is_some());
+}
+
+#[test]
+fn fit_model_runs_golden_arima_fixture() {
+    let mut request = sample_fit_model_request();
+    request.project_context.working_dir = golden_datasets_dir().to_string_lossy().to_string();
+    request.dataset_ref.path = "golden/timeseries_arima.csv".to_string();
+    request.model_spec.model_type = "arima".to_string();
+    request.model_spec.formula = "".to_string();
+    merge_params(
+        &mut request,
+        json!({
+            "variable": "y",
+            "time_column": "time",
+            "order": [1, 0, 0],
+            "method": "css"
+        }),
+    );
+
+    let response = execute_fit_model(&request).expect("runtime response");
+    assert_eq!(response.status, "success");
+    let payload = response.result_payload.expect("payload");
+    assert!(payload.get("glance").is_some());
+}

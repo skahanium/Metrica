@@ -1,0 +1,57 @@
+{
+    "time_column": "time",
+    "expected": {
+        "metrics": [
+            {
+                "name": "n_events",
+                "value": 6
+            },
+            {
+                "name": "loglik",
+                "value": -7.070719239565859
+            }
+        ],
+        "glance": {
+            "nobs": 8,
+            "model": "cox_ph",
+            "dof": 1
+        },
+        "tidy": [
+            {
+                "statistic": -1.8883726559517933,
+                "name": "x1",
+                "estimate": -1.884008789062501,
+                "stderror": 0.997689085956875
+            }
+        ]
+    },
+    "event_column": "fail",
+    "formula": "ph ~ x1",
+    "reference": {
+        "source": "MetricaDuration Cox Efron on 8-obs fixture; directionally consistent with R coxph.",
+        "regenerate": "julia --project=packages/MetricaDuration.jl scripts/golden/compute_duration_cox_reference.jl",
+        "notes": "Small-sample survival teaching fixture.",
+        "generated_on": "2026-06-01"
+    },
+    "id": "duration_cox",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "stderror",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "statistic",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "metric",
+            "atol": 1.0e-8
+        }
+    ],
+    "model_type": "cox_ph",
+    "dataset": "golden/duration_cox.csv"
+}

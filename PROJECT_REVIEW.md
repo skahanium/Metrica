@@ -1,7 +1,8 @@
 # Metrica 项目独立技术评估
 
-> **评估日期：** 2026-05-24  
-> **评估基准：** `oss-maturity` 分支（相对 `main` 含质量完善提交 `aed05a7`–`b808241`）  
+> **评估日期：** 2026-05-24（历史快照）  
+> **最新可信度评估：** 见 [docs/quality/project-assessment.md](docs/quality/project-assessment.md)（2026-06-01）  
+> **评估基准：** 已合并至 `main` 的质量完善提交（含 golden 体系扩展前）  
 > **评估方法：** 源码逐层审查 + 与 CI/门禁脚本对照，不依赖旧版文档表述  
 > **评估范围：** 架构、Core / Runtime / App、测试与 golden、开源就绪度  
 

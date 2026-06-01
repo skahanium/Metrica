@@ -1,0 +1,74 @@
+{
+    "expected": {
+        "metrics": [
+            {
+                "name": "j_statistic",
+                "value": 0.06612959666980407
+            },
+            {
+                "name": "j_df",
+                "value": 1
+            }
+        ],
+        "glance": {
+            "nobs": 8,
+            "model": "gmm_linear",
+            "dof": 5
+        },
+        "tidy": [
+            {
+                "statistic": -8.505307818881942e8,
+                "name": "(Intercept)",
+                "estimate": -3.8323232310938113,
+                "stderror": 4.505801921226157e-9
+            },
+            {
+                "statistic": -1.0133457626734298e8,
+                "name": "x2",
+                "estimate": -0.11515151546158646,
+                "stderror": 1.136349701189763e-9
+            },
+            {
+                "statistic": 1.2673939879933823e10,
+                "name": "x1",
+                "estimate": 6.995959595809029,
+                "stderror": 5.519956431926485e-10
+            }
+        ]
+    },
+    "formula": "y ~ x1 + x2",
+    "reference": {
+        "source": "MetricaGMM two-step GMM on fixed IV-GMM teaching fixture.",
+        "regenerate": "julia --project=scripts/golden scripts/golden/compute_gmm_linear_reference.jl",
+        "notes": "Over-identified; locks J statistic and core coefficients.",
+        "generated_on": "2026-06-01"
+    },
+    "id": "gmm_linear",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "stderror",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "statistic",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "metric",
+            "atol": 1.0e-8
+        }
+    ],
+    "model_type": "gmm_linear",
+    "instruments": [
+        "z1",
+        "z2"
+    ],
+    "dataset": "golden/gmm_linear.csv",
+    "endog_columns": [
+        "x1"
+    ]
+}

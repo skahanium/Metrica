@@ -80,6 +80,34 @@ jobs:
       - name: Check model_type alignment
         run: julia scripts/check_model_type_alignment.jl
 
+  golden-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            golden:
+              - 'datasets/golden/**'
+              - 'scripts/golden/**'
+              - 'scripts/dev/test-golden.sh'
+              - 'packages/MetricaBase.jl/test/golden_test_helpers.jl'
+              - 'packages/MetricaBase.jl/test/test_golden_contract.jl'
+              - 'packages/MetricaLinear.jl/**'
+              - 'packages/MetricaDiscrete.jl/**'
+              - 'packages/MetricaPanel.jl/**'
+              - 'packages/MetricaDuration.jl/**'
+              - 'packages/MetricaCausal.jl/**'
+              - 'packages/MetricaSystem.jl/**'
+      - uses: julia-actions/setup-julia@v2
+        if: steps.changes.outputs.golden == 'true' || github.event_name == 'push'
+        with:
+          version: '1.12'
+      - name: Golden gate
+        if: steps.changes.outputs.golden == 'true' || github.event_name == 'push'
+        run: bash scripts/dev/test-golden.sh
+
   lint:
     runs-on: ubuntu-latest
     steps:

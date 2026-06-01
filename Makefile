@@ -1,4 +1,4 @@
-.PHONY: test test-julia test-julia-core test-rust test-app test-p0 check lint clean
+.PHONY: test test-julia test-julia-core test-julia-credibility test-golden test-rust test-app test-p0 check lint clean
 
 # 全栈测试
 test:
@@ -29,6 +29,21 @@ test-rust:
 # 与 CI 主路径对齐的完整 P0 门禁（耗时较长，合并前建议跑）
 test-p0:
 	bash scripts/dev/test-p0.sh
+
+# Golden JSON schema + 含 golden 测试的包（改 datasets/golden 或数值算法时建议跑）
+test-golden:
+	bash scripts/dev/test-golden.sh
+
+# 核心实证链（可信度 P1 本地子集）
+test-julia-credibility:
+	julia --project=packages/MetricaBase.jl -e 'using Pkg; Pkg.test()'
+	julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.test()'
+	julia --project=packages/MetricaDiscrete.jl -e 'using Pkg; Pkg.test()'
+	julia --project=packages/MetricaPanel.jl -e 'using Pkg; Pkg.test()'
+	julia --project=packages/MetricaCausal.jl -e 'using Pkg; Pkg.test()'
+	julia --project=packages/MetricaRuntime.jl -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+test-credibility: test-golden test-julia-credibility test-rust
 
 # App 测试
 test-app:

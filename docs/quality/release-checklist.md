@@ -20,7 +20,7 @@
 ## 文档与发布资产
 
 - [ ] README、CHANGELOG、CITATION、SUPPORT、SECURITY 的版本、阶段、能力口径一致。
-- [ ] `docs/quality/package-status.md` 已反映最新 CI/golden/benchmark 状态。
+- [ ] `docs/quality/package-status.md` 与 [credibility-tiers.md](credibility-tiers.md) 已反映最新 CI/golden/benchmark 状态。
 - [ ] 版本号符合 [版本策略](../governance/versioning.md)，破坏性变更已在 CHANGELOG 和 release notes 中明确说明。
 - [ ] 支持范围符合 [支持策略](../governance/support-policy.md)，没有承诺未建立的 SLA、长期维护分支或发布渠道。
 - [ ] 架构、协议、治理或破坏性变更已有 Issue 或 [决策记录](../governance/decision-records.md)。

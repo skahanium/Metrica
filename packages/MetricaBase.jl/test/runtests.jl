@@ -1,6 +1,8 @@
 using Test
 using MetricaBase
 
+include("test_golden_contract.jl")
+
 @testset "MetricaBase 协议完整性（alpha 垂直切片）" begin
 
     # === Severity 枚举 ======================================================

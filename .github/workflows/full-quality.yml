@@ -77,3 +77,29 @@ jobs:
           cd apps/metrica-desktop
           npm ci
           npm test
+
+  golden-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - name: Instantiate golden scripts env
+        run: julia --project=scripts/golden -e 'using Pkg; Pkg.instantiate()'
+      - name: Validate golden JSON schema
+        run: julia --project=scripts/golden scripts/golden/check_golden_json.jl
+      - name: Golden drift check (regenerators)
+        run: REGENERATE_GOLDEN=check julia --project=scripts/golden scripts/golden/check_golden_drift.jl
+
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - name: Prepare Julia env for benchmarks
+        run: julia --project=packages/MetricaRuntime.jl -e 'using Pkg; Pkg.instantiate()'
+      - name: Run core benchmarks
+        run: julia --project=packages/MetricaRuntime.jl benchmarks/run_core_benchmarks.jl

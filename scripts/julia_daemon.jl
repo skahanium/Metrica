@@ -282,7 +282,14 @@ function handle_request(req::Dict{String, Any})
                     kwargs[:instruments] = String.(params["instruments"])
                     kwargs[:endog] = String.(params["endog_columns"])
                 elseif model_type == "gls"
-                    kwargs[:omega_fn] = r -> Matrix{Float64}(I, length(r), length(r))
+                    kwargs[:omega_fn] = function (residuals)
+                        n = length(residuals)
+                        Ω = zeros(Float64, n, n)
+                        @inbounds for i in 1:n
+                            Ω[i, i] = 1.0
+                        end
+                        return Ω
+                    end
                 end
 
                 # S4b Causal 特有参数

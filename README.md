@@ -27,7 +27,9 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 前期建设（S1–S5 全部模型族）已基本完成，当前处于回顾完善阶段。
 
-项目目前**不可用于生产或正式研究**：测试覆盖不足、数值精度未全面验证、API 可能变动、桌面 App 尚未打包分发。
+项目目前**不可用于生产或未经审阅的正式研究**：API 可能变动、桌面 App 尚未打包分发、多数模型族尚无外部（L3）数值互验。
+
+部分高频路径已通过 **golden-value** 回归（OLS/IV/GLS、Logit/Probit/Poisson、动态面板 GMM、Cox、DID、SUR 等），详见 [docs/quality/package-status.md](docs/quality/package-status.md) 与 [docs/quality/credibility-tiers.md](docs/quality/credibility-tiers.md)。
 
 欢迎参与共建。当前最适合的贡献方向是测试、golden-value 对齐、Bug 修复、文档和开源基础设施。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

@@ -85,11 +85,20 @@ bash scripts/dev/test-package.sh MetricaLinear.jl
 - 核心文档使用简体中文；代码注释中英文均可
 - Commit 消息格式：`feat(scope): description` 或 `fix(scope): description`
 
+## Golden-value 贡献
+
+1. 阅读 [docs/quality/golden-values.md](docs/quality/golden-values.md) 与 [scripts/golden/README.md](scripts/golden/README.md)。
+2. 添加 `datasets/golden/<id>.{csv,json}` 与 `scripts/golden/compute_<id>_reference.jl`。
+3. 在对应包增加 `test/test_golden.jl`（使用 `MetricaBase.jl/test/golden_test_helpers.jl`）。
+4. 更新 [docs/quality/package-status.md](docs/quality/package-status.md)。
+5. 本地运行 `make test-golden`；改动 golden 路径时 CI `golden-test` 会自动运行。
+
 ## 测试要求
 
 - 新 Bug 修复必须附带回归测试
 - 测试覆盖不得降低
 - 数值结果变更应补充或更新 golden-value fixture，格式见 [docs/quality/golden-values.md](docs/quality/golden-values.md)
+- 改动 `datasets/golden/**` 或含 golden 测试的包时：`make test-golden`
 - 发布前质量门禁见 [docs/quality/release-checklist.md](docs/quality/release-checklist.md)
 - 版本和破坏性变更规则见 [docs/governance/versioning.md](docs/governance/versioning.md)
 - 完整 P0 门禁（18 个 Julia 包 + 对齐脚本 + Runtime 串行集成 + App）：`bash scripts/dev/test-p0.sh` 或 `make test-p0`

@@ -363,6 +363,29 @@ else
                 kwargs[:threshold_trim_frac] = Float64(request.model_spec.threshold_trim_frac)
             end
         end
+        if model_type in ("panel", "panel_iv", "did", "event_study")
+            kwargs[:panel_id] = Symbol(String(request.model_spec.panel_id))
+            kwargs[:panel_time] = Symbol(String(request.model_spec.panel_time))
+            if haskey(request.model_spec, :panel_method) && !isnothing(request.model_spec.panel_method)
+                kwargs[:panel_method] = Symbol(String(request.model_spec.panel_method))
+            end
+        end
+        if haskey(request.model_spec, :treated_column) && present(request.model_spec.treated_column)
+            kwargs[:treated_column] = Symbol(String(request.model_spec.treated_column))
+        end
+        if haskey(request.model_spec, :post_column) && present(request.model_spec.post_column)
+            kwargs[:post_column] = Symbol(String(request.model_spec.post_column))
+        end
+        if model_type == "gls"
+            kwargs[:omega_fn] = function (residuals)
+                n = length(residuals)
+                Ω = zeros(Float64, n, n)
+                @inbounds for i in 1:n
+                    Ω[i, i] = 1.0
+                end
+                return Ω
+            end
+        end
         if model_type in ("sur", "system_2sls", "system_3sls")
             raw_eq = get(request.model_spec, :equations, nothing)
             kwargs[:equations] = raw_eq === nothing ? String[] : String.(collect(raw_eq))

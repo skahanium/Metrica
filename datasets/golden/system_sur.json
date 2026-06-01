@@ -1,0 +1,108 @@
+{
+    "expected": {
+        "metrics": [
+            {
+                "name": "f_pvalue",
+                "value": 3.2019219777468244e-5
+            },
+            {
+                "name": "f_stat",
+                "value": 20.220641245708688
+            },
+            {
+                "name": "n_equations",
+                "value": 2
+            },
+            {
+                "name": "r2",
+                "value": 0.704045605135295
+            },
+            {
+                "name": "rss",
+                "value": 52.961038961038945
+            },
+            {
+                "name": "sigma",
+                "value": 1.765036892816207
+            },
+            {
+                "name": "tss",
+                "value": 178.95
+            }
+        ],
+        "glance": {
+            "nobs": 20,
+            "model": "sur",
+            "dof": 34
+        },
+        "tidy": [
+            {
+                "statistic": 5.424216047421957,
+                "name": "(Intercept)",
+                "estimate": 6.896103896103709,
+                "stderror": 1.2713549452701678
+            },
+            {
+                "statistic": 5.907998646714119,
+                "name": "x1",
+                "estimate": 2.103896103896107,
+                "stderror": 0.35610978094354195
+            },
+            {
+                "statistic": 3.215971780354496,
+                "name": "x2",
+                "estimate": 1.525974025974113,
+                "stderror": 0.47449857467527445
+            },
+            {
+                "statistic": 10.462467436977125,
+                "name": "(Intercept)",
+                "estimate": 15.269480519480302,
+                "stderror": 1.4594530985600893
+            },
+            {
+                "statistic": 5.838526388786068,
+                "name": "x1",
+                "estimate": 2.3867694805194843,
+                "stderror": 0.4087965561145191
+            },
+            {
+                "statistic": 2.544064835498548,
+                "name": "x2",
+                "estimate": 1.38575487012997,
+                "stderror": 0.544701082611525
+            }
+        ]
+    },
+    "reference": {
+        "source": "MetricaSystem SUR FGLS on demo/sur_system_demo.csv.",
+        "regenerate": "julia --project=packages/MetricaSystem.jl scripts/golden/compute_system_sur_reference.jl",
+        "notes": "Two-equation SUR; complete-case on demo CSV.",
+        "generated_on": "2026-06-01"
+    },
+    "id": "system_sur",
+    "equations": [
+        "y1 ~ x1 + x2",
+        "y2 ~ x1 + x2"
+    ],
+    "model_type": "sur",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "stderror",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "statistic",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "metric",
+            "atol": 1.0e-8
+        }
+    ],
+    "dataset": "demo/sur_system_demo.csv"
+}

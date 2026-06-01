@@ -1,6 +1,8 @@
 using MetricaDiscrete
 using MetricaBase
 using Test
+
+include("test_golden.jl")
 using DataFrames
 using Distributions
 using Random

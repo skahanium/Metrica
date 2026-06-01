@@ -1,12 +1,13 @@
 # Golden-Value 验证政策
 
-Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值一致。第一阶段先建立格式和 OLS 样例，不追求一次覆盖全部模型族。
+Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值一致。标准用例存放在 `datasets/golden/`，共享测试辅助见 `packages/MetricaBase.jl/test/golden_test_helpers.jl`。
 
 ## 文件布局
 
-- 数据：`datasets/golden/<case>.csv`
+- 数据：`datasets/golden/<case>.csv`（或 `datasets/demo/` 等，`dataset` 字段相对 `datasets/`）
 - 参考值：`datasets/golden/<case>.json`
-- 测试入口：对应包的 `test/runtests.jl`
+- 再生脚本：`scripts/golden/compute_<case>_reference.jl`（统一环境 `scripts/golden/Project.toml`）
+- 测试入口：各包 `test/test_golden.jl`
 
 ## JSON 字段
 
@@ -15,8 +16,8 @@ Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值�
 - `id`：稳定用例名。
 - `dataset`：相对 `datasets/` 的路径。
 - `model_type`：协议中的模型类型。
-- `formula` 或等价模型配置。
-- `reference`：参考来源、生成日期、注意事项。
+- `formula` 或等价模型配置（如 `equations`、`panel_id`）。
+- `reference`：参考来源、生成日期、注意事项、`regenerate` 命令。
 - `tolerances`：按字段类别声明绝对容差。
 - `expected`：结构化期望值，至少覆盖 `glance`、核心 `metrics` 和核心 `tidy` 字段。
 
@@ -27,18 +28,38 @@ Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值�
 - 随机或 MCMC 路径必须固定 seed，或只验证 R-hat、ESS、均值区间等稳定摘要。
 - 如果参考值来自 Metrica 自身，必须在 `reference.notes` 中说明，后续再替换或补充外部软件对齐。
 
-## 第一批覆盖
+## 当前覆盖
 
 | Area | Status | Reference target |
 |---|---|---|
-| OLS | covered | 独立 complete-case OLS 参考（`scripts/golden/compute_ols_reference.jl`），与 R `lm` 数值等价 |
-| IV / GLS | covered | 独立 complete-case 2SLS / GLS 参考（`scripts/golden/compute_iv_reference.jl`、`scripts/golden/compute_gls_reference.jl`） |
-| Logit / Probit / Poisson | planned | R `glm` |
-| ARIMA / VAR / unitroot | planned | 公开稳定示例或主流生态实现 |
-| GMM / dynamic panel / spatial / bayes | planned | 先登记缺口，再分模型族补齐 |
+| OLS | covered (L2) | `scripts/golden/compute_ols_reference.jl` — 独立 complete-case OLS；纳入 `check_golden_drift.jl` 独立 expected 比对 |
+| IV / GLS | covered (L2) | `compute_iv_reference.jl` / `compute_gls_reference.jl` — 同上 |
+| Logit / Probit / Poisson | covered (L2) | `compute_discrete_*_reference.jl`；R `glm()` L3 见 `scripts/golden/r_smoke/verify_discrete_glm.R` |
+| dynamic_panel_gmm | covered (L2) | `compute_panel_dynamic_gmm_reference.jl` |
+| Cox PH | covered (L2) | `compute_duration_cox_reference.jl` |
+| DID | covered (L2) | `compute_causal_did_reference.jl` |
+| SUR | covered (L2) | `compute_system_sur_reference.jl` |
+| GMM linear | covered (L2) | `compute_gmm_linear_reference.jl` |
+| ARIMA(1,0,0) | covered (L2) | `compute_timeseries_arima_reference.jl` |
+| VAR / unitroot | planned | 公开稳定示例或主流生态实现 |
+| Bayes MCMC | planned | 摘要级 golden（R-hat/ESS） |
+
+Credibility 分级见 [credibility-tiers.md](credibility-tiers.md)。包级矩阵见 [package-status.md](package-status.md)。
+
+## 本地与 CI
+
+```bash
+make test-golden          # schema + 含 golden 的包测试
+julia --project=scripts/golden scripts/golden/check_golden_json.jl
+REGENERATE_GOLDEN=check julia --project=scripts/golden scripts/golden/check_golden_drift.jl
+```
+
+Drift 含 **12 项**：3 个独立线性参考（OLS/IV/GLS 的 `expected` 段）+ 9 个 Metrica 全量 JSON 再生器。
+
+PR 在改动 `datasets/golden/**` 或相关包时触发 CI `golden-test` job（见 `.github/workflows/ci.yml`）。
 
 ## 未来事项
 
 ### Rust params 强类型 wire 格式
 
-当前 `ModelSpec.params` 在 Rust 侧为 `serde_json::Value`，校验后收敛为 `ValidatedModelParams` 枚举。编译期族内字段安全已在 Rust 解析层保障，wire JSON 层不做额外编解码约束。未来可将 `Value` 替换为 serde 标签枚举，使族参数形状在反序列化阶段即获得类型安全。该改动破坏性小（TS 侧已发送结构化 `ModelFamilyParams`）、对现有校验路径无感知影响。延后至下一开发阶段考虑。
+当前 `ModelSpec.params` 在 Rust 侧为 `serde_json::Value`，校验后收敛为 `ValidatedModelParams` 枚举。未来可将 `Value` 替换为 serde 标签枚举。延后至下一开发阶段考虑。

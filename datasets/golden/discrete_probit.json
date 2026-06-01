@@ -1,0 +1,87 @@
+{
+    "expected": {
+        "metrics": [
+            {
+                "name": "aic",
+                "value": 23.846049006189116
+            },
+            {
+                "name": "bic",
+                "value": 26.83324582685109
+            },
+            {
+                "name": "deviance",
+                "value": 17.846049006189116
+            },
+            {
+                "name": "loglik",
+                "value": -8.923024503094558
+            },
+            {
+                "name": "lr_chi2",
+                "value": 9.879838216208697
+            },
+            {
+                "name": "lr_pvalue",
+                "value": 0.01961566185096164
+            },
+            {
+                "name": "pseudo_r2",
+                "value": 0.35633983998273877
+            }
+        ],
+        "glance": {
+            "nobs": 20,
+            "model": "probit",
+            "dof": 17
+        },
+        "tidy": [
+            {
+                "statistic": -0.833714545195046,
+                "name": "(Intercept)",
+                "estimate": -0.2981145546393325,
+                "stderror": 0.35757389187637256
+            },
+            {
+                "statistic": 2.535391427715226,
+                "name": "x1",
+                "estimate": 1.8689226623012205,
+                "stderror": 0.7371337781895889
+            },
+            {
+                "statistic": 1.6096975513777465,
+                "name": "x2",
+                "estimate": 1.059939786174036,
+                "stderror": 0.6584713912665329
+            }
+        ]
+    },
+    "formula": "y ~ x1 + x2",
+    "reference": {
+        "source": "MetricaDiscrete ProbitModel on fixed CSV.",
+        "regenerate": "julia --project=packages/MetricaDiscrete.jl scripts/golden/compute_discrete_probit_reference.jl",
+        "notes": "Complete-case fit on 20 obs.",
+        "generated_on": "2026-06-01"
+    },
+    "id": "discrete_probit",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "stderror",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "statistic",
+            "atol": 1.0e-8
+        },
+        {
+            "name": "metric",
+            "atol": 1.0e-8
+        }
+    ],
+    "model_type": "probit",
+    "dataset": "golden/discrete_probit.csv"
+}

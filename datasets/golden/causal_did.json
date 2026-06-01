@@ -1,0 +1,55 @@
+{
+    "expected": {
+        "metrics": [
+            {
+                "name": "treat_effect",
+                "value": 1.7999999999999996
+            },
+            {
+                "name": "treat_effect_se",
+                "value": 1.3453954157678992e-16
+            }
+        ],
+        "glance": {
+            "nobs": 40,
+            "model": "did",
+            "dof": 24
+        },
+        "tidy": [
+            {
+                "statistic": 13378966353714160,
+                "name": "treat_effect",
+                "estimate": 1.7999999999999996,
+                "stderror": 1.3453954157678992e-16
+            }
+        ]
+    },
+    "formula": "y ~ treated * post + x1",
+    "reference": {
+        "source": "MetricaCausal DID TWFE on deterministic 40-obs panel; true interaction effect 2.0 in DGP.",
+        "regenerate": "julia --project=packages/MetricaCausal.jl scripts/golden/compute_causal_did_reference.jl",
+        "notes": "treat_effect is the reported ATT-style summary.",
+        "generated_on": "2026-06-01"
+    },
+    "id": "causal_did",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 0.05
+        },
+        {
+            "name": "stderror",
+            "atol": 0.05
+        },
+        {
+            "name": "statistic",
+            "atol": 0.05
+        },
+        {
+            "name": "metric",
+            "atol": 0.05
+        }
+    ],
+    "model_type": "did",
+    "dataset": "golden/causal_did.csv"
+}

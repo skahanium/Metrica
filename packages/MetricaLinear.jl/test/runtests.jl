@@ -1,5 +1,4 @@
 using Test
-using JSON3
 using LinearAlgebra: I, dot, Diagonal, cholesky, Symmetric, inv, diag
 using Distributions: TDist, quantile
 using MetricaBase: fit, coef, vcov, stderror, nobs, dof, r2, fitted, residuals, predict,
@@ -14,16 +13,7 @@ const DEMO_CSV = joinpath(
     "demo.csv",
 )
 
-const GOLDEN_ROOT = joinpath(dirname(dirname(dirname(@__DIR__))), "datasets", "golden")
-
-function golden_case(name::AbstractString)
-    path = joinpath(GOLDEN_ROOT, "$(name).json")
-    return JSON3.read(read(path, String))
-end
-
-function assert_golden_close(actual, expected, tolerance; label::AbstractString)
-    @test isapprox(Float64(actual), Float64(expected); atol=Float64(tolerance), rtol=0.0)
-end
+include("test_golden.jl")
 
 function coef_row(fit::OLSFitResult, name::Symbol)
     return only(row for row in tidy(fit).rows if row.name === name)
@@ -58,99 +48,6 @@ end
     missing_col = fit(OLSModel, "y ~ x9", DEMO_CSV)
     @test missing_col isa ModelError
     @test missing_col.code === :unknown_variable
-end
-
-@testset "Golden OLS reference" begin
-    spec = golden_case("linear_ols")
-    data_path = joinpath(dirname(GOLDEN_ROOT), String(spec.dataset))
-    result = fit(OLSModel, String(spec.formula), data_path)
-    @test result isa OLSFitResult
-
-    @test String(glance(result).model) == String(spec.expected.glance.model)
-    @test glance(result).nobs == Int(spec.expected.glance.nobs)
-    @test glance(result).dof == Int(spec.expected.glance.dof)
-
-    tolerances = Dict(String(row.name) => Float64(row.atol) for row in spec.tolerances)
-    for expected_row in spec.expected.tidy
-        row = coef_row(result, Symbol(expected_row.name))
-        assert_golden_close(row.estimate, expected_row.estimate, tolerances["coefficient"]; label="estimate $(expected_row.name)")
-        assert_golden_close(row.stderror, expected_row.stderror, tolerances["stderror"]; label="stderror $(expected_row.name)")
-        assert_golden_close(row.statistic, expected_row.statistic, tolerances["statistic"]; label="statistic $(expected_row.name)")
-    end
-
-    for expected_metric in spec.expected.metrics
-        metric_name = Symbol(expected_metric.name)
-        @test haskey(glance(result).metrics, metric_name)
-        assert_golden_close(
-            glance(result).metrics[metric_name],
-            expected_metric.value,
-            tolerances["metric"];
-            label="metric $(expected_metric.name)",
-        )
-    end
-end
-
-@testset "Golden IV reference" begin
-    spec = golden_case("linear_iv")
-    data_path = joinpath(dirname(GOLDEN_ROOT), String(spec.dataset))
-    instruments = String.(spec.instruments)
-    endog = String.(spec.endog_columns)
-    result = fit(IVModel, String(spec.formula), data_path; instruments=instruments, endog=endog)
-    @test result isa IVFitResult
-
-    @test String(glance(result).model) == String(spec.expected.glance.model)
-    @test glance(result).nobs == Int(spec.expected.glance.nobs)
-    @test glance(result).dof == Int(spec.expected.glance.dof)
-
-    tolerances = Dict(String(row.name) => Float64(row.atol) for row in spec.tolerances)
-    for expected_row in spec.expected.tidy
-        row = coef_row(result, Symbol(expected_row.name))
-        assert_golden_close(row.estimate, expected_row.estimate, tolerances["coefficient"]; label="estimate $(expected_row.name)")
-        assert_golden_close(row.stderror, expected_row.stderror, tolerances["stderror"]; label="stderror $(expected_row.name)")
-        assert_golden_close(row.statistic, expected_row.statistic, tolerances["statistic"]; label="statistic $(expected_row.name)")
-    end
-
-    for expected_metric in spec.expected.metrics
-        metric_name = Symbol(expected_metric.name)
-        @test haskey(glance(result).metrics, metric_name)
-        assert_golden_close(
-            glance(result).metrics[metric_name],
-            expected_metric.value,
-            tolerances["metric"];
-            label="metric $(expected_metric.name)",
-        )
-    end
-end
-
-@testset "Golden GLS reference" begin
-    spec = golden_case("linear_gls")
-    data_path = joinpath(dirname(GOLDEN_ROOT), String(spec.dataset))
-    omega_fn = r -> Matrix{Float64}(I, length(r), length(r))
-    result = fit(GLSModel, String(spec.formula), data_path; omega_fn=omega_fn)
-    @test result isa GLSFitResult
-
-    @test String(glance(result).model) == String(spec.expected.glance.model)
-    @test glance(result).nobs == Int(spec.expected.glance.nobs)
-    @test glance(result).dof == Int(spec.expected.glance.dof)
-
-    tolerances = Dict(String(row.name) => Float64(row.atol) for row in spec.tolerances)
-    for expected_row in spec.expected.tidy
-        row = coef_row(result, Symbol(expected_row.name))
-        assert_golden_close(row.estimate, expected_row.estimate, tolerances["coefficient"]; label="estimate $(expected_row.name)")
-        assert_golden_close(row.stderror, expected_row.stderror, tolerances["stderror"]; label="stderror $(expected_row.name)")
-        assert_golden_close(row.statistic, expected_row.statistic, tolerances["statistic"]; label="statistic $(expected_row.name)")
-    end
-
-    for expected_metric in spec.expected.metrics
-        metric_name = Symbol(expected_metric.name)
-        @test haskey(glance(result).metrics, metric_name)
-        assert_golden_close(
-            glance(result).metrics[metric_name],
-            expected_metric.value,
-            tolerances["metric"];
-            label="metric $(expected_metric.name)",
-        )
-    end
 end
 
 @testset "无截距 OLS 链路" begin

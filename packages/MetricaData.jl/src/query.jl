@@ -7,14 +7,15 @@ using Statistics
 构造数据查看命令使用的结构化错误载荷。
 """
 function query_error(code::AbstractString, text::AbstractString; hint::Union{Nothing, AbstractString}=nothing)
+    hint_val = hint === nothing ? nothing : String(hint)
     message = Dict{String, Any}(
+        "severity" => "error",
         "level" => "error",
         "code" => String(code),
+        "detail" => String(text),
         "text" => String(text),
+        "hint" => hint_val,
     )
-    if hint !== nothing
-        message["hint"] = String(hint)
-    end
     return Dict(
         "status" => "error",
         "messages" => Any[message],
@@ -27,12 +28,21 @@ end
 构造数据查看命令使用的结构化成功载荷。
 warnings 为 `MetricaBase.ModelWarning` 向量，内部转为标准化 messages 信封。
 """
-function query_success(payload::Dict{String, Any}; warnings::Vector{MetricaBase.ModelWarning}=MetricaBase.ModelWarning[])
+function query_success(
+    payload::Dict{String, Any};
+    glance::Union{Nothing, MetricaBase.ModelGlance}=nothing,
+    warnings::Vector{MetricaBase.ModelWarning}=MetricaBase.ModelWarning[],
+)
+    body = payload
+    if glance !== nothing
+        body = attach_glance_to_payload(payload, glance)
+        warnings = vcat(glance.warnings, warnings)
+    end
     messages = [MetricaBase.warning_to_dict(w) for w in warnings]
     return Dict(
         "status" => "success",
         "messages" => messages,
-        "result_payload" => payload,
+        "result_payload" => body,
     )
 end
 
@@ -176,12 +186,16 @@ function inspect_dataset(path::AbstractString; preview_limit::Integer=5)
     dataset = read_dataset(path)
     dataset isa DataFrame || return dataset
 
-    return query_success(Dict(
-        "dataset_summary" => dataset_summary_dict(dataset),
-        "columns" => columns_summary(dataset),
-        "preview_rows" => preview_rows(dataset; limit = Int(preview_limit)),
-        "warnings" => Any[],
-    ))
+    glance = dataset_glance(dataset, :dataset_inspect)
+    return query_success(
+        Dict(
+            "kind" => "inspect",
+            "dataset_summary" => dataset_summary_dict(dataset),
+            "columns" => columns_summary(dataset),
+            "preview_rows" => preview_rows(dataset; limit = Int(preview_limit)),
+        );
+        glance = glance,
+    )
 end
 
 """
@@ -196,11 +210,15 @@ function describe_dataset(path::AbstractString; variables::Union{Nothing, Vector
     selected = select_variables(dataset, variables)
     selected isa Vector{String} || return selected
 
-    return query_success(Dict(
-        "kind" => "describe",
-        "dataset_summary" => dataset_summary_dict(dataset),
-        "variables" => columns_summary(dataset; variables = selected),
-    ))
+    glance = dataset_glance(dataset, :dataset_describe)
+    return query_success(
+        Dict(
+            "kind" => "describe",
+            "dataset_summary" => dataset_summary_dict(dataset),
+            "variables" => columns_summary(dataset; variables = selected),
+        );
+        glance = glance,
+    )
 end
 
 """
@@ -246,11 +264,21 @@ function summarize_dataset(path::AbstractString; variables::Union{Nothing, Vecto
         ))
     end
 
-    return query_success(Dict(
-        "kind" => "summarize",
-        "dataset_summary" => dataset_summary_dict(dataset),
-        "variables" => rows,
-    ))
+    glance = dataset_glance(
+        dataset,
+        :dataset_summarize;
+        extra_metrics = Dict{Symbol, MetricaBase.MetricValue}(
+            :variables_summarized => Float64(length(rows)),
+        ),
+    )
+    return query_success(
+        Dict(
+            "kind" => "summarize",
+            "dataset_summary" => dataset_summary_dict(dataset),
+            "variables" => rows,
+        );
+        glance = glance,
+    )
 end
 
 """
@@ -311,6 +339,15 @@ function tabulate_dataset(path::AbstractString; variable::AbstractString, max_le
         ))
     end
 
+    glance = dataset_glance(
+        dataset,
+        :dataset_tabulate;
+        extra_metrics = Dict{Symbol, MetricaBase.MetricValue}(
+            :tabulate_total => Float64(total),
+            :tabulate_missing => Float64(missing_count),
+            :tabulate_levels => Float64(length(rows)),
+        ),
+    )
     return query_success(
         Dict(
             "kind" => "tabulate",
@@ -321,6 +358,7 @@ function tabulate_dataset(path::AbstractString; variable::AbstractString, max_le
             "truncated" => truncated,
             "rows" => rows,
         );
+        glance = glance,
         warnings = warning_messages,
     )
 end
@@ -337,10 +375,14 @@ function browse_dataset(path::AbstractString; variables::Union{Nothing, Vector{S
     selected = select_variables(dataset, variables)
     selected isa Vector{String} || return selected
 
-    return query_success(Dict(
-        "kind" => "browse",
-        "readonly" => true,
-        "dataset_summary" => dataset_summary_dict(dataset),
-        "columns" => columns_summary(dataset; variables = selected),
-    ))
+    glance = dataset_glance(dataset, :dataset_browse)
+    return query_success(
+        Dict(
+            "kind" => "browse",
+            "readonly" => true,
+            "dataset_summary" => dataset_summary_dict(dataset),
+            "columns" => columns_summary(dataset; variables = selected),
+        );
+        glance = glance,
+    )
 end

@@ -7,6 +7,7 @@ include("transform.jl")
 include("reshape.jl")
 include("combine.jl")
 include("join.jl")
+include("glance_bridge.jl")
 include("query.jl")
 include("serialize.jl")
 

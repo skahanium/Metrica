@@ -2,6 +2,8 @@ using MetricaData
 using DataFrames
 using Test
 
+include("test_support.jl")
+
 @testset "MetricaData.jl" begin
     @testset "query" begin
         include("test_query.jl")
@@ -26,5 +28,11 @@ using Test
     end
     @testset "serialize" begin
         include("test_serialize_md.jl")
+    end
+    @testset "warning protocol" begin
+        include("test_warning_protocol.jl")
+    end
+    @testset "glance protocol" begin
+        include("test_glance_protocol.jl")
     end
 end
