@@ -2,6 +2,18 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [0.1.1] - 2026-06-03
+
+### Added
+
+- Golden L2：`quantile_median`、`spatial_lag`、`causal_ipw`、`timeseries_unitroot`、`bayes_linear_conjugate`（JSON + 再生脚本 + 包内 `test_golden.jl`）
+- L3 R smoke：`verify_causal_did.R`、`verify_duration_cox.R`、`verify_panel_gmm.R`（`golden-r-smoke.yml`）
+
+### Changed
+
+- 文档锚点：`project-assessment.md`「下一步 30 天」；路线图 S3 / 蓝图 §10 / `document-boundaries` 与回顾完善阶段对齐
+- `scripts/golden/Project.toml` 增加 MetricaQuantile、MetricaSpatial、MetricaBayes；`test-golden.sh` 覆盖上述三包
+
 ## [0.1.0] - 2026-05-17
 
 ### Added

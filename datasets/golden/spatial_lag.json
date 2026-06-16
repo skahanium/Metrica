@@ -1,0 +1,70 @@
+{
+    "spatial_row_standardize": true,
+    "expected": {
+        "metrics": [
+            {
+                "name": "rho",
+                "value": -1.233325584517119
+            },
+            {
+                "name": "moran_i",
+                "value": 0.30852169477183866
+            }
+        ],
+        "glance": {
+            "nobs": 5,
+            "model": "spatial_lag",
+            "dof": 2
+        },
+        "tidy": [
+            {
+                "statistic": -10.371867832530889,
+                "name": "rho",
+                "estimate": -1.233325584517119,
+                "stderror": 0.1189106537444345
+            },
+            {
+                "statistic": 15.596153958665656,
+                "name": "intercept",
+                "estimate": 2.2237411557085274,
+                "stderror": 0.14258266246935547
+            },
+            {
+                "statistic": 0.02514884816664321,
+                "name": "x1",
+                "estimate": 0.0018187890238072768,
+                "stderror": 0.07232096721708599
+            }
+        ]
+    },
+    "spatial_id_column": "region",
+    "formula": "y ~ x1",
+    "reference": {
+        "source": "MetricaSpatial SAR (spatial_lag) on 5-region demo with bundled W matrix.",
+        "regenerate": "julia --project=scripts/golden scripts/golden/compute_spatial_lag_reference.jl",
+        "notes": "Weights resolved relative to repo datasets/golden/ at test time.",
+        "generated_on": "2026-06-03"
+    },
+    "id": "spatial_lag",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 1.0e-6
+        },
+        {
+            "name": "stderror",
+            "atol": 1.0e-5
+        },
+        {
+            "name": "statistic",
+            "atol": 1.0e-5
+        },
+        {
+            "name": "metric",
+            "atol": 1.0e-5
+        }
+    ],
+    "model_type": "spatial_lag",
+    "dataset": "golden/spatial_lag.csv",
+    "spatial_weights_path": "golden/spatial_lag_W.csv"
+}

@@ -1,0 +1,73 @@
+{
+    "treatment_column": "treat",
+    "expected": {
+        "metrics": [
+            {
+                "name": "ate",
+                "value": 1.515345530467052
+            },
+            {
+                "name": "att",
+                "value": 1.6604809737286814
+            },
+            {
+                "name": "atu",
+                "value": 1.716149810258345
+            }
+        ],
+        "glance": {
+            "nobs": 200,
+            "model": "ipw",
+            "dof": 199
+        },
+        "tidy": [
+            {
+                "statistic": 2887.487270407728,
+                "name": "ATE",
+                "estimate": 1.515345530467052,
+                "stderror": 0.0005247973024840652
+            },
+            {
+                "statistic": 16.16684115949895,
+                "name": "ATT",
+                "estimate": 1.6604809737286814,
+                "stderror": 0.10270905474648356
+            },
+            {
+                "statistic": 18.680613165132378,
+                "name": "ATU",
+                "estimate": 1.716149810258345,
+                "stderror": 0.09186795931632279
+            }
+        ]
+    },
+    "propensity_formula": "treat ~ x1 + x2",
+    "id": "causal_ipw",
+    "reference": {
+        "source": "MetricaCausal IPW with logit PS; DGP ATE=1.5, seed 2024, n=200.",
+        "regenerate": "julia --project=scripts/golden scripts/golden/compute_causal_ipw_reference.jl",
+        "notes": "CSV created on first regenerate if missing; delete CSV to force rewrite.",
+        "generated_on": "2026-06-03"
+    },
+    "model_type": "ipw",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 0.15
+        },
+        {
+            "name": "stderror",
+            "atol": 0.15
+        },
+        {
+            "name": "statistic",
+            "atol": 0.15
+        },
+        {
+            "name": "metric",
+            "atol": 0.15
+        }
+    ],
+    "outcome_column": "y",
+    "dataset": "golden/causal_ipw.csv"
+}

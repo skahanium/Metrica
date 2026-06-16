@@ -71,15 +71,28 @@
 - 具体组件实现细节
 - 对根目录总体蓝图的覆盖权
 
+### `docs/quality/project-assessment.md`
+
+拥有：
+
+- 当前可信度基线与评分
+- **下一步 30 天**可勾选 backlog（完善阶段执行锚点）
+- 与 [package-status.md](../quality/package-status.md) 的衔接说明
+
+不拥有：
+
+- 长期产品愿景（见总蓝图）
+- 字段级 Runtime schema
+
 ### `docs/superpowers/plans/2026-05-16-s5-execution-plan.md`
 
 拥有：
 
-- 当前阶段（`S5`）唯一活跃实施计划锚点
-- 跨分期执行顺序与验证习惯提醒
+- `S5` 历史实施顺序与验证习惯（**已完成，非活跃计划**）
 
 不拥有：
 
+- 当前冲刺任务（见 `docs/quality/project-assessment.md`）
 - 替代总规或路线图的完整分期规格（须回链总规与 `docs/roadmap/s5-advanced-research-topics.md`）
 
 ### `docs/superpowers/specs/2026-04-30-metrica-main-design.md`

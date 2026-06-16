@@ -5,6 +5,8 @@ using MetricaQuantile
 using Random
 using Statistics
 
+include("test_golden.jl")
+
 const DEMO = joinpath(@__DIR__, "..", "..", "..", "datasets", "demo")
 
 @testset "分位数回归主路径" begin

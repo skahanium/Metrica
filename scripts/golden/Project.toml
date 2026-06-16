@@ -15,6 +15,9 @@ MetricaLinear = "f0fef7a3-c642-4dd0-acdf-30aa0c8e311d"
 MetricaTimeSeries = "3da64bf2-aa4b-4146-a451-f808af01572a"
 MetricaPanel = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 MetricaSystem = "e9e8e7e6-d5c4-b3a2-9180-76543210fedc"
+MetricaQuantile = "a1b2c3d4-1111-4222-8333-444455556666"
+MetricaSpatial = "b2c3d4e5-2222-4333-8444-555566667777"
+MetricaBayes = "c3d4e5f6-3333-4444-8555-666677778888"
 
 [sources]
 MetricaBase = {path = "../../packages/MetricaBase.jl"}
@@ -26,6 +29,9 @@ MetricaLinear = {path = "../../packages/MetricaLinear.jl"}
 MetricaTimeSeries = {path = "../../packages/MetricaTimeSeries.jl"}
 MetricaPanel = {path = "../../packages/MetricaPanel.jl"}
 MetricaSystem = {path = "../../packages/MetricaSystem.jl"}
+MetricaQuantile = {path = "../../packages/MetricaQuantile.jl"}
+MetricaSpatial = {path = "../../packages/MetricaSpatial.jl"}
+MetricaBayes = {path = "../../packages/MetricaBayes.jl"}
 
 [compat]
 julia = "1.12"

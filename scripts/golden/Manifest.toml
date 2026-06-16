@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "52108fdfc5fd52813f9e3fe507c997cda28b77e7"
+project_hash = "0aae4865a4da18478ee422d34558d5903c8976ea"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -497,6 +497,12 @@ path = "../../packages/MetricaBase.jl"
 uuid = "9f6ff2ae-77f1-47e1-8d02-c1542b05cf6b"
 version = "0.1.0"
 
+[[deps.MetricaBayes]]
+deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "Random", "Statistics"]
+path = "../../packages/MetricaBayes.jl"
+uuid = "c3d4e5f6-3333-4444-8555-666677778888"
+version = "0.1.0"
+
 [[deps.MetricaCausal]]
 deps = ["CSV", "DataFrames", "Distributions", "JSON3", "LinearAlgebra", "MetricaBase", "MetricaDiscrete", "MetricaLinear", "MetricaPanel", "Statistics", "StatsModels"]
 path = "../../packages/MetricaCausal.jl"
@@ -543,6 +549,18 @@ version = "0.1.0"
 deps = ["DataFrames", "Distributions", "FixedEffectModels", "LinearAlgebra", "MetricaBase", "MetricaGMM", "MetricaLinear", "Statistics", "StatsModels"]
 path = "../../packages/MetricaPanel.jl"
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+version = "0.1.0"
+
+[[deps.MetricaQuantile]]
+deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaLinear", "MetricaOutput", "QuantileRegressions", "Random", "Statistics", "StatsAPI", "StatsModels"]
+path = "../../packages/MetricaQuantile.jl"
+uuid = "a1b2c3d4-1111-4222-8333-444455556666"
+version = "0.1.0"
+
+[[deps.MetricaSpatial]]
+deps = ["CSV", "DataFrames", "Distributions", "LinearAlgebra", "MetricaBase", "MetricaOutput", "Optim", "Random", "Statistics"]
+path = "../../packages/MetricaSpatial.jl"
+uuid = "b2c3d4e5-2222-4333-8444-555566667777"
 version = "0.1.0"
 
 [[deps.MetricaSystem]]
@@ -685,6 +703,12 @@ version = "2.11.3"
 
     [deps.QuadGK.weakdeps]
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
+[[deps.QuantileRegressions]]
+deps = ["DataFrames", "Distributions", "LinearAlgebra", "StatsBase", "StatsModels"]
+git-tree-sha1 = "c1d8658d97c81e01c31d6659fb9f1e242b91d267"
+uuid = "c6596682-b856-542f-9fff-31404643e889"
+version = "0.1.11"
 
 [[deps.REPL]]
 deps = ["InteractiveUtils", "JuliaSyntaxHighlighting", "Markdown", "Sockets", "StyledStrings", "Unicode"]

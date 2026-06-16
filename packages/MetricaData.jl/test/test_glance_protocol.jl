@@ -42,3 +42,17 @@ end
     @test haskey(m, "detail")
     @test haskey(m, "text")
 end
+
+@testset "transform chain errors expose structured status" begin
+    df = DataFrame(x = [1.0, 2.0])
+    result = MetricaData.operate_chain(
+        df,
+        [Dict{String, Any}(
+            "op" => "generate",
+            "args" => Dict{String, Any}("name" => "z", "expr" => "missing_col + 1"),
+        )];
+    )
+    @test result["status"] == "error"
+    @test haskey(result, "error")
+    @test haskey(result["error"], "message")
+end

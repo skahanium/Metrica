@@ -34,6 +34,11 @@ julia --project=scripts/golden scripts/golden/compute_causal_did_reference.jl
 julia --project=scripts/golden scripts/golden/compute_system_sur_reference.jl
 julia --project=scripts/golden scripts/golden/compute_gmm_linear_reference.jl
 julia --project=scripts/golden scripts/golden/compute_timeseries_arima_reference.jl
+julia --project=scripts/golden scripts/golden/compute_quantile_median_reference.jl
+julia --project=scripts/golden scripts/golden/compute_spatial_lag_reference.jl
+julia --project=scripts/golden scripts/golden/compute_causal_ipw_reference.jl
+julia --project=scripts/golden scripts/golden/compute_timeseries_unitroot_reference.jl
+julia --project=scripts/golden scripts/golden/compute_bayes_linear_conjugate_reference.jl
 ```
 
 维护者更新 JSON 后运行：
@@ -76,7 +81,7 @@ fit <- ivreg(y ~ x1 + x2 | x1 + z1 + z2, data = df)
 coef(fit)
 ```
 
-Workflow：`.github/workflows/golden-r-smoke.yml`（`workflow_dispatch` + 每周 schedule，失败不阻塞 PR）。
+Workflow：`.github/workflows/golden-r-smoke.yml`（`workflow_dispatch` + 每周 schedule，失败不阻塞 PR）。另含 DID / Cox / panel GMM 宽松 smoke（`verify_causal_did.R`、`verify_duration_cox.R`、`verify_panel_gmm.R`）。
 
 ## 当前标准用例 id
 

@@ -1,5 +1,9 @@
 # Brooks Audit Remediation Implementation Plan
 
+> **状态：已完成 / 已归档（2026-06-03）。** 对齐脚本、IV/GLS golden 与相关文档已合入 `main`。勿再作为活跃实施计划；当前工作见 [docs/quality/project-assessment.md](../../quality/project-assessment.md)。
+
+> **For agentic workers:** 历史记录 only — 勿按本文件开新任务。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close the concrete regressions and consistency gaps found while checking `BROOKS-AUDIT-2026-05-17.md`.

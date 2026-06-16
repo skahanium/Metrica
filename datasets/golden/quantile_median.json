@@ -1,0 +1,68 @@
+{
+    "expected": {
+        "metrics": [
+            {
+                "name": "tau",
+                "value": 0.5
+            },
+            {
+                "name": "pseudo_r2",
+                "value": 0.9079229122028667
+            }
+        ],
+        "glance": {
+            "nobs": 25,
+            "model": "quantile",
+            "dof": 22
+        },
+        "tidy": [
+            {
+                "statistic": 2.4537887542348646,
+                "name": "(Intercept)",
+                "estimate": 2.4999999997342783,
+                "stderror": 1.0188326095388855
+            },
+            {
+                "statistic": 1.674348363805351,
+                "name": "x1",
+                "estimate": 1.6666666662975904,
+                "stderror": 0.9954121270854878
+            },
+            {
+                "statistic": 3.3644150981655386e-10,
+                "name": "x2",
+                "estimate": 5.231229528698148e-10,
+                "stderror": 1.5548704235546016
+            }
+        ]
+    },
+    "quantile_tau": 0.5,
+    "formula": "y ~ x1 + x2",
+    "reference": {
+        "source": "MetricaQuantile median regression (τ=0.5) on datasets/demo/quantile_demo copy.",
+        "regenerate": "julia --project=scripts/golden scripts/golden/compute_quantile_median_reference.jl",
+        "notes": "Hall–Sheather asymptotic SE; tolerances allow minor solver drift.",
+        "generated_on": "2026-06-03"
+    },
+    "id": "quantile_median",
+    "tolerances": [
+        {
+            "name": "coefficient",
+            "atol": 1.0e-6
+        },
+        {
+            "name": "stderror",
+            "atol": 1.0e-5
+        },
+        {
+            "name": "statistic",
+            "atol": 1.0e-5
+        },
+        {
+            "name": "metric",
+            "atol": 1.0e-6
+        }
+    ],
+    "model_type": "quantile",
+    "dataset": "golden/quantile_median.csv"
+}

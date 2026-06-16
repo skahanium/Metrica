@@ -41,8 +41,13 @@ Golden-value 测试用于证明 Metrica 的结构化结果与确定性参考值�
 | SUR | covered (L2) | `compute_system_sur_reference.jl` |
 | GMM linear | covered (L2) | `compute_gmm_linear_reference.jl` |
 | ARIMA(1,0,0) | covered (L2) | `compute_timeseries_arima_reference.jl` |
-| VAR / unitroot | planned | 公开稳定示例或主流生态实现 |
-| Bayes MCMC | planned | 摘要级 golden（R-hat/ESS） |
+| Unitroot (ADF/PP/KPSS) | covered (L2) | `compute_timeseries_unitroot_reference.jl` |
+| Quantile τ=0.5 | covered (L2) | `compute_quantile_median_reference.jl` |
+| Spatial SAR (spatial_lag) | covered (L2) | `compute_spatial_lag_reference.jl` |
+| IPW | covered (L2) | `compute_causal_ipw_reference.jl` |
+| Bayes linear (conjugate) | covered (L2) | `compute_bayes_linear_conjugate_reference.jl` — 摘要级，非 MCMC 轨迹 |
+| VAR | planned | 滞后阶选择需单独漂移政策 |
+| Bayes MCMC | planned | R-hat/ESS 摘要 golden |
 
 Credibility 分级见 [credibility-tiers.md](credibility-tiers.md)。包级矩阵见 [package-status.md](package-status.md)。
 
@@ -54,7 +59,7 @@ julia --project=scripts/golden scripts/golden/check_golden_json.jl
 REGENERATE_GOLDEN=check julia --project=scripts/golden scripts/golden/check_golden_drift.jl
 ```
 
-Drift 含 **12 项**：3 个独立线性参考（OLS/IV/GLS 的 `expected` 段）+ 9 个 Metrica 全量 JSON 再生器。
+Drift 含 **17 项**：3 个独立线性参考（OLS/IV/GLS 的 `expected` 段）+ 14 个 Metrica 全量 JSON 再生器。
 
 PR 在改动 `datasets/golden/**` 或相关包时触发 CI `golden-test` job（见 `.github/workflows/ci.yml`）。
 

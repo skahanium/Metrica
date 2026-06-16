@@ -1,6 +1,6 @@
 # 包级质量状态矩阵
 
-> 最后更新：2026-06-01。当前矩阵以仓库中实际存在的 `packages/*.jl` 为准，共 18 个包。可信度分级见 [credibility-tiers.md](credibility-tiers.md)。
+> 最后更新：2026-06-03。当前矩阵以仓库中实际存在的 `packages/*.jl` 为准，共 18 个包。可信度分级见 [credibility-tiers.md](credibility-tiers.md)。
 
 ## 状态口径
 
@@ -25,22 +25,22 @@
 |---|---|---|---|---|---|---|
 | MetricaBase.jl | required in PR | blocking | contract tests | L1 | not-yet-covered | 协议 warning 契约 golden 在 Base 测试层 |
 | MetricaLinear.jl | required in PR | blocking | OLS, IV, GLS (`datasets/golden/linear_*.json`) | L2 | OLS and IV harness | L3 R 抽检为可选 nightly（见 scripts/golden/README.md） |
-| MetricaBayes.jl | required in PR | blocking | planned | L1 | not-yet-covered | MCMC 仅固定 seed 摘要测试，无全路径 golden |
-| MetricaCausal.jl | required in PR | blocking | DID (`causal_did.json`) | L2 | not-yet-covered | IPW/AIPW 公共参考待补 |
-| MetricaData.jl | required in PR | blocking | query glance 协议测试 | L1 | not-yet-covered | `inspect`/`describe`/`summarize`/`tabulate`/`browse` 返回 `result_payload.glance`（`ModelGlance` 信封） |
+| MetricaBayes.jl | required in PR | blocking | `bayes_linear_conjugate`（摘要级） | L2 | not-yet-covered | MCMC 全路径 golden 待补；共轭路径已锁 posterior mean |
+| MetricaCausal.jl | required in PR | blocking | DID, IPW (`causal_did.json`, `causal_ipw.json`) | L2 | not-yet-covered | AIPW 公共参考待补；DID L3 smoke 见 `verify_causal_did.R` |
+| MetricaData.jl | required in PR | blocking | query glance 协议测试 | L1 | not-yet-covered | `inspect`/`describe`/`summarize`/`tabulate`/`browse` 已返回 `ModelGlance` 形 glance；transform 错误路径有结构测试 |
 | MetricaDiagnostics.jl | required in PR | blocking | not-yet-covered | L1 | not-yet-covered | 跨模型诊断一致性待补 |
 | MetricaDiscrete.jl | required in PR | blocking | logit, probit, poisson | L2 | logit harness | L3 R `glm` 对齐为后续抽检 |
 | MetricaDuration.jl | required in PR | blocking | Cox PH (`duration_cox.json`) | L2 | not-yet-covered | AFT 与 R survival 全面对齐待补 |
 | MetricaGMM.jl | required in PR | blocking | `gmm_linear` golden | L2 | GMM harness | Hansen J 外部参考待补 |
 | MetricaNonlinear.jl | required in PR | blocking | not-yet-covered | L1 | not-yet-covered | 多起点/门限稳定 fixture 待补 |
 | MetricaOutput.jl | required in PR | blocking | not-yet-covered | L1 | not-yet-covered | 展示层不驱动下游协议 |
-| MetricaPanel.jl | required in PR | blocking | dynamic_panel_gmm | L2 | not-yet-covered | R `plm::pgmm` L3 对齐待补 |
-| MetricaQuantile.jl | required in PR | blocking | not-yet-covered | L1 | not-yet-covered | bootstrap/IV quantile 容差政策待补 |
+| MetricaPanel.jl | required in PR | blocking | dynamic_panel_gmm | L2 | not-yet-covered | L3 宽松 smoke：`verify_panel_gmm.R` |
+| MetricaQuantile.jl | required in PR | blocking | `quantile_median` | L2 | not-yet-covered | bootstrap/IV quantile 容差政策待补 |
 | MetricaRuntime.jl | required in PR | blocking | not-yet-covered | L1 | not-yet-covered | 聚合环境 contract 测试待补 |
-| MetricaSpatial.jl | required in PR | blocking | internal-fixture (GWR) | L1 | spatial_lag harness | 标准 JSON golden 待补 |
+| MetricaSpatial.jl | required in PR | blocking | `spatial_lag` | L2 | spatial_lag harness | GWR 仍为 internal-fixture；SAR L3 R 待补 |
 | MetricaSurvey.jl | required in PR | blocking | not-yet-covered | L1 | not-yet-covered | 复杂抽样 R survey 对齐待补 |
 | MetricaSystem.jl | required in PR | blocking | SUR (`system_sur.json`) | L2 | not-yet-covered | 3SLS 外部参考待补 |
-| MetricaTimeSeries.jl | required in PR | blocking | `timeseries_arima` golden | L2 | not-yet-covered | VAR 等扩展 golden 待补 |
+| MetricaTimeSeries.jl | required in PR | blocking | ARIMA, unitroot (`timeseries_*.json`) | L2 | not-yet-covered | VAR 扩展 golden 待补 |
 
 ## golden 升级规则
 

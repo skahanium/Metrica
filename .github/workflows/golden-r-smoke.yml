@@ -22,3 +22,13 @@ jobs:
         run: Rscript scripts/golden/r_smoke/verify_iv.R
       - name: Discrete glm smoke (logit / probit / poisson)
         run: Rscript scripts/golden/r_smoke/verify_discrete_glm.R
+      - name: DID smoke (causal_did)
+        run: Rscript scripts/golden/r_smoke/verify_causal_did.R
+      - name: Cox PH smoke (duration_cox)
+        run: |
+          Rscript -e 'install.packages("survival", repos = "https://cloud.r-project.org")'
+          Rscript scripts/golden/r_smoke/verify_duration_cox.R
+      - name: Panel GMM smoke (dynamic_panel_gmm)
+        run: |
+          Rscript -e 'install.packages("plm", repos = "https://cloud.r-project.org")'
+          Rscript scripts/golden/r_smoke/verify_panel_gmm.R

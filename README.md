@@ -1,7 +1,7 @@
 # Metrica
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Version](https://img.shields.io/badge/version-0.1.0-6A5ACD)](CITATION.cff)
+[![Version](https://img.shields.io/badge/version-0.1.1-6A5ACD)](CITATION.cff)
 [![CI](https://github.com/skahanium/Metrica/actions/workflows/ci.yml/badge.svg)](https://github.com/skahanium/Metrica/actions)
 [![Julia](https://img.shields.io/badge/Julia-1.12-purple)](https://julialang.org/)
 
@@ -29,13 +29,13 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 项目目前**不可用于生产或未经审阅的正式研究**：API 可能变动、桌面 App 尚未打包分发、多数模型族尚无外部（L3）数值互验。
 
-部分高频路径已通过 **golden-value** 回归（OLS/IV/GLS、Logit/Probit/Poisson、动态面板 GMM、Cox、DID、SUR 等），详见 [docs/quality/package-status.md](docs/quality/package-status.md) 与 [docs/quality/credibility-tiers.md](docs/quality/credibility-tiers.md)。
+部分高频路径已通过 **golden-value** 回归（OLS/IV/GLS、Logit/Probit/Poisson、分位数中位数、空间 SAR、动态面板 GMM、Cox、DID、IPW、SUR、ARIMA、单位根检验、贝叶斯共轭线性等，共 17 个标准用例），详见 [docs/quality/package-status.md](docs/quality/package-status.md) 与 [docs/quality/credibility-tiers.md](docs/quality/credibility-tiers.md)。
 
 欢迎参与共建。当前最适合的贡献方向是测试、golden-value 对齐、Bug 修复、文档和开源基础设施。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 版本与引用
 
-- **当前仓库整体发布线：** `0.1.0`（与 [CHANGELOG.md](CHANGELOG.md) 最新条目、[CITATION.cff](CITATION.cff) 中的 `version` 一致）。
+- **当前仓库整体发布线：** `0.1.1`（与 [CHANGELOG.md](CHANGELOG.md) 最新条目、[CITATION.cff](CITATION.cff) 中的 `version` 一致）。
 - **论文与软件引用：** 以根目录 [CITATION.cff](CITATION.cff) 为准（含 `date-released`）；GitHub 仓库页的「Cite this repository」也由此生成。
 - **各组件版本字段：** Julia Core 为各 `packages/*/Project.toml` 的 `version`（另有 `scripts/daemon/Project.toml`）；Runtime 为 `runtime/metrica-runtime/Cargo.toml`；桌面原生壳（wry + tao，目录名 `src-tauri` 为历史路径，非 [Tauri](https://tauri.app/) 框架）为 `apps/metrica-desktop/src-tauri/Cargo.toml`。正式发布时应与上述发布线一致，清单见 [docs/governance/versioning.md](docs/governance/versioning.md#仓库内须同步的版本字段)。
 - **前端 npm 包：** `apps/metrica-desktop/package.json` 未维护 `version` 字段；若需对外报桌面版本，以 **桌面壳工程** `Cargo.toml` 为准。

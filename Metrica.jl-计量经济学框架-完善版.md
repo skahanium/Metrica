@@ -367,12 +367,13 @@ Metrica 的阶段不是按教材目录机械切，也不是按“哪个模型听
 
 ## 10. 当前阶段判断
 
-按当前仓库事实（2026-05-17）：
+按当前仓库事实（2026-06-03，与 [README.md](README.md) / [AGENTS.md](AGENTS.md) 一致）：
 
 - `S1`–`S5`：全部完成 ✅
-- `S6`：安装包与产品化收口（下一阶段主线）
+- **回顾完善阶段（当前）**：golden L2 扩展、测试与 Bug 修复、文档与开源门禁；执行锚点见 [docs/quality/project-assessment.md](docs/quality/project-assessment.md)
+- `S6`：安装包与产品化收口（**可信度覆盖面达标后的产品化主线**，非当前默认冲刺）
 
-当前仓库实现已涵盖 20 个 Core Julia 包、6 个 S5 模型族全量成熟化、统一能力协议、CLI-first App。下一步应聚焦打包分发与产品化。
+当前仓库实现已涵盖 18 个 Core Julia 包、S5 模型族成熟化、统一能力协议、CLI-first App。近期优先深化数值可信度（golden / L3 smoke），而非新增模型族或大规模架构变更。
 
 ---
 

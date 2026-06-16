@@ -1,6 +1,6 @@
 # `S3` 施工指引：复现与报告产品化
 
-> **状态：当前阶段。** 依据当前仓库事实，`S1` 与 `S2` 已完成；`S3` 是当前最合理的主线目标。
+> **状态：部分已落地 / 非当前冲刺主线。** `S1`–`S5` 已完成；仓库处于**回顾完善阶段**（可信度与测试优先）。当前执行锚点见 [docs/quality/project-assessment.md](../quality/project-assessment.md)。安装包与分发见 `S6`。
 
 ## 阶段目标
 
@@ -26,9 +26,16 @@
 
 - 对应旧 `M8-M9`
 
-## 阶段验收
+## 已落地能力（代码为准，2026-06）
 
-- 结果可导出为 Markdown 报告与 CSV 表格
-- 诊断图表可以 SVG / PNG 格式高质量导出
-- 多模型可手动选择并生成对比表，不兼容模型会被系统拒绝并提示
-- 项目可保存、重开、重跑并保留关键上下文
+- 项目保存/打开、运行列表、`rerun`（App `commandExecutor` + Runtime 项目动作）
+- `export_report`：Markdown 与 tidy/glance/diagnostics CSV（Runtime + `MetricaOutput`）
+- CLI-first 命令流与结构化结果渲染（见 [app-shell.md](../architecture/app-shell.md)）
+
+## 阶段验收（尚未完全产品化）
+
+- [ ] 出版级图表导出管线（SVG/PNG）统一、可复现
+- [ ] 多模型对比表完整产品化（含兼容性检查与教学提示）
+- [ ] Julia 崩溃后工作区状态自动恢复（部分能力在桌面宿主，未达 S3 全文验收）
+- [x] 结果可导出为 Markdown 报告与 CSV 表格（主路径可用）
+- [x] 项目可保存、重开、重跑并保留关键上下文（主路径可用）

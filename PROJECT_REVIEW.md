@@ -1,5 +1,7 @@
 # Metrica 项目独立技术评估
 
+> **⚠️ 历史快照 — 勿作当前 backlog 依据。** 最新可信度评估与「下一步 30 天」见 **[docs/quality/project-assessment.md](docs/quality/project-assessment.md)**（2026-06-01 起维护）。包级矩阵见 [docs/quality/package-status.md](docs/quality/package-status.md)。
+
 > **评估日期：** 2026-05-24（历史快照）  
 > **最新可信度评估：** 见 [docs/quality/project-assessment.md](docs/quality/project-assessment.md)（2026-06-01）  
 > **评估基准：** 已合并至 `main` 的质量完善提交（含 golden 体系扩展前）  

@@ -19,6 +19,9 @@ GOLDEN_PACKAGES=(
   MetricaSystem.jl
   MetricaGMM.jl
   MetricaTimeSeries.jl
+  MetricaQuantile.jl
+  MetricaSpatial.jl
+  MetricaBayes.jl
 )
 
 echo "=== Golden: package tests ==="

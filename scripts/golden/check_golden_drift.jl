@@ -21,6 +21,11 @@ const REGEN_SCRIPTS = [
     "compute_duration_cox_reference.jl",
     "compute_causal_did_reference.jl",
     "compute_system_sur_reference.jl",
+    "compute_quantile_median_reference.jl",
+    "compute_spatial_lag_reference.jl",
+    "compute_causal_ipw_reference.jl",
+    "compute_timeseries_unitroot_reference.jl",
+    "compute_bayes_linear_conjugate_reference.jl",
 ]
 
 const INDEPENDENT_CHECKS = [

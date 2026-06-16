@@ -16,16 +16,27 @@ README 仍建议「不可用于生产或未经审阅的正式研究」；线性 
 
 | 项目 | 状态 |
 |------|------|
-| 标准 JSON 用例 | 10+（见 `datasets/golden/*.json`） |
+| 标准 JSON 用例 | 17（见 `datasets/golden/*.json`） |
 | 共享辅助 | `GoldenTestHelpers`（MetricaBase 测试层） |
 | 快路径 | `make test-golden` / CI `golden-test` |
 | MetricaData 测试 | 多文件（query/inspect/operate/transform 等），非 2025 初评「21 行」口径 |
 | MetricaLinear | golden OLS/IV/GLS + 大量 DGP 测试 |
 
-## 后续（非本分支阻塞）
+## 下一步 30 天（可信度主线，2026-06-03）
 
-- 离散/面板等族的 L3 R 抽检（`golden-r-smoke.yml`）
-- MetricaData 与 `ModelGlance` 信封统一
-- TimeSeries / Bayes 摘要 golden
+执行锚点：与 [AGENTS.md](../../AGENTS.md)、[CONTRIBUTING.md](../../CONTRIBUTING.md) 一致；任务状态以 [package-status.md](package-status.md) 为准。
 
-历史详评见仓库根目录 `PROJECT_REVIEW.md`（2026-05-24 快照，可能滞后于本文件）。
+- [x] 文档锚点与路线图口径统一（Sprint 0）
+- [x] **Quantile / Spatial** 升格 L2：`quantile_median`、`spatial_lag`
+- [x] **Causal IPW**、**TimeSeries unitroot**、**Bayes 摘要**：`causal_ipw`、`timeseries_unitroot`、`bayes_linear_conjugate`
+- [x] **MetricaData**：`transform` 链错误路径结构测试（`test_glance_protocol.jl`）
+- [x] **L3**：`golden-r-smoke.yml` 增加 DID / Cox / panel GMM 脚本
+- [x] **发版**：`make test-golden`、golden drift（17 项）、`0.1.1` 已写入 CHANGELOG / CITATION / README；合并前建议再跑 `make test-p0`
+
+## 后续（非阻塞）
+
+- 更多族的 L3 R 抽检（Survey、Panel `plm` 等）
+- VAR 等时序 golden（滞后阶选择带来的漂移需单独政策）
+- S6 安装包与分发（可信度覆盖面达标后再开主线）
+
+历史详评见仓库根目录 `PROJECT_REVIEW.md`（2026-05-24 快照，**可能滞后**；以本文件与 package-status 为准）。
