@@ -4,8 +4,6 @@ using CSV
 using MetricaSpatial
 using MetricaBase
 
-include("test_golden.jl")
-
 const ROOT = normpath(joinpath(@__DIR__, "..", "..", ".."))
 const DEMO = joinpath(ROOT, "datasets", "demo", "spatial_demo.csv")
 const WDEMO = joinpath(ROOT, "datasets", "demo", "spatial_demo_W.csv")

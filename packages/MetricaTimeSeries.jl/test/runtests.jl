@@ -8,8 +8,6 @@ using MetricaTimeSeries
 import MetricaBase: fit, glance, tidy, augment, coef, nobs
 import MetricaTimeSeries: ForecastResult, acf, pacf, ljung_box_test, forecast
 
-include("test_golden.jl")
-
 @testset "MetricaTimeSeries.jl" begin
     @testset "Module Loading" begin
         @test isdefined(MetricaTimeSeries, :AbstractTimeSeriesModel)

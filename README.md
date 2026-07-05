@@ -2,7 +2,6 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Version](https://img.shields.io/badge/version-0.1.1-6A5ACD)](CITATION.cff)
-[![CI](https://github.com/skahanium/Metrica/actions/workflows/ci.yml/badge.svg)](https://github.com/skahanium/Metrica/actions)
 [![Julia](https://img.shields.io/badge/Julia-1.12-purple)](https://julialang.org/)
 
 Metrica 是一个开源计量经济学框架，为学术研究和数据分析提供高性能、结构化、可扩展的现代工具链。当前仓库包含 18 个 Julia 包，覆盖从经典线性回归到贝叶斯方法的主流模型族，配合 CLI-first 桌面工作台和统一的模型能力协议。
@@ -27,11 +26,11 @@ Metrica 是一个开源计量经济学框架，为学术研究和数据分析提
 
 前期建设（S1–S5 全部模型族）已基本完成，当前处于回顾完善阶段。
 
-项目目前**不可用于生产或未经审阅的正式研究**：API 可能变动、桌面 App 尚未打包分发、多数模型族尚无外部（L3）数值互验。
+项目目前**不可用于生产或未经审阅的正式研究**：API 可能变动、桌面 App 尚未打包分发、模型数值结果尚未系统完成 Stata / statsmodels / R / 闭式公式交叉验证。
 
-部分高频路径已通过 **golden-value** 回归（OLS/IV/GLS、Logit/Probit/Poisson、分位数中位数、空间 SAR、动态面板 GMM、Cox、DID、IPW、SUR、ARIMA、单位根检验、贝叶斯共轭线性等，共 17 个标准用例），详见 [docs/quality/package-status.md](docs/quality/package-status.md) 与 [docs/quality/credibility-tiers.md](docs/quality/credibility-tiers.md)。
+仓库已保留一组待外部验证的 CSV 输入数据，并移除了未经交叉验证的 JSON 期望结果文件。当前不再把这些数据称为已验证 golden；后续可信度升级以 [docs/quality/manual-golden-command-coverage.md](docs/quality/manual-golden-command-coverage.md)、[docs/quality/package-status.md](docs/quality/package-status.md) 与 [docs/quality/credibility-tiers.md](docs/quality/credibility-tiers.md) 为准。
 
-欢迎参与共建。当前最适合的贡献方向是测试、golden-value 对齐、Bug 修复、文档和开源基础设施。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎参与共建。当前最适合的贡献方向是测试、外部验证对齐、Bug 修复、文档和开源基础设施。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 版本与引用
 
@@ -92,8 +91,8 @@ datasets/demo/     教学演示数据（16 个）
 - [AGENTS.md](AGENTS.md) — AI 协作协议
 - [docs/architecture/runtime-protocol.md](docs/architecture/runtime-protocol.md) — Runtime 协议与 model_type 白名单
 - [docs/architecture/app-shell.md](docs/architecture/app-shell.md) — App 工作台结构
-- [docs/quality/package-status.md](docs/quality/package-status.md) — 包级 CI / golden / benchmark 状态矩阵
-- [docs/quality/golden-values.md](docs/quality/golden-values.md) — golden-value 验证政策
+- [docs/quality/package-status.md](docs/quality/package-status.md) — 包级质量 / 外部验证 / benchmark 状态矩阵
+- [docs/quality/golden-values.md](docs/quality/golden-values.md) — golden 验证政策与当前未验证口径
 - [docs/quality/release-checklist.md](docs/quality/release-checklist.md) — 发布前质量门禁
 - [docs/governance/versioning.md](docs/governance/versioning.md) — SemVer 与破坏性变更规则
 - [docs/governance/release-process.md](docs/governance/release-process.md) — 手动发布流程

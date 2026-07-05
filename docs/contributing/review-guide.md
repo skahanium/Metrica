@@ -32,5 +32,5 @@ Metrica 当前由个人维护为主，review 目标是守住架构边界和结�
 ## Docs / Quality
 
 - 不把 planned / under validation 写成已完成
-- 包数量、CI 状态、benchmark 状态必须和仓库事实一致
+- 包数量、质量状态、benchmark 状态必须和仓库事实一致
 - release checklist、package status 和 README 口径要同步

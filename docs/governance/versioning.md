@@ -9,7 +9,7 @@ Metrica 在进入稳定研究可用状态前采用轻量 SemVer 规则。目标�
 ## 版本号规则
 
 - `0.MINOR.0`：用户可见能力、协议字段、CLI 行为、包级 API 或文档承诺有实质变化。
-- `0.MINOR.PATCH`：Bug 修复、测试补充、文档修正、CI 或开发脚本改进。
+- `0.MINOR.PATCH`：Bug 修复、测试补充、文档修正或开发脚本改进。
 - 进入 `1.0.0` 前，minor 版本允许破坏性变更，但必须在 `CHANGELOG.md` 和 release notes 中明确说明。
 
 ## 破坏性变更

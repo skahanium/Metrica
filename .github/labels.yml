@@ -7,7 +7,7 @@
   description: Documentation-only changes or reports.
 - name: tests
   color: a2eeef
-  description: Test coverage, golden values, or verification work.
+  description: Test coverage, external validation, or verification work.
 - name: good first issue
   color: 7057ff
   description: Small, well-scoped task suitable for a first contribution.
@@ -25,7 +25,7 @@
   description: Desktop application or React UI.
 - name: quality
   color: fbca04
-  description: CI, release checks, golden values, benchmarks, or trust signals.
+  description: Release checks, external validation, benchmarks, or trust signals.
 - name: enhancement
   color: a2eeef
   description: Small improvement request that fits the current phase.

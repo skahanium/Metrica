@@ -8,9 +8,9 @@
 
 **Goal:** Close the concrete regressions and consistency gaps found while checking `BROOKS-AUDIT-2026-05-17.md`.
 
-**Architecture:** Keep fixes within the existing Core / Runtime / App boundaries. This pass repairs CI-breaking checks, Julia model registry declarations, golden-value fixtures, and docs consistency without adding model families or changing user-facing model semantics.
+**Architecture:** Keep fixes within the existing Core / Runtime / App boundaries. This pass repairs quality-gate checks, Julia model registry declarations, golden-value fixtures, and docs consistency without adding model families or changing user-facing model semantics.
 
-**Tech Stack:** Julia packages, Rust runtime, TypeScript protocol docs, GitHub Actions.
+**Tech Stack:** Julia packages, Rust runtime, TypeScript protocol docs, local quality scripts.
 
 ---
 
@@ -45,7 +45,7 @@
 **Files:**
 - Modify: `docs/quality/package-status.md`
 
-- [ ] Sync PR CI mode with the expanded 18-package matrix.
+- [ ] Sync PR quality mode with the expanded 18-package matrix.
 - [ ] Mark Linear IV/GLS as internal deterministic fixtures unless externally validated.
 - [ ] Keep remaining golden gaps explicit.
 

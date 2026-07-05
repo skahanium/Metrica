@@ -1,7 +1,5 @@
 using MetricaBayes, MetricaBase, Test, CSV, DataFrames, Statistics, Distributions, Random
 
-include("test_golden.jl")
-
 const DEMO = joinpath(@__DIR__, "..", "..", "..", "datasets", "demo")
 
 @testset "Bayes linear σ² known" begin

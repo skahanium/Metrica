@@ -17,7 +17,7 @@
 - `bug`：行为错误、崩溃、错误结果、错误提示不清楚
 - `docs`：README、教程、架构文档、贡献文档
 - `tests`：测试覆盖、golden-value、回归 fixture
-- `quality`：CI、benchmark、release checklist、开发脚本
+- `quality`：benchmark、release checklist、开发脚本、质量门禁
 
 区域标签：
 

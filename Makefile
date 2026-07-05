@@ -20,17 +20,17 @@ test-julia-core:
 	julia --project=packages/MetricaBase.jl -e 'using Pkg; Pkg.test()'
 	julia --project=packages/MetricaLinear.jl -e 'using Pkg; Pkg.test()'
 
-# Rust 编译检查 + 单元测试 + 串行 vertical_slice（与 CI rust-check 一致）
+# Rust 编译检查 + 单元测试 + 串行 vertical_slice
 test-rust:
 	cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
 	cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml
 	cargo test --test vertical_slice --manifest-path runtime/metrica-runtime/Cargo.toml -- --test-threads=1
 
-# 与 CI 主路径对齐的完整 P0 门禁（耗时较长，合并前建议跑）
+# 完整 P0 本地门禁（耗时较长，合并前建议跑）
 test-p0:
 	bash scripts/dev/test-p0.sh
 
-# Golden JSON schema + 含 golden 测试的包（改 datasets/golden 或数值算法时建议跑）
+# 手动验证输入 CSV 检查（当前不保留未经交叉验证的 JSON golden）
 test-golden:
 	bash scripts/dev/test-golden.sh
 
@@ -53,11 +53,11 @@ test-app:
 check-rust:
 	cargo check --manifest-path runtime/metrica-runtime/Cargo.toml
 
-# Rust lint（与 CI lint job 一致）
+# Rust lint
 lint-rust:
 	cargo clippy --manifest-path runtime/metrica-runtime/Cargo.toml -- -D warnings
 
-# App 类型检查（仓库无 ESLint 配置，与 CI 使用 npm run build）
+# App 类型检查（仓库无 ESLint 配置，使用 npm run build）
 lint-app:
 	cd apps/metrica-desktop && npm ci && npm run build
 

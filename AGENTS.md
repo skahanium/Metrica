@@ -22,7 +22,7 @@ Core / Runtime / App 三层架构边界不得混淆。
 1. 测试覆盖（补充缺失的测试、golden-value 对齐）
 2. Bug 修复（数值精度、边界条件、错误处理）
 3. 文档完善（README、教程、协议文档准确性）
-4. 开源基础设施（CI、贡献指南、许可证）
+4. 开源基础设施（贡献指南、许可证、开发脚本）
 
 明确禁止：
 
@@ -179,6 +179,6 @@ UI 代码不得包含计量逻辑。Core 包代码不得依赖 GUI 细节。Runt
 
 Metrica 采用 GPL v3 许可证。
 
-贡献流程：阅读 CONTRIBUTING.md → 从 Issue 列表认领或创建新 Issue → Fork → 分支 → PR → CI 检查 + review 后合并。
+贡献流程：阅读 CONTRIBUTING.md → 从 Issue 列表认领或创建新 Issue → Fork → 分支 → PR → 本地验证记录 + review 后合并。
 
 行为准则见 CODE_OF_CONDUCT.md。安全漏洞报告见 SECURITY.md。

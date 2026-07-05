@@ -3,8 +3,6 @@ using DataFrames
 using MetricaBase
 using MetricaGMM
 
-include("test_golden.jl")
-
 @testset "GMMLinearModel 恰识别" begin
     io = IOBuffer()
     println(io, "y,x1,z1")

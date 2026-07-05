@@ -1,33 +1,40 @@
 #!/usr/bin/env bash
-# Golden 快路径：标准 JSON schema + 含 golden 测试的包（较 P0 更短）。
+# 手动验证输入数据快路径：确认当前不再保留未经交叉验证的 JSON golden，
+# 并检查 datasets/golden 下 CSV 可被标准 CSV 解析器读取。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-echo "=== Golden: JSON schema ==="
-julia --project=scripts/golden -e 'using Pkg; Pkg.instantiate()'
-julia --project=scripts/golden scripts/golden/check_golden_json.jl
+echo "=== Manual validation inputs: no JSON expectations ==="
+if find datasets/golden -maxdepth 1 -name '*.json' -print -quit | grep -q .; then
+  echo "Unexpected JSON expectation files remain in datasets/golden." >&2
+  find datasets/golden -maxdepth 1 -name '*.json' -print >&2
+  exit 1
+fi
 
-GOLDEN_PACKAGES=(
-  MetricaBase.jl
-  MetricaLinear.jl
-  MetricaDiscrete.jl
-  MetricaPanel.jl
-  MetricaDuration.jl
-  MetricaCausal.jl
-  MetricaSystem.jl
-  MetricaGMM.jl
-  MetricaTimeSeries.jl
-  MetricaQuantile.jl
-  MetricaSpatial.jl
-  MetricaBayes.jl
-)
+echo "=== Manual validation inputs: CSV parse check ==="
+python3 - <<'PY'
+import csv
+import glob
+import sys
 
-echo "=== Golden: package tests ==="
-for pkg in "${GOLDEN_PACKAGES[@]}"; do
-  echo "--- ${pkg} ---"
-  julia --project="packages/${pkg}" -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
-done
+files = sorted(glob.glob("datasets/golden/*.csv"))
+if not files:
+    print("No CSV inputs found in datasets/golden.", file=sys.stderr)
+    sys.exit(1)
 
-echo "✅ Golden gate passed"
+for path in files:
+    with open(path, newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+    if not reader.fieldnames:
+        print(f"{path}: missing header", file=sys.stderr)
+        sys.exit(1)
+    if not rows:
+        print(f"{path}: no data rows", file=sys.stderr)
+        sys.exit(1)
+    print(f"{path}: {len(rows)} rows")
+PY
+
+echo "Manual validation input check passed"

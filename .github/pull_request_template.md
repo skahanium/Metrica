@@ -21,7 +21,7 @@
 - [ ] Runtime
 - [ ] Desktop App
 - [ ] 文档 / 教程
-- [ ] CI / 开发工具
+- [ ] 开发工具
 
 是否触及结构化协议（`glance` / `tidy` / `augment` / warnings / diagnostics）：
 
@@ -36,7 +36,7 @@
 - [ ] 已运行核心测试：`make test-julia-core`
 - [ ] 已运行 Runtime 测试：`cargo test --lib --manifest-path runtime/metrica-runtime/Cargo.toml`
 - [ ] 已运行 App 测试：`cd apps/metrica-desktop && npm test`
-- [ ] 如涉及数值结果，已更新或说明 golden-value / benchmark
+- [ ] 如涉及数值结果，已更新或说明外部验证输入 / benchmark
 
 ## 检查清单
 

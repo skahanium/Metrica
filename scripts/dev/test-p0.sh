@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# P0 质量门禁：与 .github/workflows/ci.yml 主路径对齐（本地发 PR / 合并前建议全量跑）。
+# P0 质量门禁：本地发 PR / 合并前建议全量跑。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

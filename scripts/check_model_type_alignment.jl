@@ -2,7 +2,7 @@
 """
     check_model_type_alignment.jl
 
-CI script to verify that the list of supported model_type values is consistent
+Script to verify that the list of supported model_type values is consistent
 across:
   - Rust: `model_required_fields()` keys (HashMap in validation/required.rs)
   - Julia: `MODEL_REGISTRY` keys (populated by each package __init__)
@@ -26,7 +26,7 @@ end
 
 # ----- Extract Julia MODEL_REGISTRY keys -----
 function parse_julia_model_types(packages_dir::String)::Vector{String}
-    # We cannot run Julia with full package loading in CI easily.
+    # Keep this check lightweight enough to run without full package loading.
     # Instead, grep __init__() for register_model / MODEL_REGISTRY[...] = ...
     types = String[]
     for (root, dirs, files) in walkdir(packages_dir)

@@ -1,8 +1,6 @@
 using MetricaCausal, MetricaBase, MetricaPanel, MetricaDiscrete
 using DataFrames, Distributions, Random, Statistics, Test, LinearAlgebra
 
-include("test_golden.jl")
-
 Random.seed!(42)
 
 # === TWFE ====================================================================

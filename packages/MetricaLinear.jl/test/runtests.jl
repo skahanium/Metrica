@@ -13,8 +13,6 @@ const DEMO_CSV = joinpath(
     "demo.csv",
 )
 
-include("test_golden.jl")
-
 function coef_row(fit::OLSFitResult, name::Symbol)
     return only(row for row in tidy(fit).rows if row.name === name)
 end

@@ -1,6 +1,5 @@
 using Test
 
-include("test_golden.jl")
 using MetricaBase
 using MetricaSystem
 

@@ -15,7 +15,7 @@ Metrica 处于回顾完善阶段。优先接受：
 - 测试补充：确定性测试、边界条件、结构化 warning、golden-value 对齐
 - Bug 修复：数值精度、缺失值处理、错误处理、协议字段一致性
 - 文档改进：README、教程、架构文档、贡献者说明
-- 开源基础设施：CI、开发脚本、发布检查清单
+- 开源基础设施：开发脚本、发布检查清单
 
 暂不接受：
 
@@ -58,7 +58,7 @@ Metrica 处于回顾完善阶段。优先接受：
    ```bash
    # 快速：核心 Julia + Runtime 单测 + App
    bash scripts/dev/test-core.sh
-   # 合并前建议：与 CI 对齐的完整 P0 门禁
+   # 合并前建议：完整 P0 本地门禁
    bash scripts/dev/test-p0.sh
    # 或：make test-p0
    ```
@@ -91,7 +91,7 @@ bash scripts/dev/test-package.sh MetricaLinear.jl
 2. 添加 `datasets/golden/<id>.{csv,json}` 与 `scripts/golden/compute_<id>_reference.jl`。
 3. 在对应包增加 `test/test_golden.jl`（使用 `MetricaBase.jl/test/golden_test_helpers.jl`）。
 4. 更新 [docs/quality/package-status.md](docs/quality/package-status.md)。
-5. 本地运行 `make test-golden`；改动 golden 路径时 CI `golden-test` 会自动运行。
+5. 本地运行 `make test-golden`；改动 golden 路径时同步说明验证结果。
 
 ## 测试要求
 
